@@ -1,82 +1,59 @@
 # LOG — đọc file này trước, đừng đọc lại toàn bộ project
 
-> Mục đích: giúp một phiên Claude Code mới nắm được trạng thái dự án trong vài giây, không
-> phải quét lại `Plan/`, `docs/`, và toàn bộ codebase mỗi lần mở lại. Cập nhật file này ngay
-> sau khi hoàn tất một mốc việc lớn (xong 1 ngày kế hoạch, xong 1 gate, sửa lỗi hệ thống lớn).
-> Nếu thông tin ở đây mâu thuẫn với code/docs thực tế, tin vào thực tế và sửa lại file này.
+> Mục đích: phiên làm việc mới nắm trạng thái trong vài giây. Cập nhật sau mỗi mốc lớn.
+> Nếu file này mâu thuẫn với code/docs thực tế → tin thực tế, sửa lại file này.
 
 ## Trạng thái ngay bây giờ (2026-07-18)
 
-- Tuần 1 (5 ngày kế hoạch) đã xong. Gate gần nhất: **G5 GO**.
-- Có một walking skeleton chạy thật: `Next.js (apps/web) → NestJS (apps/api) → PostgreSQL`,
-  route `/vn` và `/ph` render context thật từ DB. Xem chi tiết + evidence:
-  `docs/product/G5_WEEK1_GATE.md`.
-- **Chưa có business feature nào** (không Auth, không KYC, không Campaign, không Money/Ledger,
-  không Payout). Đừng giả định các module đó tồn tại chỉ vì tài liệu thiết kế đã khóa.
-- Việc tiếp theo: Ngày 6 — Auth/session adapter + `User` + `CreatorCountryProfile`. Chi tiết ở
-  `docs/product/G5_WEEK1_GATE.md` mục cuối, và `Plan/KE_HOACH_CHI_TIET_TUAN_1.md` mục 15.
-- Git: đã commit đến hết Ngày 4 (`aaa7b88`). Ngày 5 (walking skeleton) đã làm xong nhưng
-  **có thể chưa commit** — kiểm tra `git log`/`git status` trước khi giả định.
+- **Đang chạy KẾ HOẠCH V2** (`Plan/KE_HOACH_V2.md` — plan duy nhất, 4 tuần N1-N20).
+  Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
+- Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
+  V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
+- **Đang ở N1** (Tuần A): brainstorm `docs/PRODUCT.md` cùng Anh Quang. Kế tiếp: N2-N3 mockup
+  (trọng tâm), N4 ERD lean, N5 schema mới.
+- Code hiện có: walking skeleton chạy được (Next.js `/vn` `/ph` → NestJS → Postgres seed
+  VN/PH). Schema 45 bảng cũ **vẫn còn** — chỉ thay tại N5 khi có schema lean (đừng xóa sớm,
+  app đang phụ thuộc bảng country/country_config).
+- Git: `main`; mốc: `aaa7b88` (tuần 1 ngày 1-4 cũ) → `08fd74e` (checkpoint trước V2) → các
+  commit V2 sau đó.
 
-## Đọc gì khi cần, đừng đọc mọi thứ
+## Sự cố cần nhớ
 
-| Cần biết gì | Đọc file nào (đừng đọc file khác trừ khi thật sự cần) |
+- **Book1.xlsx từng bị mất khỏi đĩa và CHƯA TỪNG có trong git** (phát hiện 2026-07-18 khi dọn
+  repo). Đã khôi phục từ bản giải nén trong scratchpad (10/10 file XML, 187 strings + 93 rows
+  khớp nguyên bản) và commit vào git ngay sau đó. Bài học: file nguồn quan trọng phải vào git
+  ngay, đừng để untracked.
+
+## Đọc gì khi cần
+
+| Cần biết | Đọc |
 |---|---|
-| Trạng thái tổng quan, việc tiếp theo | File này + `Plan/00_PROJECT_EXECUTION_LOG.md` |
-| Đề bài gốc (22 Must, tiêu chí chấm điểm) | `Plan/docs/Book1.xlsx` (file binary — xem cách đọc bên dưới) |
-| Roadmap 5 tuần, gate G0-G25 | `Plan/KE_HOACH_TRIEN_KHAI_5_TUAN.md` |
-| Kế hoạch chi tiết theo ngày của tuần đang chạy | `Plan/KE_HOACH_CHI_TIET_TUAN_<n>.md` |
-| Requirement traceability, status từng Must | `docs/product/RTM.md` |
-| Quyết định nghiệp vụ đã khóa + lý do | `docs/product/DECISION_LOG.md` |
-| Data model | `docs/architecture/ERD.md`, `apps/api/prisma/schema.prisma` |
-| API convention/endpoint | `docs/architecture/API_CONTRACT.md` |
-| Cách chạy dự án | `README.md` |
-| Evidence + known-issues kỹ thuật của gate gần nhất | `docs/product/G<n>_*.md` mới nhất |
+| Kế hoạch, lịch, phạm vi, bài toán khó | `Plan/KE_HOACH_V2.md` |
+| Đề bài gốc | `Plan/docs/Book1.xlsx` (xlsx = zip; unzip rồi parse XML bằng node — không cần Excel) |
+| Product/personas/luồng | `docs/PRODUCT.md` (tạo tại N1) |
+| Data model + vì sao | `docs/DATA_MODEL.md` (N4) |
+| Kiến trúc | `docs/ARCHITECTURE.md` (N6) |
+| Q&A hỏi đáp mentor | `docs/HARD_PROBLEMS.md` (N19) |
+| Cách chạy | `README.md` |
 
-Đừng mở tất cả file trên trong cùng một phiên trừ khi câu hỏi thật sự cần — phần lớn task
-chỉ cần file này + 1-2 file liên quan trực tiếp.
+## Gotcha kỹ thuật — đừng debug lại từ đầu
 
-## Book1.xlsx — cách đọc không cần Excel/Python
+1. **Prisma 7** (`prisma-client` generator, esm): bắt buộc `new PrismaClient({ adapter: new PrismaPg({ connectionString }) })` — xem `apps/api/src/prisma.service.ts`.
+2. **Generated client là ESM `.ts`** → API chạy qua `tsx` (`pnpm dev`/`start` trong apps/api), không chạy `node dist/main.js`.
+3. **NestJS DI vỡ dưới tsx/esbuild** (không emit decorator metadata) → mọi constructor param phải `@Inject(Token)` tường minh.
+4. **`pnpm` không có trên PATH** → luôn `corepack pnpm`; script lồng trong package.json cũng phải ghi `corepack pnpm`.
+5. **Cảnh báo "No projects matched the filters" khi `pnpm --filter`** = noise vô hại do tên thư mục có `(GLOBAL)`, lệnh vẫn chạy đúng.
+6. **`.env` bị gitignore** → mất là mất luôn password volume Postgres cũ (`P1000` khi lệch). Hỏi user trước khi `docker compose down -v`.
+7. **`apps/api` tự nạp `.env`** qua `src/load-env.ts` (import đầu trong main.ts + test) → `dev:api`/`dev:web`/`pnpm test` không cần source env; riêng `db:*` (prisma CLI) vẫn cần.
+8. **`git rm` nhiều pathspec: 1 cái sai = abort cả cụm** — tách lệnh khi xóa hàng loạt.
 
-`.xlsx` là file zip. Không có Excel/Python trong môi trường này; cách đã dùng và hoạt động:
+## Nhịp cập nhật
 
-```bash
-unzip -o "Plan/docs/Book1.xlsx" -d <thư mục scratch>
-# strings nằm trong xl/sharedStrings.xml, cell reference nằm trong xl/worksheets/sheet1.xml
-# dùng node để parse XML thủ công (regex đơn giản là đủ, xem lịch sử phiên trước để lấy script mẫu)
-```
+Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc kế). Mỗi mốc lớn: sửa mục
+"Trạng thái ngay bây giờ".
 
-## Gotcha kỹ thuật đã tốn thời gian debug — đừng lặp lại
+## Nhật ký N1-N20
 
-1. **Prisma 7 (`prisma-client` generator, moduleFormat esm) không tự đọc `DATABASE_URL`.**
-   Bắt buộc `new PrismaClient({ adapter: new PrismaPg({ connectionString }) })` — xem
-   `apps/api/src/prisma.service.ts`.
-2. **Generated Prisma client là ESM `.ts` chưa compile**, không phải `.js`. API phải chạy qua
-   `tsx` (`pnpm dev`/`pnpm start` trong `apps/api`), không chạy trực tiếp `node dist/main.js`.
-   `pnpm build` (tsc) chỉ để chứng minh code tự viết compile sạch, không phải entrypoint thật.
-3. **NestJS dependency injection theo type bị vỡ khi chạy qua tsx/esbuild** (esbuild không emit
-   `design:paramtypes`). Mọi constructor injection phải dùng `@Inject(Token)` tường minh — xem
-   `health.controller.ts`, `markets.controller.ts`, `markets.service.ts` làm mẫu.
-4. **`pnpm` không có sẵn trên PATH trong môi trường này** (chỉ `corepack pnpm` hoạt động).
-   Mọi lệnh `pnpm ...` lồng bên trong script của `package.json` phải viết là
-   `corepack pnpm ...`, kể cả trong `playwright.config.ts` (`webServer.command`).
-5. **`pnpm --filter <pkg> ...` in ra dòng cảnh báo "No projects matched the filters ..." kèm
-   đường dẫn có dấu ngoặc** (tên thư mục project chứa `(GLOBAL)`) — đây là noise vô hại, lệnh
-   vẫn chạy đúng target sau dòng cảnh báo đó. Đừng nhầm là lỗi thật.
-6. **Volume Postgres local mất password giữa các phiên** nếu `.env` không được giữ lại (file bị
-   gitignore, không nằm trong repo). Nếu gặp `P1000: Authentication failed`, đó là dấu hiệu
-   volume cũ + `.env` mới lệch nhau — hỏi user trước khi `docker compose down -v` (data local
-   chỉ là synthetic theo policy, nhưng vẫn phải hỏi trước khi xoá).
-7. **`apps/api` tự nạp `.env` từ repo root** qua `apps/api/src/load-env.ts` (import đầu tiên
-   trong `main.ts` và trong test) — dùng `process.loadEnvFile()` built-in của Node, không cần
-   dependency. Vì vậy `pnpm dev:api`/`dev:web`/`pnpm test` **không** cần source `.env` thủ công
-   nữa. Chỉ các lệnh `db:*` (gọi thẳng `prisma` CLI) mới còn cần source `.env` thủ công. Nếu
-   thêm app/service Node mới, cân nhắc áp dụng cùng pattern để tránh lặp lại bug "chạy trực
-   tiếp thì DATABASE_URL undefined, /health trả 503" đã xảy ra sau G5.
-
-## Cách cập nhật file này
-
-Sau khi hoàn tất một mốc việc (xong N ngày kế hoạch, xong 1 gate, sửa 1 lỗi hệ thống tốn thời
-gian debug), sửa 3 phần: "Trạng thái ngay bây giờ", thêm gotcha mới nếu có, và đảm bảo bảng
-"Đọc gì khi cần" vẫn trỏ đúng file mới nhất. Không cần giữ lịch sử ở đây — lịch sử chi tiết đã
-có trong `Plan/00_PROJECT_EXECUTION_LOG.md` và các file gate `docs/product/G<n>_*.md`.
+- **N1 (2026-07-18)**: Chốt plan V2; commit checkpoint `08fd74e`; dọn repo (xóa 7 plan cũ +
+  docs cũ + 5 scripts); khôi phục + commit Book1.xlsx; viết `KE_HOACH_V2.md` + LOG mới.
+  Đang làm: brainstorm `docs/PRODUCT.md`. Kế: N2 mockup Creator.
