@@ -20,6 +20,11 @@ export default function HomePage() {
           </Link>
         </li>
       </ul>
+      <p style={{ marginTop: 24 }}>
+        <Link href="/mockup" data-testid="link-mockup">
+          → Prototype product (N2 — luồng Creator)
+        </Link>
+      </p>
     </main>
   );
 }
