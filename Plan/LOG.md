@@ -18,6 +18,27 @@
 - Git: `main`; mốc: `aaa7b88` (tuần 1 ngày 1-4 cũ) → `08fd74e` (checkpoint trước V2) → các
   commit V2 sau đó.
 
+## Tổng kết Tuần A — Product & Database (N1-N5) ✅ XONG
+
+Mục tiêu Tuần A: từ đề bài → hiểu sản phẩm → vẽ màn hình → suy ra dữ liệu → schema thật chạy được.
+
+| Ngày | Làm gì | Đầu ra chạm được | Giải thích 1 câu cho mentor |
+|---|---|---|---|
+| **N1** | Chốt Product | `docs/PRODUCT.md` + plan V2 | 3 QĐ nền: reward content-flat, KYC-tại-Join, budget = suất×giá |
+| **N2** | Mockup Creator 8 màn | `/mockup/creator/*` | Màn hình cho biết dữ liệu nào PHẢI tồn tại — thiết kế DB từ nhu cầu thật |
+| **N3** | Mockup Staff 4 màn | `/mockup` (V09-V12) | Reward 3 trục SỐNG trong UI; payout 3 trạng thái; đối soát khoá batch |
+| **N4** | ERD từ mockup | `docs/DATA_MODEL.md` (18 bảng) | Mỗi bảng có màn nào cần + unique key chống bug gì |
+| **N5** | Schema thật | `schema.prisma` 18 bảng + migrate + seed | Xoá 45 bảng cũ; DB lean chạy được, /vn /ph xanh |
+
+**3 quyết định sản phẩm (QĐ-1/2/3)** và **7 bài toán khó** đã neo vào schema:
+`earning.submission_id` (exactly-once), `participation(profile,campaign)` (join idempotent),
+`payout_attempt.provider_ref` (không double-pay), `ledger_entry` append-only, snapshot ở
+`participation`, `row_version` (409), `country_id` + `role_assignment` (cách ly).
+
+**Trạng thái kỹ thuật cuối Tuần A**: lint/typecheck/build sạch · API 4/4 · E2E 4/4 · DB 20
+bảng seed VN/PH · git tới `5c3b487`. Câu tự kiểm để qua tuần: *"chỉ vào bất kỳ bảng nào, nói
+được màn nào cần nó + unique nào chống bug gì trong 10 giây"* → tài liệu `DATA_MODEL.md` §2+§4.
+
 ## Sự cố cần nhớ
 
 - **Book1.xlsx từng bị mất khỏi đĩa và CHƯA TỪNG có trong git** (phát hiện 2026-07-18 khi dọn
@@ -47,6 +68,10 @@
 6. **`.env` bị gitignore** → mất là mất luôn password volume Postgres cũ (`P1000` khi lệch). Hỏi user trước khi `docker compose down -v`.
 7. **`apps/api` tự nạp `.env`** qua `src/load-env.ts` (import đầu trong main.ts + test) → `dev:api`/`dev:web`/`pnpm test` không cần source env; riêng `db:*` (prisma CLI) vẫn cần.
 8. **`git rm` nhiều pathspec: 1 cái sai = abort cả cụm** — tách lệnh khi xóa hàng loạt.
+9. **`Cannot find module './xxx.js'` ở `.next/server/webpack-runtime.js`** = `.next` cache lẫn
+   giữa `next build` (production) và `next dev` chạy đồng thời trên cùng thư mục. Fix: dừng dev,
+   `Remove-Item -Recurse -Force apps/web/.next`, chạy lại `dev:web`. **Đừng `pnpm build` khi
+   dev server web đang chạy.**
 
 ## Nhịp cập nhật
 
