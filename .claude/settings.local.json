@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(unzip -l \"Plan/docs/Book1.xlsx\")",
+      "Bash(mkdir -p /tmp/xlsx_extract)",
+      "Bash(unzip -o \"Plan/docs/Book1.xlsx\" -d /tmp/xlsx_extract)",
+      "Read(//tmp/xlsx_extract/**)",
+      "Read(//tmp/**)",
+      "Bash(mkdir -p \"/c/Users/dangq/AppData/Local/Temp/claude/d--VSF-X-y-D-ng-H--Th-ng-Affiliate-GLOBAL-/78391b18-3aa8-43ec-b1f9-3b80a15147f5/scratchpad/xlsx_extract\")",
+      "Bash(unzip -o \"/d/VSF/Xây Dựng Hệ Thống Affiliate\\(GLOBAL\\)/Plan/docs/Book1.xlsx\" -d \"/c/Users/dangq/AppData/Local/Temp/claude/d--VSF-X-y-D-ng-H--Th-ng-Affiliate-GLOBAL-/78391b18-3aa8-43ec-b1f9-3b80a15147f5/scratchpad/xlsx_extract\")"
+    ]
+  }
+}

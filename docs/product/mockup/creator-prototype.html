@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Affiliate GLOBAL — End-to-end low-fi prototype</title>
+  <style>
+    :root { color-scheme: light; font-family: Roboto, "Noto Sans", Arial, sans-serif; --ink:#1d1b20; --muted:#625b71; --line:#cac4d0; --surface:#fffbfe; --panel:#f7f2fa; --primary:#6750a4; --primary-soft:#eaddff; --ok:#176b3a; --warn:#8a4f00; --danger:#b3261e; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#ece6f0; color:var(--ink); }
+    button, select, input { font:inherit; }
+    button { cursor:pointer; }
+    .layout { min-height:100vh; display:grid; grid-template-columns:280px minmax(390px, 1fr) 300px; gap:24px; padding:24px; }
+    .panel { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:20px; align-self:start; position:sticky; top:24px; }
+    .panel h1 { font-size:20px; margin:0 0 6px; }
+    .panel h2 { font-size:14px; margin:24px 0 8px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+    .panel p, .panel li { font-size:13px; line-height:1.45; color:var(--muted); }
+    .stack { display:grid; gap:8px; }
+    .control { width:100%; border:1px solid var(--line); background:white; border-radius:12px; padding:10px 12px; text-align:left; }
+    .control.active { border-color:var(--primary); background:var(--primary-soft); color:#21005d; font-weight:700; }
+    .control small { display:block; color:var(--muted); margin-top:2px; }
+    .phone-wrap { display:grid; place-items:start center; }
+    .phone { width:390px; min-height:844px; background:var(--surface); border:2px solid #49454f; border-radius:28px; overflow:hidden; box-shadow:0 16px 40px #1d1b2030; position:relative; }
+    .market-bar { min-height:64px; padding:10px 16px; background:#21005d; color:white; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .market { font-weight:800; }
+    .profile { font-size:12px; opacity:.86; text-align:right; }
+    .screen { display:none; min-height:720px; padding-bottom:84px; }
+    .screen.active { display:block; }
+    .appbar { padding:20px 20px 12px; border-bottom:1px solid var(--line); }
+    .appbar .eyebrow { font-size:12px; color:var(--muted); font-weight:700; }
+    .appbar h2 { margin:4px 0 3px; font-size:24px; }
+    .appbar p { margin:0; color:var(--muted); font-size:13px; line-height:1.4; }
+    .content { padding:16px 20px; display:grid; gap:12px; }
+    .card { border:1px solid var(--line); border-radius:16px; padding:14px; background:white; }
+    .card.selected { border:2px solid var(--primary); background:#fdf8ff; }
+    .card h3 { font-size:16px; margin:0 0 6px; }
+    .card p { margin:4px 0; color:var(--muted); font-size:13px; line-height:1.42; }
+    .row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .chip { border-radius:999px; padding:5px 9px; background:var(--panel); font-size:11px; font-weight:700; color:var(--muted); }
+    .chip.ok { background:#d9f8e5; color:var(--ok); }
+    .chip.warn { background:#ffddb8; color:var(--warn); }
+    .chip.danger { background:#ffdad6; color:var(--danger); }
+    .money { font-size:24px; font-weight:800; }
+    .usd { color:var(--muted); font-size:12px; }
+    .field { border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:white; }
+    .field label { display:block; color:var(--muted); font-size:11px; margin-bottom:4px; }
+    .field.locked { background:#eee9f0; color:#79747e; }
+    .field.error { border-color:var(--danger); }
+    .reason { color:var(--danger); font-size:12px; margin-top:5px; }
+    .primary, .secondary { width:100%; border-radius:999px; min-height:46px; padding:10px 16px; font-weight:800; }
+    .primary { border:0; background:var(--primary); color:white; }
+    .primary:disabled { background:#e6e0e9; color:#938f99; cursor:not-allowed; }
+    .secondary { border:1px solid var(--primary); background:white; color:var(--primary); }
+    .condition { font-size:11px; color:var(--muted); text-align:center; margin-top:-4px; }
+    .timeline { display:grid; gap:0; }
+    .event { border-left:2px solid var(--line); padding:0 0 14px 14px; position:relative; }
+    .event::before { content:""; width:9px; height:9px; background:var(--primary); border-radius:50%; position:absolute; left:-6px; top:4px; }
+    .event strong { font-size:13px; }
+    .event span { display:block; color:var(--muted); font-size:12px; margin-top:2px; }
+    .variant-banner { display:none; margin:12px 20px 0; border:1px solid var(--warn); background:#fff4e5; border-radius:12px; padding:12px; font-size:12px; }
+    .variant-banner.visible { display:block; }
+    .variant-banner strong { display:block; margin-bottom:4px; }
+    .variant-banner button { margin-top:8px; border:1px solid currentColor; color:inherit; background:transparent; border-radius:999px; padding:6px 10px; }
+    .bottom-nav { position:absolute; bottom:0; left:0; right:0; background:var(--panel); border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(4,1fr); padding:9px 6px 14px; }
+    .bottom-nav button { border:0; background:transparent; font-size:10px; color:var(--muted); }
+    .bottom-nav button strong { display:block; font-size:16px; color:var(--ink); }
+    .scenario-progress { background:var(--primary-soft); border-radius:12px; padding:10px; margin-top:10px; font-size:12px; color:#21005d; display:none; }
+    .scenario-progress.visible { display:block; }
+    .legend { border-left:3px solid var(--primary); padding-left:10px; }
+    .compact { margin:0; padding-left:18px; }
+    .divider { height:1px; background:var(--line); margin:8px 0; }
+    @media (max-width:1050px) { .layout { grid-template-columns:1fr; } .panel { position:static; } .left { order:1; } .phone-wrap { order:2; } .right { order:3; } }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <aside class="panel left">
+      <h1>Affiliate low-fi v0.4</h1>
+      <p>HTML fallback theo DEC-14. 12 core views nối Creator, Ops, Admin và Finance qua cùng country context.</p>
+
+      <h2>Clickable scenarios</h2>
+      <div class="stack">
+        <button class="control" data-scenario="S01"><strong>S01 · VN happy path</strong><small>Login → KYC → join → content → earning → payout</small></button>
+        <button class="control" data-scenario="S02"><strong>S02 · PH KYC partial rejection</strong><small>Reject bank field → edit only rejected field → approve</small></button>
+        <button class="control" data-scenario="S03"><strong>S03 · Content recovery</strong><small>Creator submit → Ops reject → resubmit → approve exactly once</small></button>
+        <button class="control" data-scenario="S04"><strong>S04 · Payout recovery</strong><small>Failure release → retry → UNKNOWN hold → Paid → reversal</small></button>
+        <button class="control" id="scenarioNext" disabled>Đi bước tiếp theo</button>
+      </div>
+      <div class="scenario-progress" id="scenarioProgress"></div>
+
+      <h2>12 shared core views</h2>
+      <div class="stack" id="viewNav"></div>
+    </aside>
+
+    <section class="phone-wrap" aria-label="Prototype viewport">
+      <div class="phone">
+        <header class="market-bar">
+          <div><div class="market" id="marketLabel">🇻🇳 VN · VND</div><small id="localeLabel">Tiếng Việt</small></div>
+          <div class="profile"><strong id="profileLabel">VN-CR-001</strong><br><span id="roleLabel">Creator · country profile</span></div>
+        </header>
+        <div class="variant-banner" id="variantBanner"><strong id="variantTitle"></strong><span id="variantCopy"></span><br><button data-recovery="true" id="recoveryButton">Khôi phục</button></div>
+
+        <section class="screen active" data-view-id="V01">
+          <div class="appbar"><div class="eyebrow">V01 · CR-01 / CP-03</div><h2>Đăng nhập toàn cầu</h2><p>Một identity, profile theo từng quốc gia.</p></div>
+          <div class="content">
+            <div class="card selected"><h3>Google OAuth</h3><p>Provider thật nếu credential sẵn. Prototype đang mô phỏng callback.</p><div class="chip warn">MOCK DISCLOSED</div></div>
+            <div class="card"><h3>Chọn thị trường</h3><div class="row"><button class="secondary" data-country="VN">🇻🇳 Việt Nam</button><button class="secondary" data-country="PH">🇵🇭 Philippines</button></div></div>
+            <button class="primary" data-next="V02">Tiếp tục với Google</button>
+            <div class="condition">Enabled khi market hợp lệ; callback lỗi có Retry.</div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V02">
+          <div class="appbar"><div class="eyebrow">V02 · CR-02 / CR-04</div><h2>Profile & KYC</h2><p id="kycSubtitle">Checklist theo VN; chỉ field bị reject được sửa.</p></div>
+          <div class="content">
+            <div class="chips"><span class="chip ok">Profile active</span><span class="chip warn" id="kycState">Needs changes</span></div>
+            <div class="field locked"><label>Họ tên pháp lý · Approved</label>Nguyễn Minh Anh</div>
+            <div class="field locked"><label>ID document · Approved</label>•••• 4821</div>
+            <div class="field error" id="bankField"><label>Bank account · Needs changes</label>VCB •••• 0712<div class="reason">Tên chủ tài khoản không khớp hồ sơ. Cập nhật field này.</div></div>
+            <button class="primary" data-next="V03" id="kycPrimary">Gửi lại field bị từ chối</button>
+            <div class="condition">Approved fields bị khóa; join chỉ enable khi KYC Approved.</div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V03">
+          <div class="appbar"><div class="eyebrow">V03 · CR-05</div><h2>Khám phá campaign</h2><p>Eligibility và status được giải thích trước khi mở detail.</p></div>
+          <div class="content">
+            <div class="field"><label>Tìm kiếm / filter</label>Beauty · Active · Eligible</div>
+            <div class="card selected"><div class="row"><h3>Glow VN Launch</h3><span class="chip ok">Eligible</span></div><p>Flat reward · 500.000 ₫ / approved content</p><p>18/30 slots còn lại · Budget 62%</p><button class="secondary" data-next="V04">Xem chi tiết</button></div>
+            <div class="card"><div class="row"><h3>Fitness PH</h3><span class="chip warn">KYC required</span></div><p>Hiển thị được trước KYC; Join bị khóa.</p></div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V04">
+          <div class="appbar"><div class="eyebrow">V04 · CR-05 / AD-09</div><h2>Chi tiết campaign</h2><p>Rule, terms, eligibility và capacity trước Join.</p></div>
+          <div class="content">
+            <div class="card"><div class="row"><h3>Glow VN Launch</h3><span class="chip ok">Active</span></div><p><strong>Reward:</strong> CONTENT_APPROVED + CONTENT_FLAT</p><p><strong>Amount:</strong> 500.000 ₫ · USD ≈ $19.60 reference</p><p><strong>Terms:</strong> 1 rewarded deliverable; snapshot tại Join.</p><p><strong>Capacity:</strong> 18 slots · budget available</p></div>
+            <div class="card"><h3>Eligibility</h3><p>✓ VN profile · ✓ KYC Approved · ✓ category match</p></div>
+            <button class="primary" data-next="V05">Tham gia campaign</button>
+            <div class="condition">Disabled nếu KYC chưa Approved, paused/closed/full hoặc hết budget.</div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V05">
+          <div class="appbar"><div class="eyebrow">V05 · CR-05 / CR-06</div><h2>Campaign workspace</h2><p>Tracking asset cá nhân và content submission.</p></div>
+          <div class="content">
+            <div class="card selected"><h3>Personal tracking asset</h3><p>Link: aff.demo/vn/glow/CR001</p><p>Code: <strong>GLOW-CR001</strong> · #GlowWithAnh</p><button class="secondary">Sao chép asset</button></div>
+            <div class="field"><label>Content URL</label>https://social.example/post/127</div>
+            <div class="chips"><span class="chip ok">Hashtag detected</span><span class="chip ok">Public content</span></div>
+            <button class="primary" data-next="V06">Gửi content</button>
+            <div class="condition">URL/platform/hashtag/code hợp lệ; duplicate/private content bị chặn.</div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V06">
+          <div class="appbar"><div class="eyebrow">V06 · CR-05 / CR-06</div><h2>My Campaigns</h2><p>Version, reason và đường resubmit không làm mất history.</p></div>
+          <div class="content">
+            <div class="card"><div class="row"><h3>Glow VN Launch</h3><span class="chip warn">Rejected</span></div><div class="timeline"><div class="event"><strong>v1 Submitted</strong><span>17 Jul · 10:20</span></div><div class="event"><strong>Rejected</strong><span>Thiếu personal hashtag #GlowWithAnh</span></div><div class="event"><strong>v2 Resubmitted</strong><span>History v1 retained</span></div></div></div>
+            <button class="primary" data-next="V07">Xem kết quả approved</button>
+            <div class="condition">Reject có reason; re-approve/double-click không tạo earning thứ hai.</div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V07">
+          <div class="appbar"><div class="eyebrow">V07 · CR-07 / CP-06 / CP-08</div><h2>Thu nhập</h2><p>Source → Gross → Tax → Net → lifecycle.</p></div>
+          <div class="content">
+            <div class="card selected"><p>Available balance</p><div class="money">450.000 ₫</div><div class="usd">≈ $17.65 · reference FX snapshot only</div></div>
+            <div class="card"><h3>Glow VN · Approved content</h3><div class="row"><span>Gross</span><strong>500.000 ₫</strong></div><div class="row"><span>Tax (demo 10%)</span><strong>-50.000 ₫</strong></div><div class="divider"></div><div class="row"><span>Net</span><strong>450.000 ₫</strong></div><p>Source: deliverable v2 · Terms snapshot JOIN-001</p><div class="chips"><span class="chip">Pending</span><span class="chip">Confirmed</span><span class="chip ok">Available</span></div></div>
+            <button class="primary" data-next="V08">Yêu cầu payout</button>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V08">
+          <div class="appbar"><div class="eyebrow">V08 · CR-08 / AD-07</div><h2>Wallet & payout</h2><p>Reserve, OTP, provider result và retry có timeline.</p></div>
+          <div class="content">
+            <div class="card"><div class="row"><span>Available</span><strong>450.000 ₫</strong></div><p>Minimum payout: 200.000 ₫ · Local currency only</p></div>
+            <div class="field"><label>OTP · expires in 01:42</label>••••••</div>
+            <div class="card"><h3>Attempt #2</h3><div class="timeline"><div class="event"><strong>Reserved once</strong><span>Available → Reserved</span></div><div class="event"><strong>Provider processing</strong><span>UNKNOWN giữ reserve; không retry sớm</span></div><div class="event"><strong>Paid</strong><span>Resolved after reconciliation</span></div></div></div>
+            <button class="primary" data-next="V01">Xác nhận payout</button>
+            <button class="secondary" data-state="provider">Xem variant UNKNOWN / recovery</button>
+            <div class="condition">Expired OTP, insufficient balance và duplicate request bị chặn.</div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V09">
+          <div class="appbar"><div class="eyebrow">V09 · CP-01 / CP-02 / AD-01 / AD-02</div><h2>Admin country shell</h2><p>Role, country, config version và audit luôn đi cùng action.</p></div>
+          <div class="content">
+            <div class="chips"><span class="chip ok">Local Admin · VN</span><span class="chip ok">MFA verified</span><span class="chip">Config v12</span></div>
+            <div class="card selected"><div class="row"><h3>Country configuration</h3><span class="chip ok">Active</span></div><p>Locale: vi-VN · Currency: VND · KYC: VN-v4</p><p>Tax demo: VN-DEMO-10 · Payment adapter: MOCK disclosed</p><button class="secondary">Xem version history</button></div>
+            <div class="card"><h3>Audit drawer</h3><div class="timeline"><div class="event"><strong>Campaign activated</strong><span>admin.vn · VN · success · reason retained</span></div><div class="event"><strong>Cross-country denied</strong><span>target hash only · no PH PII disclosed</span></div></div></div>
+            <button class="primary" data-next="V11">Mở Campaign Builder</button>
+            <div class="condition">Global cross-country cần explicit bypass + MFA + reason + audit.</div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V10">
+          <div class="appbar"><div class="eyebrow">V10 · AD-03 / AD-04</div><h2>Ops review workbench</h2><p>Queue theo country; review đúng field/version và chống stale action.</p></div>
+          <div class="content">
+            <div class="chips"><span class="chip">KYC 6</span><span class="chip warn">Content 3</span><span class="chip danger">SLA risk 1</span></div>
+            <div class="card"><div class="row"><h3>Content · SUB-204 v2</h3><span class="chip warn">In Review</span></div><p>Creator VN-CR-001 · Glow VN · current version v2</p><p><strong>v1 rejected:</strong> thiếu #GlowWithAnh · history retained</p><p><strong>v2:</strong> URL public, hashtag và tracking code hợp lệ</p><div class="row"><button class="secondary" data-next="V06">Reject + reason</button><button class="secondary" data-next="V07">Approve once</button></div></div>
+            <div class="card"><div class="row"><h3>KYC · KYC-118</h3><span class="chip warn">Needs Changes</span></div><p>Bank field rejected; legal name/ID accepted và locked.</p><button class="secondary" data-next="V02">Gửi field reason cho Creator</button></div>
+            <button class="primary" data-next="V10">Claim item kế tiếp</button>
+            <div class="condition">Finance không review. Direct ID khác country trả 404; stale version trả 409 + Refresh.</div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V11">
+          <div class="appbar"><div class="eyebrow">V11 · AD-09</div><h2>Campaign builder</h2><p>Product → Offer/reward → Campaign; Full chỉ là derived eligibility.</p></div>
+          <div class="content">
+            <div class="chips"><span class="chip ok">Draft valid</span><span class="chip">VN · VND</span></div>
+            <div class="field locked"><label>Product</label>Glow Serum · reusable catalog item</div>
+            <div class="field locked"><label>Offer snapshot source</label>CONTENT_APPROVED + CONTENT_FLAT · 500.000 ₫</div>
+            <div class="field"><label>Campaign localization</label>Glow VN Launch · vi-VN · 30 slots · budget 15.000.000 ₫</div>
+            <div class="card"><h3>Activation checks</h3><p>✓ executable reward · ✓ terms/version · ✓ date/cap · ✓ country config</p><p>`Full` derives from slot/budget transaction; không có SetFull.</p></div>
+            <button class="primary" data-next="V03">Activate & xem Creator discovery</button>
+            <button class="secondary" data-state="validation">Xem activation error</button>
+            <div class="condition">Closed immutable; Paused/Ended/Full-derived không cho join.</div>
+          </div>
+        </section>
+
+        <section class="screen" data-view-id="V12">
+          <div class="appbar"><div class="eyebrow">V12 · AD-06 / AD-07 / CP-06 / CP-08</div><h2>Finance workbench</h2><p>Reconciliation, immutable lock và payout attempt history.</p></div>
+          <div class="content">
+            <div class="chips"><span class="chip ok">Local Finance VN</span><span class="chip ok">MFA verified</span></div>
+            <div class="card"><div class="row"><h3>Batch REC-VN-0717</h3><span class="chip ok">Locked</span></div><p>12 lines · Gross 6.000.000 ₫ · Tax 600.000 ₫ · Net 5.400.000 ₫</p><p>Locked batches have no Edit/Unlock. Correction = linked adjustment.</p><button class="secondary" disabled>Chỉnh sửa batch</button></div>
+            <div class="card selected"><div class="row"><h3>Payout PAY-0091</h3><span class="chip warn">UNKNOWN</span></div><div class="timeline"><div class="event"><strong>Attempt #1 · FailedFinal</strong><span>reserve released once; duplicate callback no-op</span></div><div class="event"><strong>Attempt #2 · UNKNOWN</strong><span>reserve held; Retry/Release blocked</span></div></div><button class="secondary" data-next="V12">Reconcile provider status</button></div>
+            <button class="primary" data-next="V08">Resolve success → Creator Paid</button>
+            <button class="secondary" data-state="provider">Xem UNKNOWN recovery rule</button>
+            <div class="condition">Post-success refund tạo linked reversal; không overwrite Paid hoặc attempt cũ.</div>
+          </div>
+        </section>
+
+        <nav class="bottom-nav" aria-label="Shared role navigation">
+          <button data-next="V03"><strong>⌂</strong>Creator</button><button data-next="V10"><strong>✓</strong>Review</button><button data-next="V11"><strong>▣</strong>Campaign</button><button data-next="V12"><strong>₫</strong>Finance</button>
+        </nav>
+      </div>
+    </section>
+
+    <aside class="panel right">
+      <h1>State variants</h1>
+      <p>Mỗi lỗi critical có CTA phục hồi. Chọn variant để kiểm bất kỳ view nào.</p>
+      <div class="stack" id="stateNav"></div>
+      <h2>Contract checklist</h2>
+      <div class="legend"><p>Country/role luôn thấy. UI ẩn action trái quyền; API vẫn kiểm tra. Locked batch immutable. UNKNOWN giữ reserve.</p></div>
+      <h2>Quick market switch</h2>
+      <div class="row"><button class="control" data-country="VN">VN</button><button class="control" data-country="PH">PH</button></div>
+      <p id="contextWarning">Switch market đổi profile context; không copy KYC/content/money xuyên country.</p>
+    </aside>
+  </main>
+
+  <script>
+    const views = [
+      ["V01","Login & market"],["V02","Profile & KYC"],["V03","Campaign discovery"],["V04","Campaign detail"],
+      ["V05","Workspace & submit"],["V06","My Campaigns"],["V07","Earnings"],["V08","Wallet & payout"],
+      ["V09","Admin shell & audit"],["V10","Ops review queue"],["V11","Campaign builder"],["V12","Finance workbench"]
+    ];
+    const variants = {
+      happy:["Happy / populated","Dữ liệu hợp lệ; primary CTA theo business guard.","Tiếp tục"],
+      loading:["Loading","Đang tải dữ liệu theo country context. Không hiển thị dữ liệu cũ.","Thử tải lại"],
+      empty:["Empty first-use","Chưa có dữ liệu phù hợp. Giải thích điều kiện và next action.","Khám phá campaign"],
+      validation:["Validation error","Dữ liệu chưa hợp lệ; lỗi gắn đúng field, không mất input.","Sửa trường lỗi"],
+      provider:["Provider timeout / UNKNOWN","Kết quả chưa xác định. Giữ reserve, reconcile trước retry/release.","Kiểm tra trạng thái"],
+      permission:["Permission / country denied","Session không có quyền với market này. Không trả row/count/export.","Về profile được cấp quyền"],
+      session:["Session expired","Phiên hết hạn; không tiếp tục command nhạy cảm.","Đăng nhập lại"],
+      conflict:["Stale / conflict","Item đã được actor khác xử lý. Refresh trước khi hành động.","Tải trạng thái mới"]
+    };
+    const market = {
+      VN:{label:"🇻🇳 VN · VND",locale:"Tiếng Việt",profile:"VN-CR-001",kyc:"Checklist theo VN; chỉ field bị reject được sửa."},
+      PH:{label:"🇵🇭 PH · PHP",locale:"Filipino · EN fallback",profile:"PH-CR-014",kyc:"PH checklist; bank field lamang ang maaaring baguhin."}
+    };
+    const scenarios = {
+      S01:[
+        ["V01","VN","happy","Đăng nhập và chọn VN"],["V02","VN","happy","KYC Approved"],["V03","VN","happy","Discover eligible campaign"],
+        ["V04","VN","happy","Xem terms/reward và Join"],["V05","VN","happy","Nhận tracking asset và submit"],["V06","VN","happy","Content Approved exactly once"],
+        ["V07","VN","happy","Pending → Confirmed → Available"],["V08","VN","happy","OTP payout → Paid"]
+      ],
+      S02:[
+        ["V01","PH","happy","Đăng nhập và chọn PH"],["V02","PH","validation","Ops PH reject bank field có reason"],
+        ["V02","PH","happy","Chỉ bank field được sửa và resubmit"],["V02","PH","happy","PH KYC Approved; VN Ops vẫn bị deny"]
+      ],
+      S03:[
+        ["V05","VN","happy","Creator submit content v1"],["V10","VN","happy","Ops reject v1 với reason"],
+        ["V06","VN","validation","Creator xem reason và resubmit v2"],["V10","VN","happy","Ops approve active v2 exactly once"],
+        ["V07","VN","happy","Một Pending Earning có source/snapshot"],["V10","VN","conflict","Replay approve trả kết quả cũ; earning count vẫn 1"]
+      ],
+      S04:[
+        ["V08","VN","happy","OTP verified và reserve một lần"],["V12","VN","validation","Attempt #1 FailedFinal; release một lần"],
+        ["V08","VN","happy","Creator tạo retry bằng key/attempt mới"],["V12","VN","provider","Attempt #2 timeout → UNKNOWN; giữ reserve"],
+        ["V12","VN","conflict","Retry/Release bị chặn; chỉ Reconcile"],["V12","VN","happy","Authoritative lookup → Paid một lần"],
+        ["V08","VN","happy","Creator thấy Paid; duplicate success no-op"],["V12","VN","happy","Post-success refund → linked reversal"]
+      ]
+    };
+    let currentView="V01", currentCountry="VN", currentState="happy", activeScenario=null, scenarioIndex=0;
+    const viewNav=document.querySelector("#viewNav");
+    views.forEach(([id,label])=>{ const b=document.createElement("button"); b.className="control"; b.dataset.next=id; b.innerHTML=`<strong>${id}</strong><small>${label}</small>`; viewNav.appendChild(b); });
+    const stateNav=document.querySelector("#stateNav");
+    Object.entries(variants).forEach(([id,[title]])=>{ const b=document.createElement("button"); b.className="control"; b.dataset.state=id; b.textContent=title; stateNav.appendChild(b); });
+
+    function setCountry(code){ currentCountry=code; const cfg=market[code]; marketLabel.textContent=cfg.label; localeLabel.textContent=cfg.locale; kycSubtitle.textContent=cfg.kyc; contextWarning.textContent=`${code} context active. KYC, participation, content và balance không được copy từ ${code==="VN"?"PH":"VN"}.`; setRoleContext(currentView); }
+    function setRoleContext(id){ const admin=id>="V09"; const finance=id==="V12"; const ops=id==="V10"; profileLabel.textContent=admin?`${currentCountry}-${finance?"FIN":ops?"OPS":"ADM"}-001`:market[currentCountry].profile; roleLabel.textContent=admin?`${finance?"Local Finance":ops?"Local Ops":"Local Admin"} · authorized country`:"Creator · country profile"; }
+    function setView(id){ currentView=id; setRoleContext(id); document.querySelectorAll(".screen").forEach(n=>n.classList.toggle("active",n.dataset.viewId===id)); document.querySelectorAll("[data-next]").forEach(n=>n.classList.toggle("active",n.dataset.next===id && n.closest("#viewNav"))); }
+    function setVariant(id){ currentState=id; const [title,copy,action]=variants[id]; variantTitle.textContent=title; variantCopy.textContent=copy; recoveryButton.textContent=action; variantBanner.classList.toggle("visible",id!=="happy"); document.querySelectorAll("#stateNav [data-state]").forEach(n=>n.classList.toggle("active",n.dataset.state===id)); }
+    function startScenario(id){ activeScenario=id; scenarioIndex=0; document.querySelectorAll("[data-scenario]").forEach(n=>n.classList.toggle("active",n.dataset.scenario===id)); scenarioNext.disabled=false; runScenarioStep(); }
+    function runScenarioStep(){ const steps=scenarios[activeScenario]; const [view,country,state,note]=steps[scenarioIndex]; setCountry(country); setView(view); setVariant(state); scenarioProgress.classList.add("visible"); scenarioProgress.innerHTML=`<strong>${activeScenario} · ${scenarioIndex+1}/${steps.length}</strong><br>${note}`; scenarioNext.textContent=scenarioIndex===steps.length-1?"Hoàn tất / chạy lại":"Đi bước tiếp theo"; }
+    scenarioNext.addEventListener("click",()=>{ if(!activeScenario)return; scenarioIndex=(scenarioIndex+1)%scenarios[activeScenario].length; runScenarioStep(); });
+    document.addEventListener("click",event=>{ const t=event.target.closest("button"); if(!t)return; if(t.dataset.scenario)startScenario(t.dataset.scenario); if(t.dataset.next){ activeScenario=null; scenarioProgress.classList.remove("visible"); scenarioNext.disabled=true; setView(t.dataset.next); } if(t.dataset.country)setCountry(t.dataset.country); if(t.dataset.state)setVariant(t.dataset.state); if(t.dataset.recovery)setVariant("happy"); });
+    setCountry("VN"); setView("V01"); setVariant("happy");
+  </script>
+</body>
+</html>

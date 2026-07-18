@@ -1,0 +1,38 @@
+# Dependencies and build outputs
+node_modules/
+.pnpm-store/
+.next/
+dist/
+coverage/
+apps/api/src/generated/prisma/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+secrets/
+
+# Runtime data and local infrastructure
+*.log
+tmp/
+temp/
+.docker-data/
+postgres-data/
+minio-data/
+redis-data/
+
+# IDE / OS
+.idea/
+.vscode/*.local.json
+.DS_Store
+Thumbs.db
+
+# Test artifacts that may contain private data
+playwright-report/
+test-results/
+artifacts/private/

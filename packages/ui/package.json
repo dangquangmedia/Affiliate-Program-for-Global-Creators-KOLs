@@ -1,0 +1,9 @@
+{
+  "name": "@affiliate-global/ui",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "check": "node -e \"console.log('ui workspace: scaffold-ready')\""
+  }
+}
+

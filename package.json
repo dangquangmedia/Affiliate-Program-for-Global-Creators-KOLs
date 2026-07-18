@@ -1,0 +1,31 @@
+{
+  "name": "affiliate-global",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": "24.11.1",
+    "pnpm": "10.15.1"
+  },
+  "scripts": {
+    "check": "node scripts/check-workspace.mjs && node scripts/check-architecture.mjs && node scripts/check-db-scaffold.mjs",
+    "check:workspace": "node scripts/check-workspace.mjs",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "check:db": "node scripts/check-db-scaffold.mjs",
+    "db:validate": "prisma validate",
+    "db:generate": "prisma generate",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "mockup": "node scripts/serve-mockup.mjs",
+    "infra:config": "docker compose config --quiet",
+    "infra:up": "docker compose up -d postgres",
+    "infra:status": "docker compose ps"
+  },
+  "devDependencies": {
+    "prisma": "^7.8.0"
+  },
+  "dependencies": {
+    "@prisma/client": "7.8.0"
+  }
+}

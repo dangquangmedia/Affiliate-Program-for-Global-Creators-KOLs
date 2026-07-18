@@ -1,0 +1,288 @@
+openapi: 3.1.0
+info:
+  title: Affiliate GLOBAL Week 2 API
+  version: 0.1.0
+  description: G4 design contract; implementation status is not implied.
+servers:
+  - url: /api/v1
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, db]
+                properties:
+                  status: { type: string, const: ok }
+                  db: { type: string, enum: [up] }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /markets/{market}/context:
+    get:
+      operationId: getMarketContext
+      parameters:
+        - $ref: "#/components/parameters/Market"
+      responses:
+        "200":
+          description: Active market projection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketContext" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /profiles:
+    get:
+      operationId: listOwnProfiles
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Own profile summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProfileSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /{market}/profiles:
+    post:
+      operationId: createCountryProfile
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Market"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [displayName, preferredLocale]
+              properties:
+                displayName: { type: string, minLength: 1, maxLength: 120 }
+                preferredLocale: { type: string, minLength: 2, maxLength: 16 }
+      responses:
+        "201":
+          description: Created or idempotently replayed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfileSummary" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /{market}/kyc/checklist:
+    get:
+      operationId: getKycChecklist
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Market"
+      responses:
+        "200":
+          description: Active country KYC checklist
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, fields]
+                properties:
+                  version: { type: integer, minimum: 1 }
+                  fields:
+                    type: array
+                    items:
+                      type: object
+                      required: [fieldKey, required]
+                      properties:
+                        fieldKey: { type: string }
+                        required: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /{market}/kyc/cases/{caseId}/submit:
+    post:
+      operationId: submitKycCase
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Market"
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string, pattern: '^"[0-9]+"$' }
+      responses:
+        "200":
+          description: Submitted/resubmitted state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KycCase" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+  /{market}/ops/kyc/cases:
+    get:
+      operationId: listOpsKycQueue
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Market"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: state
+          in: query
+          schema: { $ref: "#/components/schemas/KycState" }
+      responses:
+        "200":
+          description: Country-scoped queue
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/KycCase" }
+                  page: { $ref: "#/components/schemas/CursorPage" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /{market}/ops/kyc/cases/{caseId}/request-changes:
+    post:
+      operationId: requestKycFieldChanges
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Market"
+        - $ref: "#/components/parameters/CaseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expectedVersion, decisions]
+              properties:
+                expectedVersion: { type: integer, minimum: 0 }
+                decisions:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [fieldKey, fieldVersion, decision, reasonCode]
+                    properties:
+                      fieldKey: { type: string }
+                      fieldVersion: { type: integer, minimum: 1 }
+                      decision: { type: string, const: NEEDS_CHANGES }
+                      reasonCode: { type: string }
+      responses:
+        "200":
+          description: Field decisions appended
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KycCase" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: affiliate_session
+  parameters:
+    Market:
+      name: market
+      in: path
+      required: true
+      schema: { type: string, enum: [vn, ph] }
+    CaseId:
+      name: caseId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string, maxLength: 2048 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+  schemas:
+    MarketContext:
+      type: object
+      additionalProperties: false
+      required: [market, countryName, locale, fallbackLocale, currency, currencyExponent, configVersion, enabled]
+      properties:
+        market: { type: string, enum: [VN, PH] }
+        countryName: { type: string }
+        locale: { type: string }
+        fallbackLocale: { type: string }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        currencyExponent: { type: integer, minimum: 0, maximum: 4 }
+        configVersion: { type: integer, minimum: 1 }
+        enabled: { type: boolean }
+    ProfileSummary:
+      type: object
+      additionalProperties: false
+      required: [id, market, displayName, preferredLocale, status, version]
+      properties:
+        id: { type: string, format: uuid }
+        market: { type: string, enum: [VN, PH] }
+        displayName: { type: string }
+        preferredLocale: { type: string }
+        status: { type: string, enum: [ACTIVE, SUSPENDED] }
+        version: { type: integer, minimum: 0 }
+    KycState:
+      type: string
+      enum: [DRAFT, SUBMITTED, IN_REVIEW, NEEDS_CHANGES, RESUBMITTED, APPROVED, REJECTED]
+    KycCase:
+      type: object
+      additionalProperties: false
+      required: [id, state, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        state: { $ref: "#/components/schemas/KycState" }
+        version: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CursorPage:
+      type: object
+      additionalProperties: false
+      required: [nextCursor, hasMore, limit]
+      properties:
+        nextCursor: { type: [string, "null"] }
+        hasMore: { type: boolean }
+        limit: { type: integer }
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, status, correlationId, retryable]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            status: { type: integer }
+            correlationId: { type: string }
+            retryable: { type: boolean }
+            details: { type: array, items: { type: object } }
+  responses:
+    BadRequest: { description: Bad request, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Unauthorized: { description: Authentication required, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Forbidden: { description: Permission/MFA/country denied, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    NotFound: { description: Missing or concealed resource, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Conflict: { description: Version/state/idempotency conflict, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Unprocessable: { description: Business guard failed, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    ServiceUnavailable: { description: Dependency unavailable, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+
