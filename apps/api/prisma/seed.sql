@@ -1,51 +1,59 @@
--- Deterministic, idempotent, synthetic seed for local/test only.
--- No real PII, credentials, provider tokens or legal tax claims.
+-- Seed synthetic tối thiểu cho walking skeleton (N5): chỉ countries + country_configs.
+-- Idempotent (ON CONFLICT), không PII thật. Đủ để /vn /ph round-trip DB chạy.
+-- Dữ liệu nghiệp vụ (users/campaigns/...) seed sau khi có luồng thật (N6+).
 
-WITH vn AS (
-  INSERT INTO country (id, code, name, currency_code, currency_exponent, enabled, created_at)
-  VALUES ('10000000-0000-4000-8000-000000000001', 'VN', 'Vietnam', 'VND', 0, true, CURRENT_TIMESTAMP)
-  ON CONFLICT (code) DO UPDATE SET
-    name = EXCLUDED.name,
-    currency_code = EXCLUDED.currency_code,
-    currency_exponent = EXCLUDED.currency_exponent,
-    enabled = EXCLUDED.enabled
-  RETURNING id
-)
-INSERT INTO country_config (
-  id, country_id, version, locale, fallback_locale, config_json, active, active_from, created_at
-)
-SELECT
-  '11000000-0000-4000-8000-000000000001', id, 1, 'vi-VN', 'en',
-  '{"kycChecklistVersion":"VN-v1","taxRuleVersion":"VN-DEMO-10","paymentAdapter":"mock","providerModeDisclosed":true}'::jsonb,
-  true, '2026-07-18T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP
-FROM vn
-ON CONFLICT (country_id, version) DO UPDATE SET
+-- VN
+INSERT INTO country (id, code, name, currency_code, currency_exponent, locale, fallback_locale, enabled, created_at)
+VALUES ('10000000-0000-4000-8000-000000000001', 'VN', 'Vietnam', 'VND', 0, 'vi-VN', 'en', true, CURRENT_TIMESTAMP)
+ON CONFLICT (code) DO UPDATE SET
+  name = EXCLUDED.name,
+  currency_code = EXCLUDED.currency_code,
+  currency_exponent = EXCLUDED.currency_exponent,
   locale = EXCLUDED.locale,
   fallback_locale = EXCLUDED.fallback_locale,
-  config_json = EXCLUDED.config_json,
-  active = EXCLUDED.active;
+  enabled = EXCLUDED.enabled;
 
-WITH ph AS (
-  INSERT INTO country (id, code, name, currency_code, currency_exponent, enabled, created_at)
-  VALUES ('20000000-0000-4000-8000-000000000001', 'PH', 'Philippines', 'PHP', 2, true, CURRENT_TIMESTAMP)
-  ON CONFLICT (code) DO UPDATE SET
-    name = EXCLUDED.name,
-    currency_code = EXCLUDED.currency_code,
-    currency_exponent = EXCLUDED.currency_exponent,
-    enabled = EXCLUDED.enabled
-  RETURNING id
-)
 INSERT INTO country_config (
-  id, country_id, version, locale, fallback_locale, config_json, active, active_from, created_at
+  id, country_id, tax_percent, min_payout_minor, feature_kyc, feature_payout, feature_cps, config_version, created_at, updated_at
 )
-SELECT
-  '21000000-0000-4000-8000-000000000001', id, 1, 'fil-PH', 'en',
-  '{"kycChecklistVersion":"PH-v1","taxRuleVersion":"PH-DEMO-05","paymentAdapter":"mock","providerModeDisclosed":true}'::jsonb,
-  true, '2026-07-18T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP
-FROM ph
-ON CONFLICT (country_id, version) DO UPDATE SET
+VALUES (
+  '11000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  10, 200000, true, true, false, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+)
+ON CONFLICT (country_id) DO UPDATE SET
+  tax_percent = EXCLUDED.tax_percent,
+  min_payout_minor = EXCLUDED.min_payout_minor,
+  feature_kyc = EXCLUDED.feature_kyc,
+  feature_payout = EXCLUDED.feature_payout,
+  feature_cps = EXCLUDED.feature_cps,
+  config_version = EXCLUDED.config_version,
+  updated_at = CURRENT_TIMESTAMP;
+
+-- PH
+INSERT INTO country (id, code, name, currency_code, currency_exponent, locale, fallback_locale, enabled, created_at)
+VALUES ('20000000-0000-4000-8000-000000000001', 'PH', 'Philippines', 'PHP', 2, 'fil-PH', 'en', true, CURRENT_TIMESTAMP)
+ON CONFLICT (code) DO UPDATE SET
+  name = EXCLUDED.name,
+  currency_code = EXCLUDED.currency_code,
+  currency_exponent = EXCLUDED.currency_exponent,
   locale = EXCLUDED.locale,
   fallback_locale = EXCLUDED.fallback_locale,
-  config_json = EXCLUDED.config_json,
-  active = EXCLUDED.active;
+  enabled = EXCLUDED.enabled;
 
+INSERT INTO country_config (
+  id, country_id, tax_percent, min_payout_minor, feature_kyc, feature_payout, feature_cps, config_version, created_at, updated_at
+)
+VALUES (
+  '21000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  8, 50000, true, true, false, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+)
+ON CONFLICT (country_id) DO UPDATE SET
+  tax_percent = EXCLUDED.tax_percent,
+  min_payout_minor = EXCLUDED.min_payout_minor,
+  feature_kyc = EXCLUDED.feature_kyc,
+  feature_payout = EXCLUDED.feature_payout,
+  feature_cps = EXCLUDED.feature_cps,
+  config_version = EXCLUDED.config_version,
+  updated_at = CURRENT_TIMESTAMP;

@@ -1,3 +1,7 @@
+// Schema LEAN N5 — 18 bảng suy từ 12 màn mockup (xem docs/DATA_MODEL.md).
+// Thay hoàn toàn schema 45-bảng cũ. Mỗi bảng có 1 màn mockup "đòi" nó ra.
+// 3 luật xuyên suốt: tiền = *_minor BigInt + currency; country scope; ledger/audit append-only.
+
 generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"
@@ -8,18 +12,8 @@ datasource db {
   provider = "postgresql"
 }
 
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-}
-
-enum ProfileStatus {
-  ACTIVE
-  SUSPENDED
-}
-
+// ---------- Enums ----------
 enum RoleCode {
-  CREATOR
   LOCAL_OPS
   LOCAL_FINANCE
   LOCAL_ADMIN
@@ -29,734 +23,460 @@ enum RoleCode {
 enum KycCaseState {
   DRAFT
   SUBMITTED
-  IN_REVIEW
-  NEEDS_CHANGES
   RESUBMITTED
   APPROVED
   REJECTED
 }
 
 enum KycFieldState {
-  DRAFT
-  SUBMITTED
+  EMPTY
+  FILLED
   ACCEPTED
   NEEDS_CHANGES
-  REJECTED
 }
 
-enum ReviewTargetType {
-  KYC_CASE
-  KYC_FIELD
-  CONTENT_SUBMISSION
-  SUBMISSION_VERSION
-}
-
-enum ReviewDecisionType {
-  CLAIMED
-  ACCEPTED
-  NEEDS_CHANGES
-  REJECTED
-  APPROVED
-}
-
-enum CatalogStatus {
-  DRAFT
+enum CampaignStatus {
   ACTIVE
   PAUSED
-  ARCHIVED
+  ENDED
 }
 
-enum RewardTrigger {
+enum TriggerType {
   CONTENT_APPROVED
+  VIEW_THRESHOLD
   PAID_ORDER
-  QUALIFIED_LEAD
-  APP_INSTALL
-  SUBSCRIPTION
 }
 
-enum RewardCalculation {
-  CONTENT_FLAT
-  SALE_PERCENT
-  LEAD_FLAT
-  INSTALL_FLAT
-  RECURRING_FLAT
-  RECURRING_PERCENT
+enum PricingType {
+  FLAT
+  TIERED
+  PERCENT
 }
 
-enum CampaignState {
-  DRAFT
-  ACTIVE
-  PAUSED
-  CLOSED
+enum CapType {
+  SLOTS_X_PRICE
+  POOL
 }
 
 enum ParticipationState {
   JOINED
-  ACTIVE
-  SUSPENDED
-  COMPLETED
-  CANCELLED
-}
-
-enum ContentState {
-  DRAFT
-  SUBMITTED
-  IN_REVIEW
-  NEEDS_CHANGES
-  REJECTED
-  RESUBMITTED
+  CONTENT_SUBMITTED
   APPROVED
+  REJECTED
+  LEFT
 }
 
-enum EarningState {
+enum SubmissionState {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum EarningStatus {
   PENDING
-  CONFIRMED
   AVAILABLE
   PAID
   REVERSED
 }
 
-enum SnapshotKind {
-  TERMS
-  REWARD
-  COMMISSION
+enum LedgerEntryType {
+  EARNING_ACCRUE
   TAX
-  FX
-  ROUNDING
+  PAYOUT_RESERVE
+  PAYOUT_PAID
+  PAYOUT_RELEASE
+  REVERSAL
 }
 
-enum LedgerDirection {
-  DEBIT
-  CREDIT
-}
-
-enum BatchState {
-  DRAFT
-  REVIEWING
-  APPROVED
+enum BatchStatus {
+  OPEN
   LOCKED
-  EXPORTED
-}
-
-enum ReconciliationDecision {
-  PENDING
-  APPROVED
-  ANOMALY
-  ADJUSTED
-}
-
-enum OtpState {
-  OTP_PENDING
-  VERIFIED
-  EXPIRED
-  ATTEMPTS_EXCEEDED
 }
 
 enum PayoutState {
-  RESERVED
-  QUEUED
   PROCESSING
   PAID
-  FAILED_FINAL
-  UNKNOWN
-  REVERSED
+  FAILED_RELEASED
+  UNKNOWN_HOLD
 }
 
-enum PayoutAttemptState {
-  QUEUED
-  PROCESSING
-  SUCCEEDED
-  FAILED_FINAL
+enum PayoutAttemptResult {
+  SUCCESS
+  FAIL
   UNKNOWN
 }
 
-enum AuditOutcome {
-  ATTEMPTED
-  SUCCEEDED
-  DENIED
-  FAILED
+enum OtpPurpose {
+  PAYOUT
 }
 
-enum ExternalEventStatus {
-  RECEIVED
-  APPLIED
-  DUPLICATE
-  CONFLICT
-  FAILED
-}
+// ===== Nhóm A — Danh tính & nền quốc gia =====
 
+// 1. users — danh tính toàn cục, 1 người = 1 tài khoản (V01 login SSO mock).
 model User {
-  id                 String                @id @default(uuid()) @db.Uuid
-  status             UserStatus            @default(ACTIVE)
-  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
-  identities         IdentityProvider[]
-  sessions           Session[]
-  profiles           CreatorCountryProfile[]
-  roleAssignments    RoleAssignment[]
-  reviewDecisions    ReviewDecision[]       @relation("ReviewActor")
-  auditEvents        AuditEvent[]
-  idempotencyRecords IdempotencyRecord[]
+  id              String                  @id @default(uuid()) @db.Uuid
+  email           String                  @unique
+  displayName     String                  @map("display_name")
+  authProvider    String                  @map("auth_provider")
+  providerSubject String                  @map("provider_subject")
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  profiles        CreatorCountryProfile[]
+  roleAssignments RoleAssignment[]
+  otpCodes        OtpCode[]
+  auditEvents     AuditEvent[]
 
+  @@unique([authProvider, providerSubject]) // 1 danh tính SSO không tạo 2 tài khoản
   @@map("app_user")
 }
 
-model IdentityProvider {
-  id                  String   @id @default(uuid()) @db.Uuid
-  userId              String   @map("user_id") @db.Uuid
-  provider            String   @db.VarChar(40)
-  providerSubjectHash String   @map("provider_subject_hash") @db.VarChar(128)
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  user                User     @relation(fields: [userId], references: [id], onDelete: Restrict)
-
-  @@unique([provider, providerSubjectHash])
-  @@index([userId])
-  @@map("identity_provider")
-}
-
-model Session {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  tokenHash String   @unique @map("token_hash") @db.VarChar(128)
-  mfaLevel  String   @default("BASE") @map("mfa_level") @db.VarChar(20)
-  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
-  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, expiresAt])
-  @@map("session")
-}
-
+// 2. countries — bảng neo mọi cách ly. Phase 1: VN, PH. (nút đổi VN/PH mọi màn)
 model Country {
-  id               String                  @id @default(uuid()) @db.Uuid
-  code             String                  @unique @db.Char(2)
-  name             String                  @db.VarChar(100)
-  currencyCode     String                  @map("currency_code") @db.Char(3)
-  currencyExponent Int                     @map("currency_exponent") @db.SmallInt
-  enabled          Boolean                 @default(true)
-  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
-  configs          CountryConfig[]
-  profiles         CreatorCountryProfile[]
+  id               String                @id @default(uuid()) @db.Uuid
+  code             String                @unique @db.Char(2)
+  name             String
+  currencyCode     String                @map("currency_code") @db.Char(3)
+  currencyExponent Int                   @map("currency_exponent") @db.SmallInt
+  locale           String
+  fallbackLocale   String                @default("en") @map("fallback_locale")
+  enabled          Boolean               @default(true)
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  config           CountryConfig?
   roleAssignments  RoleAssignment[]
+  profiles         CreatorCountryProfile[]
   campaigns        Campaign[]
-  kycCases         KycCase[]
   participations   Participation[]
-  submissions      ContentSubmission[]
   earnings         Earning[]
   ledgerEntries    LedgerEntry[]
   batches          ReconciliationBatch[]
-  payoutIntents    PayoutIntent[]
   payoutRequests   PayoutRequest[]
   auditEvents      AuditEvent[]
-  externalEvents   ExternalEvent[]
 
   @@map("country")
 }
 
+// 3. country_configs — tham số vận hành từng nước, Global Admin chỉnh (V09).
 model CountryConfig {
   id             String   @id @default(uuid()) @db.Uuid
-  countryId      String   @map("country_id") @db.Uuid
-  version        Int
-  locale         String   @db.VarChar(16)
-  fallbackLocale String   @default("en") @map("fallback_locale") @db.VarChar(16)
-  config         Json     @map("config_json")
-  active         Boolean  @default(false)
-  activeFrom     DateTime? @map("active_from") @db.Timestamptz(3)
+  countryId      String   @unique @map("country_id") @db.Uuid // 1 nước đúng 1 config hiệu lực
+  taxPercent     Int      @map("tax_percent") // thuế synthetic demo (VN 10, PH 8)
+  minPayoutMinor BigInt   @map("min_payout_minor")
+  featureKyc     Boolean  @default(true) @map("feature_kyc")
+  featurePayout  Boolean  @default(true) @map("feature_payout")
+  featureCps     Boolean  @default(false) @map("feature_cps")
+  configVersion  Int      @default(1) @map("config_version")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   country        Country  @relation(fields: [countryId], references: [id], onDelete: Restrict)
 
-  @@unique([countryId, version])
-  @@index([countryId, active])
   @@map("country_config")
 }
 
-model CreatorCountryProfile {
-  id                    String              @id @default(uuid()) @db.Uuid
-  userId                String              @map("user_id") @db.Uuid
-  countryId             String              @map("country_id") @db.Uuid
-  displayName           String              @map("display_name") @db.VarChar(120)
-  preferredLocale       String              @map("preferred_locale") @db.VarChar(16)
-  status                ProfileStatus       @default(ACTIVE)
-  bankReferenceEncrypted String?             @map("bank_reference_encrypted") @db.Text
-  taxReferenceEncrypted String?              @map("tax_reference_encrypted") @db.Text
-  version               Int                 @default(0)
-  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt             DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
-  user                  User                @relation(fields: [userId], references: [id], onDelete: Restrict)
-  country               Country             @relation(fields: [countryId], references: [id], onDelete: Restrict)
-  kycCases              KycCase[]
-  participations        Participation[]
-  payoutIntents         PayoutIntent[]
-
-  @@unique([userId, countryId])
-  @@unique([id, countryId])
-  @@index([countryId, status, createdAt])
-  @@map("creator_country_profile")
-}
-
+// 4. role_assignments — RBAC 4 vai + phạm vi nước (điểm ENFORCE cách ly staff).
 model RoleAssignment {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @map("user_id") @db.Uuid
-  countryId   String?  @map("country_id") @db.Uuid
-  role        RoleCode
-  permissions String[] @default([])
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  country     Country? @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  countryId String?  @map("country_id") @db.Uuid // NULL cho GLOBAL_ADMIN
+  role      RoleCode
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country   Country? @relation(fields: [countryId], references: [id], onDelete: Restrict)
 
-  @@unique([userId, countryId, role])
+  @@unique([userId, countryId, role]) // không cấp trùng vai
   @@index([countryId, role])
   @@map("role_assignment")
 }
 
-model KycCase {
-  id           String        @id @default(uuid()) @db.Uuid
-  profileId    String        @map("profile_id") @db.Uuid
-  countryId    String        @map("country_id") @db.Uuid
-  state        KycCaseState  @default(DRAFT)
-  version      Int           @default(0)
-  submittedAt  DateTime?     @map("submitted_at") @db.Timestamptz(3)
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
-  profile      CreatorCountryProfile @relation(fields: [profileId, countryId], references: [id, countryId], onDelete: Restrict)
-  country      Country       @relation(fields: [countryId], references: [id], onDelete: Restrict)
-  fields       KycFieldVersion[]
-  decisions    ReviewDecision[]
+// ===== Nhóm B — Creator onboarding =====
 
-  @@unique([id, countryId])
-  @@index([countryId, state, createdAt, id])
+// 5. creator_country_profiles — hồ sơ creator RIÊNG từng nước (V02). Mỏ neo dữ liệu creator.
+model CreatorCountryProfile {
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String          @map("user_id") @db.Uuid
+  countryId       String          @map("country_id") @db.Uuid
+  onboardingState String          @default("NEW") @map("onboarding_state")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  country         Country         @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  kycCase         KycCase?
+  participations  Participation[]
+  earnings        Earning[]
+  ledgerEntries   LedgerEntry[]
+  payoutRequests  PayoutRequest[]
+
+  @@unique([userId, countryId]) // 1 tài khoản không tạo 2 hồ sơ cùng nước
+  @@index([countryId])
+  @@map("creator_country_profile")
+}
+
+// 6. kyc_cases — hồ sơ định danh của 1 profile, có máy trạng thái (V03/V10). Cổng chặn Join.
+model KycCase {
+  id         String       @id @default(uuid()) @db.Uuid
+  profileId  String       @unique @map("profile_id") @db.Uuid // mỗi hồ sơ nước đúng 1 case
+  state      KycCaseState @default(DRAFT)
+  reviewedBy String?      @map("reviewed_by") @db.Uuid
+  reviewedAt DateTime?    @map("reviewed_at") @db.Timestamptz(3)
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  profile    CreatorCountryProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  fields     KycField[]
+
   @@map("kyc_case")
 }
 
-model KycFieldVersion {
-  id        String        @id @default(uuid()) @db.Uuid
-  caseId    String        @map("case_id") @db.Uuid
-  fieldKey  String        @map("field_key") @db.VarChar(80)
-  version   Int
-  valueRef  String?       @map("value_ref") @db.Text
-  valueHash String?       @map("value_hash") @db.VarChar(128)
-  state     KycFieldState @default(DRAFT)
-  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  kycCase   KycCase       @relation(fields: [caseId], references: [id], onDelete: Restrict)
-  decisions ReviewDecision[]
+// 7. kyc_fields — từng trường KYC + trạng thái + lý do (duyệt/từ chối THEO trường).
+model KycField {
+  id     String        @id @default(uuid()) @db.Uuid
+  caseId String        @map("case_id") @db.Uuid
+  key    String
+  label  String
+  value  String?
+  state  KycFieldState @default(EMPTY)
+  reason String? // chỉ khi NEEDS_CHANGES
+  case   KycCase       @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
-  @@unique([caseId, fieldKey, version])
-  @@index([caseId, fieldKey, state])
-  @@map("kyc_field_version")
+  @@unique([caseId, key]) // mỗi trường đúng 1 dòng
+  @@map("kyc_field")
 }
 
-model ReviewDecision {
-  id               String             @id @default(uuid()) @db.Uuid
-  actorUserId      String             @map("actor_user_id") @db.Uuid
-  countryId        String             @map("country_id") @db.Uuid
-  targetType       ReviewTargetType   @map("target_type")
-  targetId         String             @map("target_id") @db.Uuid
-  targetVersion    Int?               @map("target_version")
-  decision         ReviewDecisionType
-  reasonCode       String?            @map("reason_code") @db.VarChar(80)
-  reasonText       String?            @map("reason_text") @db.Text
-  kycCaseId        String?            @map("kyc_case_id") @db.Uuid
-  kycFieldVersionId String?           @map("kyc_field_version_id") @db.Uuid
-  submissionId     String?            @map("submission_id") @db.Uuid
-  submissionVersionId String?         @map("submission_version_id") @db.Uuid
-  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  actor            User               @relation("ReviewActor", fields: [actorUserId], references: [id], onDelete: Restrict)
-  kycCase          KycCase?           @relation(fields: [kycCaseId], references: [id], onDelete: Restrict)
-  kycFieldVersion  KycFieldVersion?   @relation(fields: [kycFieldVersionId], references: [id], onDelete: Restrict)
-  submission       ContentSubmission? @relation(fields: [submissionId], references: [id], onDelete: Restrict)
-  submissionVersion SubmissionVersion? @relation(fields: [submissionVersionId], references: [id], onDelete: Restrict)
+// ===== Nhóm C — Campaign & tham gia =====
 
-  @@index([countryId, targetType, targetId, createdAt])
-  @@map("review_decision")
-}
-
-model Partner {
-  id        String        @id @default(uuid()) @db.Uuid
-  name      String        @db.VarChar(160)
-  status    CatalogStatus @default(ACTIVE)
-  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  products  Product[]
-
-  @@map("partner")
-}
-
-model Product {
-  id        String        @id @default(uuid()) @db.Uuid
-  partnerId String        @map("partner_id") @db.Uuid
-  name      String        @db.VarChar(180)
-  category  String        @db.VarChar(100)
-  status    CatalogStatus @default(DRAFT)
-  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  partner   Partner       @relation(fields: [partnerId], references: [id], onDelete: Restrict)
-  offers    Offer[]
-
-  @@index([partnerId, status])
-  @@map("product")
-}
-
-model Offer {
-  id           String        @id @default(uuid()) @db.Uuid
-  productId    String        @map("product_id") @db.Uuid
-  termsVersion Int           @map("terms_version")
-  terms        Json          @map("terms_json")
-  currency     String        @db.Char(3)
-  status       CatalogStatus @default(DRAFT)
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  product      Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
-  rewardRules  RewardRule[]
-  campaigns    Campaign[]
-
-  @@index([productId, status])
-  @@map("offer")
-}
-
-model RewardRule {
-  id          String            @id @default(uuid()) @db.Uuid
-  offerId     String            @map("offer_id") @db.Uuid
-  trigger     RewardTrigger
-  calculation RewardCalculation
-  amountMinor BigInt?           @map("amount_minor")
-  rate        Decimal?          @db.Decimal(20, 10)
-  version     Int
-  active      Boolean           @default(true)
-  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  offer       Offer             @relation(fields: [offerId], references: [id], onDelete: Restrict)
-
-  @@unique([offerId, version])
-  @@map("reward_rule")
-}
-
+// 8. campaigns — chiến dịch, gắn ĐÚNG 1 nước (V04/V05/V11). "Đầy" = suy ra, không lưu.
 model Campaign {
-  id             String        @id @default(uuid()) @db.Uuid
-  offerId        String        @map("offer_id") @db.Uuid
-  countryId      String        @map("country_id") @db.Uuid
-  state          CampaignState @default(DRAFT)
-  startsAt       DateTime      @map("starts_at") @db.Timestamptz(3)
-  endsAt         DateTime      @map("ends_at") @db.Timestamptz(3)
-  slotCap        Int?          @map("slot_cap")
-  budgetMinor    BigInt?       @map("budget_minor")
-  currency       String        @db.Char(3)
-  version        Int           @default(0)
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
-  offer          Offer         @relation(fields: [offerId], references: [id], onDelete: Restrict)
-  country        Country       @relation(fields: [countryId], references: [id], onDelete: Restrict)
-  localizations  CampaignLocalization[]
-  participations Participation[]
+  id              String         @id @default(uuid()) @db.Uuid
+  countryId       String         @map("country_id") @db.Uuid
+  brand           String
+  title           String
+  rewardMinor     BigInt         @map("reward_minor")
+  currency        String         @db.Char(3) // PHẢI = currency của country
+  slotsTotal      Int            @map("slots_total")
+  slotsTaken      Int            @default(0) @map("slots_taken")
+  status          CampaignStatus @default(ACTIVE)
+  platform        String
+  requiredHashtag String         @map("required_hashtag")
+  brief           String
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  country         Country        @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  rewardRule      RewardRule?
+  participations  Participation[]
 
-  @@unique([id, countryId])
-  @@index([countryId, state, startsAt, endsAt])
+  @@index([countryId, status])
   @@map("campaign")
 }
 
-model CampaignLocalization {
-  id         String   @id @default(uuid()) @db.Uuid
-  campaignId String   @map("campaign_id") @db.Uuid
-  locale     String   @db.VarChar(16)
-  title      String   @db.VarChar(180)
-  brief      String   @db.Text
-  termsCopy  String   @map("terms_copy") @db.Text
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+// 9. reward_rules — quy tắc thưởng 3 TRỤC, tách khỏi campaign (V11). Phase 1: CONTENT_APPROVED+FLAT.
+model RewardRule {
+  id              String      @id @default(uuid()) @db.Uuid
+  campaignId      String      @unique @map("campaign_id") @db.Uuid
+  triggerType     TriggerType @map("trigger_type")          // ① điều kiện
+  viewThreshold   Int?        @map("view_threshold")        // ① NULL trừ VIEW_THRESHOLD
+  pricingType     PricingType @map("pricing_type")          // ② định giá
+  flatAmountMinor BigInt?     @map("flat_amount_minor")     // ② FLAT
+  percentBps      Int?        @map("percent_bps")           // ② % cho CPS sau (chừa đường)
+  capType         CapType     @map("cap_type")              // ③ trần ngân sách
+  capSlots        Int?        @map("cap_slots")
+  capPoolMinor    BigInt?     @map("cap_pool_minor")
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  campaign        Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
-  @@unique([campaignId, locale])
-  @@map("campaign_localization")
+  @@map("reward_rule")
 }
 
+// 10. participations — giữ 1 suất + SNAPSHOT điều khoản lúc join (V05). Join idempotent.
 model Participation {
-  id          String             @id @default(uuid()) @db.Uuid
-  profileId   String             @map("profile_id") @db.Uuid
-  campaignId  String             @map("campaign_id") @db.Uuid
-  countryId   String             @map("country_id") @db.Uuid
-  state       ParticipationState @default(JOINED)
-  joinedAt    DateTime           @default(now()) @map("joined_at") @db.Timestamptz(3)
-  version     Int                @default(0)
-  profile     CreatorCountryProfile @relation(fields: [profileId, countryId], references: [id, countryId], onDelete: Restrict)
-  campaign    Campaign           @relation(fields: [campaignId, countryId], references: [id, countryId], onDelete: Restrict)
-  country     Country            @relation(fields: [countryId], references: [id], onDelete: Restrict)
-  snapshot    ParticipationSnapshot?
-  assets      TrackingAsset[]
-  submissions ContentSubmission[]
+  id                   String             @id @default(uuid()) @db.Uuid
+  profileId            String             @map("profile_id") @db.Uuid
+  campaignId           String             @map("campaign_id") @db.Uuid
+  countryId            String             @map("country_id") @db.Uuid
+  state                ParticipationState @default(JOINED)
+  joinedAt             DateTime           @default(now()) @map("joined_at") @db.Timestamptz(3)
+  snapshotRewardMinor  BigInt             @map("snapshot_reward_minor")  // earning tính từ đây
+  snapshotCurrency     String             @map("snapshot_currency") @db.Char(3)
+  snapshotTriggerType  TriggerType        @map("snapshot_trigger_type")
+  snapshotPricingType  PricingType        @map("snapshot_pricing_type")
+  rowVersion           Int                @default(0) @map("row_version")
+  profile              CreatorCountryProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  campaign             Campaign           @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  country              Country            @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  submissions          Submission[]
+  earnings             Earning[]
 
-  @@unique([profileId, campaignId])
-  @@unique([id, countryId])
-  @@index([countryId, state, joinedAt])
+  @@unique([profileId, campaignId]) // Join idempotent: 2 lần bấm không giữ 2 suất
+  @@index([countryId, state])
   @@map("participation")
 }
 
-model ParticipationSnapshot {
-  id              String        @id @default(uuid()) @db.Uuid
-  participationId String        @unique @map("participation_id") @db.Uuid
-  offerVersion    Int           @map("offer_version")
-  termsSnapshot   Json          @map("terms_snapshot")
-  rewardSnapshot  Json          @map("reward_snapshot")
-  commissionSnapshot Json       @map("commission_snapshot")
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  participation   Participation @relation(fields: [participationId], references: [id], onDelete: Restrict)
+// ===== Nhóm D — Content & duyệt =====
 
-  @@map("participation_snapshot")
-}
+// 11. submissions — mỗi lần nộp content = 1 dòng (append theo attempt) (V06/V10).
+model Submission {
+  id             String          @id @default(uuid()) @db.Uuid
+  participationId String         @map("participation_id") @db.Uuid
+  attemptNo      Int             @map("attempt_no")
+  supersedesId   String?         @map("supersedes_id") @db.Uuid // trỏ bản bị reject trước
+  url            String
+  platform       String
+  hashtagOk      Boolean         @map("hashtag_ok")
+  platformOk     Boolean         @map("platform_ok")
+  state          SubmissionState @default(SUBMITTED)
+  rejectReason   String?         @map("reject_reason")
+  reviewedBy     String?         @map("reviewed_by") @db.Uuid
+  reviewedAt     DateTime?       @map("reviewed_at") @db.Timestamptz(3)
+  rowVersion     Int             @default(0) @map("row_version") // version check -> 409
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  participation  Participation   @relation(fields: [participationId], references: [id], onDelete: Restrict)
+  supersedes     Submission?     @relation("SubmissionChain", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersededBy   Submission[]    @relation("SubmissionChain")
+  earning        Earning?
 
-model TrackingAsset {
-  id              String        @id @default(uuid()) @db.Uuid
-  participationId String        @map("participation_id") @db.Uuid
-  type            String        @db.VarChar(40)
-  publicValue     String        @map("public_value") @db.Text
-  valueHash       String        @map("value_hash") @db.VarChar(128)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  participation   Participation @relation(fields: [participationId], references: [id], onDelete: Restrict)
-
-  @@unique([participationId, type])
-  @@unique([type, valueHash])
-  @@map("tracking_asset")
-}
-
-model ContentSubmission {
-  id              String        @id @default(uuid()) @db.Uuid
-  participationId String        @map("participation_id") @db.Uuid
-  countryId       String        @map("country_id") @db.Uuid
-  state           ContentState  @default(DRAFT)
-  activeVersion   Int?          @map("active_version")
-  version         Int           @default(0)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
-  participation   Participation @relation(fields: [participationId, countryId], references: [id, countryId], onDelete: Restrict)
-  country         Country       @relation(fields: [countryId], references: [id], onDelete: Restrict)
-  versions        SubmissionVersion[]
-  decisions       ReviewDecision[]
-
-  @@unique([id, countryId])
-  @@index([countryId, state, createdAt, id])
+  @@unique([participationId, attemptNo]) // không trùng số lần nộp
   @@map("content_submission")
 }
 
-model SubmissionVersion {
-  id           String            @id @default(uuid()) @db.Uuid
-  submissionId String            @map("submission_id") @db.Uuid
-  version      Int
-  contentRef   String            @map("content_ref") @db.Text
-  contentHash  String            @map("content_hash") @db.VarChar(128)
-  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  submission   ContentSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
-  decisions    ReviewDecision[]
-  earning      Earning?
+// ===== Nhóm E — Tiền =====
 
-  @@unique([submissionId, version])
-  @@map("submission_version")
-}
-
+// 12. earnings — thu nhập, sinh ĐÚNG 1 LẦN khi content được duyệt (V07). Khóa quan trọng nhất.
 model Earning {
-  id              String            @id @default(uuid()) @db.Uuid
-  countryId       String            @map("country_id") @db.Uuid
-  profileId       String            @map("profile_id") @db.Uuid
-  sourceType      String            @map("source_type") @db.VarChar(60)
-  sourceId        String            @unique @map("source_id") @db.Uuid
-  submissionVersionId String?       @unique @map("submission_version_id") @db.Uuid
-  state           EarningState      @default(PENDING)
-  grossMinor      BigInt            @map("gross_minor")
-  taxMinor        BigInt            @map("tax_minor")
-  netMinor        BigInt            @map("net_minor")
-  currency        String            @db.Char(3)
-  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
-  country         Country           @relation(fields: [countryId], references: [id], onDelete: Restrict)
-  submissionVersion SubmissionVersion? @relation(fields: [submissionVersionId], references: [id], onDelete: Restrict)
-  snapshots       EarningSnapshot[]
-  ledgerEntries   LedgerEntry[]
-  reconciliationLines ReconciliationLine[]
+  id             String        @id @default(uuid()) @db.Uuid
+  participationId String       @map("participation_id") @db.Uuid
+  submissionId   String        @unique @map("submission_id") @db.Uuid // exactly-once earning
+  countryId      String        @map("country_id") @db.Uuid
+  profileId      String        @map("profile_id") @db.Uuid
+  grossMinor     BigInt        @map("gross_minor")
+  taxMinor       BigInt        @map("tax_minor") // net = gross - tax (KHÔNG lưu)
+  currency       String        @db.Char(3)
+  status         EarningStatus @default(PENDING)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  participation  Participation @relation(fields: [participationId], references: [id], onDelete: Restrict)
+  submission     Submission    @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  country        Country       @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  profile        CreatorCountryProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  ledgerEntries  LedgerEntry[]
+  reconLine      ReconciliationLine?
 
-  @@unique([sourceType, sourceId])
-  @@unique([id, countryId])
-  @@index([countryId, profileId, state, createdAt])
+  @@index([countryId, profileId, status])
   @@map("earning")
 }
 
-model EarningSnapshot {
-  id          String       @id @default(uuid()) @db.Uuid
-  earningId   String       @map("earning_id") @db.Uuid
-  kind        SnapshotKind
-  ruleVersion String       @map("rule_version") @db.VarChar(80)
-  value       Json         @map("value_json")
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  earning     Earning      @relation(fields: [earningId], references: [id], onDelete: Restrict)
-
-  @@unique([earningId, kind])
-  @@map("earning_snapshot")
-}
-
+// 13. ledger_entries — sổ cái APPEND-ONLY, sự thật cuối cùng về tiền. Không UPDATE/DELETE.
 model LedgerEntry {
-  id              String          @id @default(uuid()) @db.Uuid
-  countryId       String          @map("country_id") @db.Uuid
-  transactionKey  String          @map("transaction_key") @db.VarChar(128)
-  effectKey       String          @unique @map("effect_key") @db.VarChar(180)
-  account         String          @db.VarChar(80)
-  direction       LedgerDirection
-  amountMinor     BigInt          @map("amount_minor")
-  currency        String          @db.Char(3)
-  earningId       String?         @map("earning_id") @db.Uuid
-  payoutRequestId String?         @map("payout_request_id") @db.Uuid
-  reversesEntryId String?         @map("reverses_entry_id") @db.Uuid
-  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  country         Country         @relation(fields: [countryId], references: [id], onDelete: Restrict)
-  earning         Earning?        @relation(fields: [earningId], references: [id], onDelete: Restrict)
-  payoutRequest   PayoutRequest?  @relation(fields: [payoutRequestId], references: [id], onDelete: Restrict)
-  reversesEntry   LedgerEntry?    @relation("LedgerReversal", fields: [reversesEntryId], references: [id], onDelete: Restrict)
-  reversedBy      LedgerEntry[]   @relation("LedgerReversal")
+  id           String          @id @default(uuid()) @db.Uuid
+  countryId    String          @map("country_id") @db.Uuid
+  profileId    String          @map("profile_id") @db.Uuid
+  entryType    LedgerEntryType @map("entry_type")
+  amountMinor  BigInt          @map("amount_minor") // CÓ DẤU (+/-)
+  currency     String          @db.Char(3)
+  refType      String          @map("ref_type") // 'earning' | 'payout' ...
+  refId        String          @map("ref_id") @db.Uuid
+  reversalOfId String?         @map("reversal_of_id") @db.Uuid
+  earningId    String?         @map("earning_id") @db.Uuid
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  country      Country         @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  profile      CreatorCountryProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  reversalOf   LedgerEntry?    @relation("LedgerReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy   LedgerEntry[]   @relation("LedgerReversal")
+  earning      Earning?        @relation(fields: [earningId], references: [id], onDelete: Restrict)
 
-  @@index([countryId, transactionKey])
-  @@index([countryId, earningId])
-  @@index([countryId, payoutRequestId])
+  @@unique([refType, refId, entryType]) // 1 sự kiện không ghi sổ 2 lần (chống double-pay)
+  @@index([countryId, profileId])
   @@map("ledger_entry")
 }
 
+// 14. reconciliation_batches — kỳ đối soát, LOCKED = bất biến (V12).
 model ReconciliationBatch {
-  id          String        @id @default(uuid()) @db.Uuid
-  countryId   String        @map("country_id") @db.Uuid
-  currency    String        @db.Char(3)
-  periodStart DateTime      @map("period_start") @db.Timestamptz(3)
-  periodEnd   DateTime      @map("period_end") @db.Timestamptz(3)
-  state       BatchState    @default(DRAFT)
-  version     Int           @default(0)
-  lockedAt    DateTime?     @map("locked_at") @db.Timestamptz(3)
-  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  country     Country       @relation(fields: [countryId], references: [id], onDelete: Restrict)
-  lines       ReconciliationLine[]
+  id        String               @id @default(uuid()) @db.Uuid
+  countryId String               @map("country_id") @db.Uuid
+  period    String
+  status    BatchStatus          @default(OPEN)
+  lockedBy  String?              @map("locked_by") @db.Uuid
+  lockedAt  DateTime?            @map("locked_at") @db.Timestamptz(3)
+  createdAt DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  country   Country              @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  lines     ReconciliationLine[]
 
-  @@unique([id, countryId])
-  @@index([countryId, state, createdAt])
+  @@index([countryId, status])
   @@map("reconciliation_batch")
 }
 
+// 15. reconciliation_lines — từng dòng đối soát; 1 earning vào ĐÚNG 1 batch (V12).
 model ReconciliationLine {
-  id          String                 @id @default(uuid()) @db.Uuid
-  batchId     String                 @map("batch_id") @db.Uuid
-  earningId   String                 @map("earning_id") @db.Uuid
-  countryId   String                 @map("country_id") @db.Uuid
-  decision    ReconciliationDecision @default(PENDING)
-  amountMinor BigInt                 @map("amount_minor")
-  currency    String                 @db.Char(3)
-  reasonCode  String?                @map("reason_code") @db.VarChar(80)
-  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
-  batch       ReconciliationBatch    @relation(fields: [batchId, countryId], references: [id, countryId], onDelete: Restrict)
-  earning     Earning                @relation(fields: [earningId, countryId], references: [id, countryId], onDelete: Restrict)
+  id        String              @id @default(uuid()) @db.Uuid
+  batchId   String              @map("batch_id") @db.Uuid
+  earningId String              @unique @map("earning_id") @db.Uuid // không đối soát/trả 2 lần
+  netMinor  BigInt              @map("net_minor")
+  currency  String              @db.Char(3)
+  anomaly   String?
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  batch     ReconciliationBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  earning   Earning             @relation(fields: [earningId], references: [id], onDelete: Restrict)
 
-  @@unique([batchId, earningId])
-  @@index([countryId, decision])
   @@map("reconciliation_line")
 }
 
-model PayoutIntent {
-  id             String                @id @default(uuid()) @db.Uuid
-  profileId      String                @map("profile_id") @db.Uuid
-  countryId      String                @map("country_id") @db.Uuid
-  state          OtpState              @default(OTP_PENDING)
-  otpHash        String                @map("otp_hash") @db.VarChar(128)
-  attempts       Int                   @default(0)
-  expiresAt      DateTime              @map("expires_at") @db.Timestamptz(3)
-  verifiedAt     DateTime?             @map("verified_at") @db.Timestamptz(3)
-  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  profile        CreatorCountryProfile @relation(fields: [profileId, countryId], references: [id, countryId], onDelete: Restrict)
-  country        Country               @relation(fields: [countryId], references: [id], onDelete: Restrict)
-  request        PayoutRequest?
-
-  @@unique([id, countryId])
-  @@index([countryId, profileId, state, createdAt])
-  @@map("payout_intent")
-}
-
+// 16. payout_requests — lệnh rút, máy trạng thái 3 kết cục (V08/V12).
 model PayoutRequest {
-  id             String          @id @default(uuid()) @db.Uuid
-  intentId       String          @unique @map("intent_id") @db.Uuid
-  countryId      String          @map("country_id") @db.Uuid
-  profileId      String          @map("profile_id") @db.Uuid
-  state          PayoutState     @default(RESERVED)
-  amountMinor    BigInt          @map("amount_minor")
-  currency       String          @db.Char(3)
-  reservedAt     DateTime        @default(now()) @map("reserved_at") @db.Timestamptz(3)
-  releasedAt     DateTime?       @map("released_at") @db.Timestamptz(3)
-  paidAt         DateTime?       @map("paid_at") @db.Timestamptz(3)
-  version        Int             @default(0)
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  intent         PayoutIntent    @relation(fields: [intentId, countryId], references: [id, countryId], onDelete: Restrict)
-  country        Country         @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  id             String        @id @default(uuid()) @db.Uuid
+  countryId      String        @map("country_id") @db.Uuid
+  profileId      String        @map("profile_id") @db.Uuid
+  amountMinor    BigInt        @map("amount_minor")
+  currency       String        @db.Char(3)
+  state          PayoutState   @default(PROCESSING)
+  otpId          String?       @map("otp_id") @db.Uuid
+  idempotencyKey String        @unique @map("idempotency_key") // bấm rút 2 lần không tạo 2 lệnh
+  requestedAt    DateTime      @default(now()) @map("requested_at") @db.Timestamptz(3)
+  country        Country       @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  profile        CreatorCountryProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  otp            OtpCode?      @relation(fields: [otpId], references: [id], onDelete: Restrict)
   attempts       PayoutAttempt[]
-  ledgerEntries  LedgerEntry[]
 
-  @@unique([id, countryId])
-  @@unique([intentId, countryId])
-  @@index([countryId, profileId, state, createdAt])
+  @@index([countryId, profileId, state])
   @@map("payout_request")
 }
 
+// 17. payout_attempts — mỗi lần gọi provider mock = 1 dòng. providerRef unique = idempotent.
 model PayoutAttempt {
-  id                 String             @id @default(uuid()) @db.Uuid
-  requestId          String             @map("request_id") @db.Uuid
-  sequence           Int
-  provider           String             @db.VarChar(60)
-  providerRequestKey String             @map("provider_request_key") @db.VarChar(160)
-  state              PayoutAttemptState @default(QUEUED)
-  responseCode       String?            @map("response_code") @db.VarChar(80)
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  resolvedAt         DateTime?          @map("resolved_at") @db.Timestamptz(3)
-  request            PayoutRequest      @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  id              String              @id @default(uuid()) @db.Uuid
+  payoutRequestId String              @map("payout_request_id") @db.Uuid
+  providerRef     String              @unique @map("provider_ref") // callback/retry chỉ ghi 1 lần
+  result          PayoutAttemptResult
+  raw             String?
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  request         PayoutRequest       @relation(fields: [payoutRequestId], references: [id], onDelete: Restrict)
 
-  @@unique([requestId, sequence])
-  @@unique([provider, providerRequestKey])
   @@map("payout_attempt")
 }
 
+// ===== Nhóm F — cắt ngang =====
+
+// 18. otp_codes — OTP mock cho rút tiền (V08). consumed_at => không tái dùng.
+model OtpCode {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  purpose    OtpPurpose
+  code       String
+  expiresAt  DateTime   @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime?  @map("consumed_at") @db.Timestamptz(3)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payoutRequests PayoutRequest[]
+
+  @@index([userId, purpose])
+  @@map("otp_code")
+}
+
+// audit_events — nhật ký mọi quyết định staff (append-only). Cắt ngang mọi màn staff.
 model AuditEvent {
-  id             String       @id @default(uuid()) @db.Uuid
-  actorUserId    String       @map("actor_user_id") @db.Uuid
-  countryId      String?      @map("country_id") @db.Uuid
-  correlationId  String       @map("correlation_id") @db.VarChar(128)
-  action         String       @db.VarChar(120)
-  aggregateType  String?      @map("aggregate_type") @db.VarChar(80)
-  aggregateId    String?      @map("aggregate_id") @db.Uuid
-  outcome        AuditOutcome
-  reasonCode     String?      @map("reason_code") @db.VarChar(80)
-  beforeRedacted Json?        @map("before_redacted")
-  afterRedacted  Json?        @map("after_redacted")
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  actor          User         @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
-  country        Country?     @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  countryId   String?  @map("country_id") @db.Uuid
+  action      String
+  targetType  String?  @map("target_type")
+  targetId    String?  @map("target_id") @db.Uuid
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor       User     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  country     Country? @relation(fields: [countryId], references: [id], onDelete: Restrict)
 
-  @@index([countryId, createdAt, id])
-  @@index([aggregateType, aggregateId, createdAt])
+  @@index([countryId, createdAt])
   @@map("audit_event")
-}
-
-model IdempotencyRecord {
-  id             String   @id @default(uuid()) @db.Uuid
-  actorUserId    String   @map("actor_user_id") @db.Uuid
-  scope          String   @db.VarChar(100)
-  key            String   @db.VarChar(128)
-  requestHash    String   @map("request_hash") @db.VarChar(128)
-  responseStatus Int?     @map("response_status")
-  responseBody   Json?    @map("response_body")
-  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  actor          User     @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
-
-  @@unique([actorUserId, scope, key])
-  @@index([expiresAt])
-  @@map("idempotency_record")
-}
-
-model ExternalEvent {
-  id              String              @id @default(uuid()) @db.Uuid
-  countryId       String              @map("country_id") @db.Uuid
-  provider        String              @db.VarChar(60)
-  externalEventId String              @map("external_event_id") @db.VarChar(180)
-  payloadHash     String              @map("payload_hash") @db.VarChar(128)
-  status          ExternalEventStatus @default(RECEIVED)
-  aggregateType   String?             @map("aggregate_type") @db.VarChar(80)
-  aggregateId     String?             @map("aggregate_id") @db.Uuid
-  receivedAt      DateTime            @default(now()) @map("received_at") @db.Timestamptz(3)
-  appliedAt       DateTime?           @map("applied_at") @db.Timestamptz(3)
-  country         Country             @relation(fields: [countryId], references: [id], onDelete: Restrict)
-
-  @@unique([provider, externalEventId])
-  @@index([countryId, status, receivedAt])
-  @@map("external_event")
 }

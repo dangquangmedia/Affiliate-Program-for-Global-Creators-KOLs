@@ -9,11 +9,12 @@
   Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
 - Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
   V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
-- **Đang ở N1** (Tuần A): brainstorm `docs/PRODUCT.md` cùng Anh Quang. Kế tiếp: N2-N3 mockup
-  (trọng tâm), N4 ERD lean, N5 schema mới.
-- Code hiện có: walking skeleton chạy được (Next.js `/vn` `/ph` → NestJS → Postgres seed
-  VN/PH). Schema 45 bảng cũ **vẫn còn** — chỉ thay tại N5 khi có schema lean (đừng xóa sớm,
-  app đang phụ thuộc bảng country/country_config).
+- **Xong Tuần A (N1-N5)**: Product (PRODUCT.md) + 12 màn mockup + ERD (DATA_MODEL.md) +
+  **schema lean thật đã migrate**. Kế: Tuần B (N6-N10) — ARCHITECTURE.md + auth/country/KYC/
+  campaign/join spine thật.
+- Code hiện có: walking skeleton chạy trên **schema mới 18 bảng** (Next.js `/vn` `/ph` →
+  NestJS → Postgres). Schema 45 bảng cũ **ĐÃ XÓA & thay** bằng lean N5 (migration
+  `20260718095722_init_lean_18_tables`, DB có 20 base table gồm _prisma_migrations).
 - Git: `main`; mốc: `aaa7b88` (tuần 1 ngày 1-4 cũ) → `08fd74e` (checkpoint trước V2) → các
   commit V2 sau đó.
 
@@ -99,23 +100,32 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   + mục "cố ý KHÔNG mô hình hóa" (brands/fx/notif). CHƯA code schema (đó là N5). Kế: N5 viết
   schema.prisma mới 18 bảng, xóa 45 bảng cũ, migrate DB rỗng + seed.
 
+- **N5 (2026-07-18)**: Viết lại `schema.prisma` từ đầu = **18 bảng lean** (+audit) đúng
+  DATA_MODEL.md, xóa schema 45 bảng + 3 migration cũ. Wipe DB (DROP SCHEMA public) → `migrate
+  dev` tạo migration mới `init_lean_18_tables` → seed VN/PH (countries + country_configs:
+  tax 10/8, minPayout, feature flags). Chỉnh `markets.service.ts`: locale/fallback về
+  `countries`, config 1:1 (`include:{config:true}`) thay vì list versioned — response 8-field
+  giữ NGUYÊN nên web/e2e không đổi. Kết quả: lint/api-typecheck/web-typecheck/build sạch, API
+  smoke 4/4, **E2E 4/4** (/vn=VND/vi-VN, /ph=PHP/fil-PH đọc từ DB mới), DB 20 base table.
+  3 unique trụ cột đã vào schema: `earning.submission_id`, `participation(profile,campaign)`,
+  `payout_attempt.provider_ref`. Kế: N6 ARCHITECTURE.md + auth mock SSO + session.
+
 ## Current State & Hand-off (cập nhật trước compact — 2026-07-18)
 
 **1. Vừa xong / trạng thái:**
-- Xong hết Tuần A phần Product: N1 PRODUCT.md, N2 mockup 8 màn Creator, N3 mockup 4 màn Staff, +2 fix.
-- Reward model đã chốt: CORE = `CONTENT_APPROVED + FLAT`, schema `reward_rule` tổng quát 3 trục (trigger/pricing/cap) — view-gate & CPS là config/model-only.
-- Git sạch, đã commit hết tới `799fc2b`. `pnpm verify` (typecheck/lint/build) + E2E 4/4 xanh. Postgres đang healthy, đã seed VN/PH.
-- Không có việc dở dang.
+- Xong hết **Tuần A (N1-N5)**: PRODUCT.md + 12 màn mockup + DATA_MODEL.md + **schema lean 18 bảng đã migrate + seed**.
+- Reward model chốt: CORE = `CONTENT_APPROVED + FLAT`, bảng `reward_rule` 3 trục (trigger/pricing/cap) — view-gate & CPS là config/model-only. Đã vào schema thật.
+- Toàn xanh: lint/typecheck/build + API 4/4 + E2E 4/4. DB Postgres healthy, 20 base table, seed VN/PH configs.
+- Không có việc dở dang. (Chưa commit N5 tại thời điểm viết — commit ngay sau.)
 
 **2. File/khái niệm quan trọng đang thao tác:**
-- Mockup: `apps/web/src/mockup/{data.ts, ui.tsx, mockup.module.css}` + `apps/web/src/app/mockup/**` (12 màn: creator/* + admin/config + admin/campaign-builder + ops/review + finance/workbench).
-- Product docs: `docs/PRODUCT.md` (3 QĐ + reward 3 trục + Core Platform), `Plan/KE_HOACH_V2.md` (lịch N1-N20).
-- Walking skeleton (giữ, xây tiếp N6+): `apps/web/src/app/[market]/page.tsx`, `src/lib/market-context.ts`, `apps/api/src/*`.
-- **Schema 45 bảng cũ `apps/api/prisma/schema.prisma` VẪN CÒN — sẽ thay tại N5** (walking skeleton đang phụ thuộc country/country_config).
+- Schema thật: `apps/api/prisma/schema.prisma` (18 bảng, 6 nhóm A-F) + migration `20260718095722_init_lean_18_tables` + `apps/api/prisma/seed.sql` (chỉ countries+configs).
+- Walking skeleton đã cập nhật cho schema mới: `apps/api/src/markets.service.ts` (đọc `config` 1:1, locale từ `countries`). Response 8-field KHÔNG đổi.
+- Product docs: `docs/PRODUCT.md`, `docs/DATA_MODEL.md`, `Plan/KE_HOACH_V2.md`.
+- Mockup (tái dùng ở N6+): `apps/web/src/mockup/**` + `apps/web/src/app/mockup/**` (12 màn).
+- **Gotcha DB**: `db:*` (prisma CLI) cần nạp `.env` thủ công vào session PowerShell trước khi chạy (config đọc `env("DATABASE_URL")`). `migrate reset` Prisma 7 KHÔNG có `--skip-seed` → dùng `db execute DROP SCHEMA public CASCADE` để wipe.
 
-**3. Nhiệm vụ đầu tiên phiên sau — N5:**
-- N4 XONG: `docs/DATA_MODEL.md` (18 bảng, thiết kế trên giấy). Giờ CODE thật.
-- Viết `apps/api/prisma/schema.prisma` MỚI đúng 18 bảng trong DATA_MODEL.md §2 (theo thứ tự 6 nhóm A-F).
-- Xóa schema 45 bảng cũ + 3 migration cũ → tạo migration mới TỪ DB rỗng → seed VN/PH + country_configs.
-- Nhớ giữ 3 unique-key trụ cột: `earnings.submission_id` (exactly-once), `participations(profile,campaign)` (join idempotent), `payout_attempts.provider_ref` (không double-pay).
-- **Cảnh báo phụ thuộc**: walking skeleton (`market-context.ts` → `/markets/:market/context`) đang đọc bảng country/country_config cũ — schema mới phải giữ được 2 bảng đó (đổi tên = countries/country_configs) để `/vn` `/ph` không gãy. Chạy E2E sau migrate để chắc.
+**3. Nhiệm vụ đầu tiên phiên sau — N6 (Tuần B):**
+- Viết `docs/ARCHITECTURE.md` 1 trang (modular monolith — vì sao không microservices; sơ đồ module; luồng country context) + code auth mock SSO + session (bảng `users` + phiên).
+- Bắt đầu spine thật: login → session → country context end-to-end (route→session→mọi query scoped theo country phiên).
+- Schema đã có `users`, `role_assignments`, `creator_country_profiles` sẵn sàng cho auth/RBAC.
