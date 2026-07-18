@@ -223,3 +223,117 @@ export const PAYOUT_HISTORY: PayoutRow[] = [
 ];
 
 export const PAYOUT_MIN_MINOR: Record<Currency, number> = { VND: 200000, PHP: 50000, USD: 1000 };
+
+// ========== STAFF (Admin / Ops / Finance) — N3 ==========
+
+// ---- Country config (Global Admin, V09) ----
+export interface CountryConfigRow {
+  market: Market;
+  taxPercent: number; // thuế synthetic demo
+  minPayoutMinor: number;
+  features: { key: string; label: string; on: boolean }[];
+}
+export const COUNTRY_CONFIG: Record<Market, CountryConfigRow> = {
+  VN: {
+    market: "VN",
+    taxPercent: 10,
+    minPayoutMinor: 200000,
+    features: [
+      { key: "kyc", label: "Bật KYC", on: true },
+      { key: "payout", label: "Bật rút tiền", on: true },
+      { key: "cps", label: "Bật CPS (đơn hàng)", on: false },
+    ],
+  },
+  PH: {
+    market: "PH",
+    taxPercent: 8,
+    minPayoutMinor: 50000,
+    features: [
+      { key: "kyc", label: "Bật KYC", on: true },
+      { key: "payout", label: "Bật rút tiền", on: true },
+      { key: "cps", label: "Bật CPS (đơn hàng)", on: false },
+    ],
+  },
+};
+
+// ---- Ops: KYC review queue (V10) ----
+export interface KycQueueItem {
+  id: string;
+  creatorName: string;
+  market: Market;
+  submittedAt: string;
+  state: "SUBMITTED" | "RESUBMITTED";
+}
+export const KYC_QUEUE: KycQueueItem[] = [
+  { id: "kq1", creatorName: "Nguyễn Minh Anh", market: "VN", submittedAt: "17/07 09:12", state: "SUBMITTED" },
+  { id: "kq2", creatorName: "Trần Bảo", market: "VN", submittedAt: "17/07 10:40", state: "RESUBMITTED" },
+  { id: "kq3", creatorName: "Maria Santos", market: "PH", submittedAt: "18/07 08:03", state: "SUBMITTED" },
+];
+
+// ---- Ops: content review queue (V10) ----
+export interface ContentQueueItem {
+  id: string;
+  creatorName: string;
+  campaignTitle: string;
+  market: Market;
+  platform: string;
+  url: string;
+  hashtagOk: boolean;
+  platformOk: boolean;
+  submittedAt: string;
+}
+export const CONTENT_QUEUE: ContentQueueItem[] = [
+  { id: "cq1", creatorName: "Nguyễn Minh Anh", campaignTitle: "Review son mùa hè", market: "VN", platform: "TikTok", url: "tiktok.com/@minhanh/video/771", hashtagOk: true, platformOk: true, submittedAt: "18/07 07:20" },
+  { id: "cq2", creatorName: "Phạm Dương", campaignTitle: "Review son mùa hè", market: "VN", platform: "TikTok", url: "facebook.com/photo/992", hashtagOk: false, platformOk: false, submittedAt: "18/07 07:55" },
+  { id: "cq3", creatorName: "Jose Cruz", campaignTitle: "Snack taste test", market: "PH", platform: "TikTok", url: "tiktok.com/@jose/video/210", hashtagOk: true, platformOk: true, submittedAt: "18/07 09:10" },
+];
+
+// ---- Finance: reconciliation (V12) ----
+export interface ReconLine {
+  id: string;
+  creatorName: string;
+  campaignTitle: string;
+  netMinor: number;
+  currency: Currency;
+  anomaly?: string;
+}
+export const RECON_LINES: ReconLine[] = [
+  { id: "rl1", creatorName: "Nguyễn Minh Anh", campaignTitle: "Review son mùa hè", netMinor: 450000, currency: "VND" },
+  { id: "rl2", creatorName: "Trần Bảo", campaignTitle: "Giới thiệu app học tiếng Anh", netMinor: 720000, currency: "VND" },
+  { id: "rl3", creatorName: "Lê Chi", campaignTitle: "Review son mùa hè", netMinor: 450000, currency: "VND", anomaly: "Thiếu thông tin ngân hàng" },
+];
+
+// ---- Finance: payout queue (V12) ----
+export interface PayoutQueueItem {
+  id: string;
+  creatorName: string;
+  amountMinor: number;
+  currency: Currency;
+  state: "RESERVED" | "PROCESSING" | "PAID" | "FAILED_RELEASED" | "UNKNOWN_HOLD";
+}
+export const PAYOUT_QUEUE: PayoutQueueItem[] = [
+  { id: "pq1", creatorName: "Nguyễn Minh Anh", amountMinor: 450000, currency: "VND", state: "RESERVED" },
+  { id: "pq2", creatorName: "Trần Bảo", amountMinor: 720000, currency: "VND", state: "PROCESSING" },
+];
+
+// ---- Reward rule 3 trục (Campaign builder V11) ----
+// Thể hiện QĐ-1 SỐNG trong UI: Phase 1 chỉ enable content-flat; view/CPS disabled (chừa đường).
+export type TriggerType = "CONTENT_APPROVED" | "VIEW_THRESHOLD" | "PAID_ORDER";
+export type PricingType = "FLAT" | "TIERED" | "PERCENT";
+
+export interface RewardOption<T> {
+  key: T;
+  label: string;
+  enabled: boolean;
+  note: string;
+}
+export const TRIGGER_OPTIONS: RewardOption<TriggerType>[] = [
+  { key: "CONTENT_APPROVED", label: "① Content được duyệt", enabled: true, note: "Phase 1 — chạy thật" },
+  { key: "VIEW_THRESHOLD", label: "① Đạt ngưỡng view", enabled: false, note: "Chừa đường — view làm CỔNG, tiền vẫn flat" },
+  { key: "PAID_ORDER", label: "① Có đơn hàng (CPS)", enabled: false, note: "Chừa đường — cần tracking/attribution" },
+];
+export const PRICING_OPTIONS: RewardOption<PricingType>[] = [
+  { key: "FLAT", label: "② Cố định / content", enabled: true, note: "Phase 1 — ngân sách kiểm soát tuyệt đối" },
+  { key: "TIERED", label: "② Bậc có trần", enabled: false, note: "Chừa đường — vẫn cap được" },
+  { key: "PERCENT", label: "② % giá trị đơn", enabled: false, note: "Chừa đường — đi cùng CPS" },
+];

@@ -222,6 +222,60 @@
 }
 .ctxBanner b { color: #cfe0ff; }
 
+/* Table (queue cho staff) */
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th {
+  text-align: left;
+  color: #7d8896;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-bottom: 1px solid #1e2733;
+  font-size: 12px;
+}
+.table td { padding: 9px 10px; border-bottom: 1px solid #141b24; color: #d7dee6; vertical-align: middle; }
+.table tr:last-child td { border-bottom: none; }
+.rowClickable { cursor: pointer; }
+.rowClickable:hover td { background: #0f1620; }
+.rowActive td { background: #10233b; }
+
+/* Reward-rule option picker (3 trục) */
+.optRow { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #2b3644;
+  background: #0f1620;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.optOn { border-color: #1f6feb; background: #12233d; }
+.optDisabled { opacity: 0.55; cursor: not-allowed; }
+.optNote { font-size: 11px; color: #7d8896; }
+
+/* Flow scenario box (2 luồng click) */
+.flowBox {
+  border: 1px solid #1e2733;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.flowSteps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.flowStep {
+  border: 1px solid #2b3644;
+  background: #131a22;
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 12px;
+  color: #cfe0ff;
+  text-decoration: none;
+}
+.flowStep:hover { border-color: #1f6feb; }
+.flowArrow { color: #4a5666; font-size: 12px; }
+
 /* Index screen list */
 .indexList { list-style: none; padding: 0; margin: 0; }
 .indexItem {
