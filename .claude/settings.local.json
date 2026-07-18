@@ -9,7 +9,24 @@
       "Read(//tmp/xlsx_extract/**)",
       "Read(//tmp/**)",
       "Bash(mkdir -p \"/c/Users/dangq/AppData/Local/Temp/claude/d--VSF-X-y-D-ng-H--Th-ng-Affiliate-GLOBAL-/78391b18-3aa8-43ec-b1f9-3b80a15147f5/scratchpad/xlsx_extract\")",
-      "Bash(unzip -o \"/d/VSF/Xây Dựng Hệ Thống Affiliate\\(GLOBAL\\)/Plan/docs/Book1.xlsx\" -d \"/c/Users/dangq/AppData/Local/Temp/claude/d--VSF-X-y-D-ng-H--Th-ng-Affiliate-GLOBAL-/78391b18-3aa8-43ec-b1f9-3b80a15147f5/scratchpad/xlsx_extract\")"
+      "Bash(unzip -o \"/d/VSF/Xây Dựng Hệ Thống Affiliate\\(GLOBAL\\)/Plan/docs/Book1.xlsx\" -d \"/c/Users/dangq/AppData/Local/Temp/claude/d--VSF-X-y-D-ng-H--Th-ng-Affiliate-GLOBAL-/78391b18-3aa8-43ec-b1f9-3b80a15147f5/scratchpad/xlsx_extract\")",
+      "Bash(pnpm --version)",
+      "Bash(npm ping *)",
+      "Bash(corepack pnpm *)",
+      "Bash(npm --version)",
+      "Bash(docker compose *)",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./package.json'\\).dependencies\\)\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./apps/api/package.json'\\).devDependencies.typescript\\)\")",
+      "Bash(taskkill //F //IM node.exe //T)",
+      "Bash(corepack enable *)",
+      "PowerShell(Get-Command pnpm -ErrorAction SilentlyContinue)",
+      "Bash(curl -s -o /dev/null -w \"api 3001: %{http_code}\\\\n\" http://localhost:3001/health)",
+      "Bash(curl -s -o /dev/null -w \"web 3000: %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -s -w \"\\\\nSTATUS:%{http_code}\\\\n\" http://localhost:3000/vn)",
+      "Bash(curl -s http://localhost:3000/ph)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/xx)",
+      "Bash(curl -s http://localhost:3001/markets/vn/context)"
     ]
   }
 }

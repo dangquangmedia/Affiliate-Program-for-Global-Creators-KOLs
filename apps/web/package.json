@@ -3,7 +3,23 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "check": "node -e \"console.log('web workspace: scaffold-ready')\""
+    "check": "node -e \"console.log('web workspace: scaffold-ready')\"",
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "next": "^15.5.20",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
   }
 }
-

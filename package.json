@@ -8,10 +8,11 @@
     "pnpm": "10.15.1"
   },
   "scripts": {
-    "check": "node scripts/check-workspace.mjs && node scripts/check-architecture.mjs && node scripts/check-db-scaffold.mjs",
+    "check": "node scripts/check-workspace.mjs && node scripts/check-architecture.mjs && node scripts/check-db-scaffold.mjs && node scripts/check-runtime-skeleton.mjs",
     "check:workspace": "node scripts/check-workspace.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:db": "node scripts/check-db-scaffold.mjs",
+    "check:runtime": "node scripts/check-runtime-skeleton.mjs",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
@@ -20,10 +21,20 @@
     "mockup": "node scripts/serve-mockup.mjs",
     "infra:config": "docker compose config --quiet",
     "infra:up": "docker compose up -d postgres",
-    "infra:status": "docker compose ps"
+    "infra:status": "docker compose ps",
+    "lint": "eslint apps/api/src apps/api/test apps/web/src apps/web/e2e apps/web/playwright.config.ts",
+    "typecheck": "corepack pnpm --filter @affiliate-global/api run typecheck && corepack pnpm --filter @affiliate-global/web run typecheck",
+    "test": "corepack pnpm --filter @affiliate-global/api run test && corepack pnpm --filter @affiliate-global/web run test",
+    "build": "corepack pnpm --filter @affiliate-global/api run build && corepack pnpm --filter @affiliate-global/web run build",
+    "dev:api": "corepack pnpm --filter @affiliate-global/api run dev",
+    "dev:web": "corepack pnpm --filter @affiliate-global/web run dev",
+    "verify": "corepack pnpm run check && corepack pnpm run lint && corepack pnpm run typecheck && corepack pnpm run test && corepack pnpm run build"
   },
   "devDependencies": {
-    "prisma": "^7.8.0"
+    "eslint": "^10.7.0",
+    "prisma": "^7.8.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.64.0"
   },
   "dependencies": {
     "@prisma/client": "7.8.0"

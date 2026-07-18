@@ -42,9 +42,9 @@ for (const securityRule of ["transaction-local", "FORCE ROW LEVEL SECURITY", "IS
 }
 
 const rtm = await readFile("docs/product/RTM.md", "utf8");
-const mustDesignReady = [...rtm.matchAll(/^\| (CP|AD|CR)-\d{2} .*\| DESIGN_READY \|$/gm)];
-if (mustDesignReady.length !== 22) {
-  throw new Error(`Expected 22 DESIGN_READY Must rows, found ${mustDesignReady.length}`);
+const mustLocked = [...rtm.matchAll(/^\| (CP|AD|CR)-\d{2} .*\| (DESIGN_READY|SKELETON_VERIFIED) \|$/gm)];
+if (mustLocked.length !== 22) {
+  throw new Error(`Expected 22 DESIGN_READY/SKELETON_VERIFIED Must rows, found ${mustLocked.length}`);
 }
 
 const openapi = await readFile("packages/contracts/openapi/week2.yaml", "utf8");
