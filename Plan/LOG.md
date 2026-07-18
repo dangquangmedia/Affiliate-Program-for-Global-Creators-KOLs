@@ -88,3 +88,34 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   trình duyệt chèn attr vào `<html>` → thêm `suppressHydrationWarning`. (4) Làm rõ **Core
   Platform KHÔNG phải persona** mà là tầng nền (CP-01..08) — ghi vào `PRODUCT.md` mục 2 + chỉ
   ra nó "sống" ở đâu trong mockup. E2E 4/4 xanh (API up), /vn êm khi API down.
+
+- **N4 (2026-07-18)**: Suy ERD lean **18 bảng** TỪ 12 màn mockup → `docs/DATA_MODEL.md`. Mỗi
+  bảng: vì sao tồn tại (màn nào cần) + unique key chống bug gì. 6 nhóm: A danh tính/nền nước
+  (users, countries, country_configs, role_assignments), B onboarding (creator_country_profiles,
+  kyc_cases, kyc_fields), C campaign (campaigns, reward_rules 3 trục, participations+snapshot),
+  D content (submissions +version/supersedes), E tiền (earnings UNIQUE submission_id,
+  ledger_entries append-only, reconciliation_batches/lines, payout_requests, payout_attempts),
+  F cắt-ngang (otp_codes, audit_events). Có bản đồ bảng→màn + bảng 7-bài-toán-khó-neo-vào-đâu
+  + mục "cố ý KHÔNG mô hình hóa" (brands/fx/notif). CHƯA code schema (đó là N5). Kế: N5 viết
+  schema.prisma mới 18 bảng, xóa 45 bảng cũ, migrate DB rỗng + seed.
+
+## Current State & Hand-off (cập nhật trước compact — 2026-07-18)
+
+**1. Vừa xong / trạng thái:**
+- Xong hết Tuần A phần Product: N1 PRODUCT.md, N2 mockup 8 màn Creator, N3 mockup 4 màn Staff, +2 fix.
+- Reward model đã chốt: CORE = `CONTENT_APPROVED + FLAT`, schema `reward_rule` tổng quát 3 trục (trigger/pricing/cap) — view-gate & CPS là config/model-only.
+- Git sạch, đã commit hết tới `799fc2b`. `pnpm verify` (typecheck/lint/build) + E2E 4/4 xanh. Postgres đang healthy, đã seed VN/PH.
+- Không có việc dở dang.
+
+**2. File/khái niệm quan trọng đang thao tác:**
+- Mockup: `apps/web/src/mockup/{data.ts, ui.tsx, mockup.module.css}` + `apps/web/src/app/mockup/**` (12 màn: creator/* + admin/config + admin/campaign-builder + ops/review + finance/workbench).
+- Product docs: `docs/PRODUCT.md` (3 QĐ + reward 3 trục + Core Platform), `Plan/KE_HOACH_V2.md` (lịch N1-N20).
+- Walking skeleton (giữ, xây tiếp N6+): `apps/web/src/app/[market]/page.tsx`, `src/lib/market-context.ts`, `apps/api/src/*`.
+- **Schema 45 bảng cũ `apps/api/prisma/schema.prisma` VẪN CÒN — sẽ thay tại N5** (walking skeleton đang phụ thuộc country/country_config).
+
+**3. Nhiệm vụ đầu tiên phiên sau — N5:**
+- N4 XONG: `docs/DATA_MODEL.md` (18 bảng, thiết kế trên giấy). Giờ CODE thật.
+- Viết `apps/api/prisma/schema.prisma` MỚI đúng 18 bảng trong DATA_MODEL.md §2 (theo thứ tự 6 nhóm A-F).
+- Xóa schema 45 bảng cũ + 3 migration cũ → tạo migration mới TỪ DB rỗng → seed VN/PH + country_configs.
+- Nhớ giữ 3 unique-key trụ cột: `earnings.submission_id` (exactly-once), `participations(profile,campaign)` (join idempotent), `payout_attempts.provider_ref` (không double-pay).
+- **Cảnh báo phụ thuộc**: walking skeleton (`market-context.ts` → `/markets/:market/context`) đang đọc bảng country/country_config cũ — schema mới phải giữ được 2 bảng đó (đổi tên = countries/country_configs) để `/vn` `/ph` không gãy. Chạy E2E sau migrate để chắc.
