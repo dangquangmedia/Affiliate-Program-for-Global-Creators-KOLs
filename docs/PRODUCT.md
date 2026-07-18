@@ -26,6 +26,27 @@ tự tạo campaign với ngân sách nhập tay.
 Ghi chú: Local Ops/Finance/Admin **chỉ thấy dữ liệu nước mình** — đây là ràng buộc sản phẩm,
 không phải chi tiết kỹ thuật (luật dữ liệu từng nước khác nhau).
 
+### "Core Platform" KHÔNG phải một persona — nó là tầng nền (giải thích điểm dễ nhầm)
+
+Book1 viết *"3 nhóm người dùng: Core Platform, Admin, Creator"*, nhưng thực chất đó là **3
+nhóm CHỨC NĂNG/yêu cầu**, không phải 3 loại người đăng nhập:
+
+- **Creator** và **Admin** (gồm Local Ops / Local Finance / Local Admin / Global Admin) là
+  **actor thật** — có tài khoản, đăng nhập, bấm nút.
+- **Core Platform** là **tầng nền xuyên suốt** mà mọi actor đều "tiêu thụ": đa quốc gia (route
+  `/vn` `/ph`), cách ly dữ liệu theo nước, i18n, đa tiền tệ, thuế, RBAC. Nó **không có màn hình
+  của riêng "người dùng Core Platform"** — nó hiện diện ở khắp nơi.
+
+Vì vậy mockup "chỉ thấy 2 nhóm" (Creator + Staff) là **đúng**: Core Platform không phải nhóm
+người, mà là nền đỡ cả hai. Trong 22 Must, Core Platform chính là các mã **CP-01…CP-08**
+(country config, cách ly, routing, i18n, tiền tệ, thuế) — capability, không phải actor.
+
+**Core Platform "sống" ở đâu trong mockup** (để chỉ cho mentor thấy nó không bị bỏ sót):
+- Nút đổi **VN/PH** + banner ngữ cảnh trên **mọi** màn → routing + cách ly theo nước (CP-02, CP-03).
+- Tiền hiển thị **VND/PHP** đúng định dạng, kèm USD tham chiếu → đa tiền tệ (CP-06).
+- Màn **V09 Cấu hình quốc gia** → nơi Core Platform được *quản trị* (do Global Admin vận hành).
+- Gross–Thuế–Net ở V07 → thuế theo nước (CP-08); chữ Việt/Anh → i18n (CP-05).
+
 ## 3. Ba quyết định sản phẩm nền móng (chốt N1)
 
 ### QĐ-1. Reward model: trả theo content được duyệt, giá cố định — thiết kế theo 3 trục

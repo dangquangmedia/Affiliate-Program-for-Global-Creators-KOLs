@@ -33,7 +33,8 @@
       "Bash(unzip -l Book1_restored.xlsx)",
       "Bash(mkdir -p verify_restore)",
       "Bash(unzip -o Book1_restored.xlsx -d verify_restore)",
-      "Bash(cp Book1_restored.xlsx \"/d/VSF/Xây Dựng Hệ Thống Affiliate\\(GLOBAL\\)/Plan/docs/Book1.xlsx\")"
+      "Bash(cp Book1_restored.xlsx \"/d/VSF/Xây Dựng Hệ Thống Affiliate\\(GLOBAL\\)/Plan/docs/Book1.xlsx\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{try{console.log\\('postgres:',JSON.parse\\(d\\).Health\\)}catch\\(e\\){console.log\\('postgres: not running'\\)}}\\)\")"
     ]
   }
 }

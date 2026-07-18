@@ -64,7 +64,10 @@ export default function CampaignBuilderScreen() {
                   onClick={() => o.enabled && setTrigger(o.key)}
                   className={`${mk.opt} ${trigger === o.key ? mk.optOn : ""} ${!o.enabled ? mk.optDisabled : ""}`}
                 >
-                  <span>{o.label} {!o.enabled && <Badge kind="neutral">khoá</Badge>}</span>
+                  <span className={mk.optLabel}>
+                    {o.label} {!o.enabled && <Badge kind="neutral">khoá</Badge>}
+                    {o.enabled && <Badge kind="success">đang dùng</Badge>}
+                  </span>
                   <span className={mk.optNote}>{o.note}</span>
                 </button>
               ))}
@@ -79,7 +82,10 @@ export default function CampaignBuilderScreen() {
                   onClick={() => o.enabled && setPricing(o.key)}
                   className={`${mk.opt} ${pricing === o.key ? mk.optOn : ""} ${!o.enabled ? mk.optDisabled : ""}`}
                 >
-                  <span>{o.label} {!o.enabled && <Badge kind="neutral">khoá</Badge>}</span>
+                  <span className={mk.optLabel}>
+                    {o.label} {!o.enabled && <Badge kind="neutral">khoá</Badge>}
+                    {o.enabled && <Badge kind="success">đang dùng</Badge>}
+                  </span>
                   <span className={mk.optNote}>{o.note}</span>
                 </button>
               ))}

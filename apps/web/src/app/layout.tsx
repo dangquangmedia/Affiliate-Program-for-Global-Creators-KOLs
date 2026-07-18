@@ -7,7 +7,9 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: một số extension trình duyệt (vd "Love Deals") chèn attribute
+    // vào <html> trước khi React hydrate, gây cảnh báo mismatch không phải do code của mình.
+    <html lang="en" suppressHydrationWarning>
       <body
         style={{
           fontFamily: "system-ui, -apple-system, sans-serif",

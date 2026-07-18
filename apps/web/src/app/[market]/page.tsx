@@ -8,12 +8,43 @@ export default async function MarketPage({
   params: Promise<{ market: string }>;
 }) {
   const { market } = await params;
-  const context = await fetchMarketContext(market);
+  const result = await fetchMarketContext(market);
 
-  if (!context) {
+  if (result.status === "not-found") {
     notFound();
   }
 
+  if (result.status === "api-unreachable") {
+    return (
+      <main style={{ padding: 32, maxWidth: 640 }} data-testid="api-unreachable">
+        <p>
+          <Link href="/">&larr; back</Link>
+        </p>
+        <h1>API chưa sẵn sàng</h1>
+        <p style={{ color: "#a9b6c4" }}>
+          Trang này đọc dữ liệu quốc gia từ PostgreSQL qua API tại <code>localhost:3001</code> —
+          có vẻ API chưa chạy. Mở một terminal khác và chạy:
+        </p>
+        <pre
+          style={{
+            background: "#0b1119",
+            border: "1px solid #2b3644",
+            borderRadius: 8,
+            padding: "12px 14px",
+            overflowX: "auto",
+          }}
+        >
+          docker compose up -d postgres{"\n"}corepack pnpm dev:api
+        </pre>
+        <p style={{ color: "#8b96a3", fontSize: 14 }}>
+          Xem hướng dẫn đầy đủ trong <code>README.md</code>. Còn bản prototype product tại{" "}
+          <Link href="/mockup">/mockup</Link> dùng dữ liệu mock nên <b>không cần API</b>.
+        </p>
+      </main>
+    );
+  }
+
+  const context = result.context;
   return (
     <main style={{ padding: 32, maxWidth: 640 }} data-testid="market-context">
       <p>

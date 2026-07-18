@@ -242,19 +242,23 @@
 .optRow { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 .opt {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid #2b3644;
   background: #0f1620;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 11px 13px;
   cursor: pointer;
   text-align: left;
 }
+.optLabel { font-size: 14px; color: #e6edf3; display: flex; align-items: center; gap: 8px; }
 .optOn { border-color: #1f6feb; background: #12233d; }
-.optDisabled { opacity: 0.55; cursor: not-allowed; }
-.optNote { font-size: 11px; color: #7d8896; }
+.optOn .optLabel { color: #cfe0ff; font-weight: 600; }
+.optDisabled { opacity: 0.7; cursor: not-allowed; }
+.optNote { font-size: 12px; color: #9aa6b3; line-height: 1.4; }
 
 /* Flow scenario box (2 luồng click) */
 .flowBox {
