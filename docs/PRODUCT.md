@@ -28,14 +28,45 @@ không phải chi tiết kỹ thuật (luật dữ liệu từng nước khác n
 
 ## 3. Ba quyết định sản phẩm nền móng (chốt N1)
 
-### QĐ-1. Trả tiền theo content được duyệt, giá cố định (không phải % đơn hàng)
+### QĐ-1. Reward model: trả theo content được duyệt, giá cố định — thiết kế theo 3 trục
 
-- Campaign ghi rõ: làm content đạt yêu cầu → nhận X tiền (VD 500.000₫).
-- **Vì sao**: toàn bộ vòng đời (nộp → duyệt → ghi thu nhập → rút) nằm TRONG hệ thống mình,
-  khép kín được E2E — ăn trọn tiêu chí chấm 0.4. CPS (% theo đơn hàng) cần hệ thống theo dõi
-  đơn + attribution bên ngoài, mock rất nặng, dễ vỡ tiến độ 4 tuần.
-- CPS được **thiết kế chừa đường mở rộng** (bảng dữ liệu không khóa chết vào content-flat)
-  và ghi lại làm câu trả lời hỏi đáp, nhưng không code.
+Đây là quyết định lõi nhất của sản phẩm. Nó được refine sau trao đổi với mentor (17/07):
+mentor chỉ ra điểm "cấn" giữa **trả-theo-view** và **ngân sách cố định của nhãn hàng**.
+
+**Bản chất: một "quy tắc thưởng" (reward rule) gồm 3 trục ĐỘC LẬP** — tách ra mới hết mơ hồ:
+
+| Trục | Câu hỏi | Phase 1 chọn | Chừa mở rộng |
+|---|---|---|---|
+| ① Điều kiện kích hoạt (trigger) | Cái gì xảy ra thì KOL "hoàn thành"? | `CONTENT_APPROVED` (Ops duyệt content đạt chuẩn) | đạt X view · có click · có sale · có lead |
+| ② Cách định giá (pricing) | Đủ điều kiện thì tính bao nhiêu? | `FLAT` (cố định mỗi content) | bậc có trần · % giá trị đơn |
+| ③ Trần ngân sách (budget cap) | Campaign chi tối đa bao nhiêu? | `SLOTS × ĐƠN_GIÁ` (QĐ-3) | pool trừ dần |
+
+**Điểm cấn của mentor nằm ở trục ②**: nếu pricing = "tuyến tính theo view, không trần" thì
+trục ③ (ngân sách cố định) sụp. VD 30 suất × 500k = 15tr cố định; trả 50đ/view thì 1 video
+10M view = 500tr → vỡ 33 lần. **View không có tội — hệ-số-nhân-không-trần mới có tội.**
+
+**Chìa khoá dung hoà (câu trả lời "hiểu sâu" cho mentor):** View được phép tham gia trục ①
+(điều kiện), miễn KHÔNG tham gia trục ② như hệ số nhân vô hạn. → 3 cách dùng view mà ngân
+sách vẫn cố định: view làm **cổng** (đạt X view → nhận flat), view làm **bậc có trần**, hoặc
+view **phi tiền tệ** (chỉ xếp hạng). Chỉ pay-per-view tuyến tính không trần mới vỡ ngân sách —
+đúng cái mentor bác.
+
+**Vì sao Phase 1 chạy `CONTENT_APPROVED + FLAT`:** toàn bộ vòng đời (nộp → duyệt → ghi thu
+nhập → rút) nằm TRONG hệ thống, khép kín E2E — ăn trọn tiêu chí chấm 0.4; ngân sách kiểm soát
+tuyệt đối.
+
+**Vì sao thiết kế `reward_rule` tổng quát 3 trục thay vì hard-code:** chi phí thêm gần bằng 0
+(vài cột config: `trigger_type`, `pricing_type`, `view_threshold?`, `cap_type`), nhưng đổi lại
+**view-gate và CPS chỉ là config/model-only** — không phải viết lại. Đây là cách một người
+chịu trách nhiệm sản phẩm để ngỏ tương lai mà không ôm đồm hiện tại.
+
+**Chỗ mơ hồ đã làm rõ** (để không bị mentor khoan bất ngờ):
+- *"Được duyệt" =* Ops xác nhận content đạt yêu cầu (đúng nền tảng + hashtag bắt buộc), Phase 1
+  KHÔNG gắn điều kiện view. Trả cho **kết quả có kiểm duyệt**, không phải cho lượt xem.
+- *KOL làm đúng chuẩn nhưng 0 view* → vẫn trả (Phase 1 trả theo "content đạt", không theo view).
+  Nếu sau này muốn "phải có view mới trả" → bật `view_threshold` ở trục ①, không đổi kiến trúc.
+- *Nếu bật view-gate, lấy số view từ đâu* → Phase 1 không có API social thật; nguồn view sẽ là
+  Ops nhập tay khi duyệt hoặc mock "social-metrics provider" đúng định dạng (giống mock eKYC).
 
 ### QĐ-2. Xem thoải mái — JOIN mới cần KYC Approved
 
@@ -91,10 +122,16 @@ tính pháp lý thuế thật.
 
 ## 6. Câu hỏi mentor có thể hỏi ngay từ tài liệu này
 
-1. *Sao không làm CPS như affiliate thật?* → QĐ-1: khép kín E2E trong 4 tuần; thiết kế chừa
-   đường mở rộng, chỉ ra được bảng nào cần thêm gì nếu làm CPS.
-2. *Sao bắt KYC trước Join mà không phải trước rút tiền?* → QĐ-2: join là cam kết tài chính.
-3. *Campaign "Đầy" là trạng thái do admin đặt à?* → Không — "Đầy" là **suy ra** từ số suất
+1. *Thế trả theo view thì sao?* → View em cho làm **cổng điều kiện** (trục ①), tiền vẫn
+   **flat** (trục ②) nên ngân sách cố định (trục ③) không vỡ. Cái vỡ ngân sách là pay-per-view
+   tuyến tính không trần — em bác vì đúng lý do đó. Phase 1 chạy sâu bản content-flat, view-gate
+   em đã model sẵn (chỉ là bật `view_threshold`).
+2. *Thế CPS / trả theo sale?* → Đó là affiliate thật nhất (gắn doanh thu), nhưng cần tracking
+   click + attribution + chống gian lận + đối soát sàn TMĐT — mock rất nặng, không khép kín,
+   dễ vỡ tiến độ 4 tuần. Em **model-hoá chừa đường** (trục ①=`PAID_ORDER`, ②=`%`), không
+   triển khai runtime Phase 1.
+3. *Sao bắt KYC trước Join mà không phải trước rút tiền?* → QĐ-2: join là cam kết tài chính.
+4. *Campaign "Đầy" là trạng thái do admin đặt à?* → Không — "Đầy" là **suy ra** từ số suất
    còn lại, không phải trạng thái lưu trong DB (tránh lệch dữ liệu).
-4. *Một creator dùng cả VN lẫn PH thì sao?* → 1 tài khoản, 2 hồ sơ độc lập (KYC, ngân hàng,
+5. *Một creator dùng cả VN lẫn PH thì sao?* → 1 tài khoản, 2 hồ sơ độc lập (KYC, ngân hàng,
    thu nhập riêng từng nước); chuyển nước = chuyển ngữ cảnh, không trộn dữ liệu.
