@@ -81,6 +81,22 @@ export type PrismaClientLike = {
     create(args: { data: unknown; include?: unknown }): Promise<unknown>;
     update(args: { where: unknown; data: unknown; include?: unknown }): Promise<unknown>;
   };
+  countryConfig: {
+    findUnique(args: { where: { countryId: string } }): Promise<unknown>;
+  };
+  submission: {
+    findFirst(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
+    findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
+    count(args: { where?: unknown }): Promise<number>;
+    create(args: { data: unknown; include?: unknown }): Promise<unknown>;
+    update(args: { where: unknown; data: unknown; include?: unknown }): Promise<unknown>;
+  };
+  earning: {
+    findFirst(args: { where?: unknown; include?: unknown }): Promise<unknown>;
+    findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
+    count(args: { where?: unknown }): Promise<number>;
+    create(args: { data: unknown }): Promise<unknown>;
+  };
   // Interactive transaction: callback nhận 1 client-like đã ở trong transaction (dùng cho
   // SELECT ... FOR UPDATE + đọc/ghi nguyên tử khi tranh suất — QĐ-5).
   $transaction<T>(fn: (tx: PrismaClientLike) => Promise<T>): Promise<T>;

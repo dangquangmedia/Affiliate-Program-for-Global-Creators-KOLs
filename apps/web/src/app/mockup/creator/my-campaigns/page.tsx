@@ -113,10 +113,23 @@ export default function MyCampaignsScreen() {
                     </p>
                   )}
                   <BtnRow>
-                    {p.state === "JOINED" && (
+                    {(p.state === "JOINED" || p.state === "REJECTED") && (
                       <Btn variant="primary">
-                        <Link href="/mockup/creator/submit" style={{ color: "#fff", textDecoration: "none" }}>
-                          Nộp nội dung →
+                        <Link
+                          href={`/mockup/creator/submit?id=${p.campaignId}&m=${market}`}
+                          style={{ color: "#fff", textDecoration: "none" }}
+                        >
+                          {p.state === "REJECTED" ? "Sửa & nộp lại →" : "Nộp nội dung →"}
+                        </Link>
+                      </Btn>
+                    )}
+                    {p.state === "CONTENT_SUBMITTED" && (
+                      <Btn variant="ghost">
+                        <Link
+                          href={`/mockup/creator/submit?id=${p.campaignId}&m=${market}`}
+                          style={{ color: "inherit", textDecoration: "none" }}
+                        >
+                          Xem bài đã nộp →
                         </Link>
                       </Btn>
                     )}

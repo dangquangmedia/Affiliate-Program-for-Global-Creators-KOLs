@@ -149,19 +149,21 @@ export function Field({
   placeholder,
   locked,
   error,
+  onChange,
 }: {
   label: string;
   value?: string;
   placeholder?: string;
   locked?: boolean;
   error?: string;
+  onChange?: (v: string) => void; // có onChange -> controlled input (form thật)
 }) {
   return (
     <div className={styles.field}>
       <label className={styles.fieldLabel}>{label}</label>
       <input
         className={`${styles.input} ${locked ? styles.inputLocked : ""} ${error ? styles.inputError : ""}`}
-        defaultValue={value}
+        {...(onChange ? { value: value ?? "", onChange: (e) => onChange(e.target.value) } : { defaultValue: value })}
         placeholder={placeholder}
         readOnly={locked}
       />

@@ -193,7 +193,10 @@ function CampaignDetailInner() {
               </p>
               <BtnRow>
                 <Btn variant="primary">
-                  <Link href="/mockup/creator/submit" style={{ color: "#fff", textDecoration: "none" }}>
+                  <Link
+                    href={`/mockup/creator/submit?id=${id}&m=${market}`}
+                    style={{ color: "#fff", textDecoration: "none" }}
+                  >
                     Nộp nội dung →
                   </Link>
                 </Btn>

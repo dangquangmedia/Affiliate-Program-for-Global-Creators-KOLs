@@ -16,6 +16,8 @@ import { CampaignService } from "./campaign/campaign.service";
 import { JoinController } from "./campaign/join.controller";
 import { JoinService } from "./campaign/join.service";
 import { ReclaimScheduler } from "./campaign/reclaim.scheduler";
+import { CreatorContentController, OpsContentController } from "./content/content.controller";
+import { ContentService } from "./content/content.service";
 
 @Module({
   controllers: [
@@ -28,6 +30,8 @@ import { ReclaimScheduler } from "./campaign/reclaim.scheduler";
     OpsKycController,
     CampaignController,
     JoinController,
+    CreatorContentController,
+    OpsContentController,
   ],
   providers: [
     PrismaService,
@@ -39,6 +43,7 @@ import { ReclaimScheduler } from "./campaign/reclaim.scheduler";
     CampaignService,
     JoinService,
     ReclaimScheduler,
+    ContentService,
   ],
 })
 export class AppModule {}

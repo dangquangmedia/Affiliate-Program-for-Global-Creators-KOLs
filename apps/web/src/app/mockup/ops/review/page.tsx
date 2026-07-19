@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CONTENT_QUEUE, type Market } from "../../../../mockup/data";
+import type { Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, mk } from "../../../../mockup/ui";
 import { mockLogin, saveSession } from "../../../../lib/auth-client";
 import { getKycQueue, reviewKyc, type KycQueueItem, type FieldDecision } from "../../../../lib/kyc-client";
+import { contentQueue, reviewContent, type ContentQueueItem } from "../../../../lib/content-client";
 
 // Quyết định đang soạn cho từng field của từng case: caseId -> fieldKey -> {decision, reason}.
 type DecisionMap = Record<string, Record<string, { decision: "ACCEPT" | "NEEDS_CHANGES"; reason: string }>>;
@@ -13,11 +14,11 @@ export default function OpsReviewScreen() {
   const [market, setMarket] = useState<Market>("VN");
   const [status, setStatus] = useState<"loading" | "needStaff" | "ready">("loading");
   const [queue, setQueue] = useState<KycQueueItem[]>([]);
+  const [content, setContent] = useState<ContentQueueItem[]>([]);
+  const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
   const [decisions, setDecisions] = useState<DecisionMap>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-
-  const content = CONTENT_QUEUE.filter((c) => c.market === market);
 
   const load = useCallback(async () => {
     const q = await getKycQueue(market);
@@ -34,6 +35,8 @@ export default function OpsReviewScreen() {
     }
     setDecisions(seed);
     setQueue(q);
+    const cq = await contentQueue(market);
+    setContent("forbidden" in cq ? [] : cq);
     setStatus("ready");
   }, [market]);
 
@@ -53,6 +56,25 @@ export default function OpsReviewScreen() {
       ...d,
       [caseId]: { ...d[caseId], [key]: { ...d[caseId][key], ...patch } },
     }));
+  }
+
+  async function reviewSubmission(id: string, decision: "APPROVE" | "REJECT") {
+    setErr(null);
+    const reason = (rejectReasons[id] ?? "").trim();
+    if (decision === "REJECT" && !reason) {
+      setErr("Từ chối content phải nhập lý do.");
+      return;
+    }
+    setBusy(id);
+    try {
+      const res = await reviewContent(market, id, decision, reason || undefined);
+      if (!res.ok && res.code === "ALREADY_REVIEWED") {
+        setErr("Submission này vừa được reviewer khác xử lý (chống duyệt trùng).");
+      }
+      await load();
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function submitReview(c: KycQueueItem) {
@@ -75,10 +97,10 @@ export default function OpsReviewScreen() {
   return (
     <Frame screen="V10 Ops review" title="Hàng đợi duyệt (Local Ops)" market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> Ops duyệt KYC thế nào, từ chối ra sao? → Duyệt/từ chối
-        <strong> theo từng field</strong>, từ chối phải có lý do; creator chỉ nộp lại field bị từ
-        chối. <em>KYC gọi API thật + RBAC: chỉ Ops đúng nước mới thấy/xử lý (bài toán #1). Hàng
-        đợi content bên dưới còn là mock — nối ở N11.</em>
+        <strong>Màn này trả lời:</strong> Ops duyệt KYC + content thế nào, từ chối ra sao? →
+        Duyệt/từ chối <strong>theo từng field</strong> (KYC) và theo submission (content), từ chối
+        phải có lý do. <em>Cả 2 hàng đợi gọi API thật + RBAC cách ly nước (bài toán #1); duyệt
+        content tạo thu nhập ĐÚNG 1 LẦN kể cả double-click (bài toán #7 — N11).</em>
       </Note>
 
       <div style={{ fontSize: 12, color: "#8b96a3", marginBottom: 14 }}>
@@ -166,28 +188,44 @@ export default function OpsReviewScreen() {
             ))}
           </Card>
 
-          <Card title={`Hàng đợi content (${content.length}) — mock (N11)`}>
-            <table className={mk.table}>
-              <thead>
-                <tr>
-                  <th>Creator</th>
-                  <th>Campaign</th>
-                  <th>Kiểm tự động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {content.map((c) => {
-                  const ok = c.hashtagOk && c.platformOk;
-                  return (
-                    <tr key={c.id}>
-                      <td>{c.creatorName}</td>
-                      <td>{c.campaignTitle}</td>
-                      <td>{ok ? <Badge kind="success">Đạt sơ bộ</Badge> : <Badge kind="danger">Cần xem</Badge>}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <Card
+            title={`Hàng đợi content (${content.length})`}
+            sub="Approve tạo ĐÚNG 1 khoản thu nhập (exactly-once); reject bắt buộc lý do, creator có 24h sửa (QĐ-4)."
+          >
+            {content.length === 0 && <p style={{ color: "#8b96a3" }}>Không có content chờ duyệt.</p>}
+            {content.map((s) => {
+              const ok = s.hashtagOk && s.platformOk;
+              return (
+                <div key={s.submissionId} data-creator={s.creatorName} style={{ borderTop: "1px solid #1b2430", paddingTop: 12, marginTop: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <div>
+                      <strong>{s.creatorName}</strong>
+                      <span style={{ color: "#8b96a3", fontSize: 13 }}> · {s.campaignTitle} · attempt #{s.attemptNo}</span>
+                    </div>
+                    {ok ? <Badge kind="success">Đạt sơ bộ</Badge> : <Badge kind="danger">Cần xem</Badge>}
+                  </div>
+                  <p style={{ fontSize: 12, color: "#6aa6ff", wordBreak: "break-all", margin: "6px 0" }}>
+                    <a href={s.url} target="_blank" rel="noreferrer" style={{ color: "#6aa6ff" }}>{s.url}</a>
+                    {!s.hashtagOk && <span style={{ color: "#f0c674" }}> · caption thiếu hashtag</span>}
+                  </p>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <Btn variant="primary" disabled={busy === s.submissionId} onClick={() => reviewSubmission(s.submissionId, "APPROVE")}>
+                      {busy === s.submissionId ? "…" : "Duyệt (+ thu nhập)"}
+                    </Btn>
+                    <Btn variant="danger" disabled={busy === s.submissionId} onClick={() => reviewSubmission(s.submissionId, "REJECT")}>
+                      Từ chối
+                    </Btn>
+                    <input
+                      className={mk.input}
+                      style={{ flex: 1, minWidth: 200 }}
+                      placeholder="Lý do từ chối (bắt buộc khi từ chối)"
+                      value={rejectReasons[s.submissionId] ?? ""}
+                      onChange={(e) => setRejectReasons((r) => ({ ...r, [s.submissionId]: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </Card>
         </>
       )}
