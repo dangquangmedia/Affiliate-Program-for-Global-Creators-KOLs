@@ -42,7 +42,8 @@
       "Bash(docker exec *)",
       "Bash(cd \"d:/VSF/Xây Dựng Hệ Thống Affiliate\\(GLOBAL\\)/apps/api/src\" && ls -la && echo \"=== KE_HOACH N6 section ===\" && grep -n \"N6\\\\|N7\\\\|Tuần B\" \"../../../Plan/KE_HOACH_V2.md\" | head -20)",
       "Read(//d/Plan/**)",
-      "Bash(git commit -q -m ' *)"
+      "Bash(git commit -q -m ' *)",
+      "Bash(awk '/export function Btn\\\\b/,/^}/' ui.tsx)"
     ]
   }
 }

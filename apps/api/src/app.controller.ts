@@ -12,6 +12,8 @@ export class AppController {
         "POST /auth/mock-login",
         "GET /auth/me",
         "POST /auth/logout",
+        "POST /me/country/{market} (auth)",
+        "GET /me/countries (auth)",
       ],
     };
   }

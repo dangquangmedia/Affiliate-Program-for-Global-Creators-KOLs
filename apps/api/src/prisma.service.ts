@@ -23,6 +23,12 @@ export interface RoleRow {
   countryId: string | null;
   role: string;
 }
+export interface ProfileRow {
+  id: string;
+  userId: string;
+  countryId: string;
+  onboardingState: string;
+}
 
 type PrismaClientLike = {
   $connect(): Promise<void>;
@@ -43,6 +49,14 @@ type PrismaClientLike = {
     create(args: { data: Omit<SessionRow, "id" | "revokedAt"> }): Promise<SessionRow>;
     findUnique(args: { where: { tokenHash: string }; include?: unknown }): Promise<unknown>;
     update(args: { where: { id: string }; data: Partial<SessionRow> }): Promise<SessionRow>;
+  };
+  creatorCountryProfile: {
+    upsert(args: {
+      where: { userId_countryId: { userId: string; countryId: string } };
+      create: { userId: string; countryId: string };
+      update: { onboardingState?: string };
+    }): Promise<ProfileRow>;
+    findMany(args: { where: { userId: string }; include?: unknown }): Promise<unknown>;
   };
 };
 

@@ -9,9 +9,10 @@
   Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
 - Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
   V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
-- **Xong Tuần A (N1-N5) + N6**: Product + 12 màn mockup + ERD + schema lean (19 model, đã
-  migrate) + **ARCHITECTURE.md + auth mock SSO/session thật** (login→me→logout chạy trên DB).
-  Đang trong Tuần B. Kế: N7 country context end-to-end + i18n + web login UI, rồi N8 KYC.
+- **Xong Tuần A (N1-N5) + N6 + N7**: Product + 12 màn mockup + ERD + schema lean (19 model) +
+  ARCHITECTURE.md + **auth/session + web login + country context end-to-end + i18n** (spine
+  chạy thật tới trình duyệt: login→chọn nước→profile trong DB). API 14/14, E2E 7/7. Đang trong
+  Tuần B. Kế: N8 KYC → N9-10 campaign/join.
 - Code hiện có: walking skeleton chạy trên **schema mới 18 bảng** (Next.js `/vn` `/ph` →
   NestJS → Postgres). Schema 45 bảng cũ **ĐÃ XÓA & thay** bằng lean N5 (migration
   `20260718095722_init_lean_18_tables`, DB có 20 base table gồm _prisma_migrations).
@@ -156,6 +157,17 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   session active. Kế N7 phần 2: chọn nước → tạo `creator_country_profiles` gắn phiên → query
   scope theo country phiên + i18n.
 
+- **N7 phần 2 — country context end-to-end + i18n (2026-07-19)**: API module `country/`
+  (guarded bằng `SessionAuthGuard`): `POST /me/country/:market` upsert `creator_country_profiles`
+  gắn **user của phiên** (userId từ session, KHÔNG từ client) — idempotent nhờ UNIQUE(user,
+  country); `GET /me/countries` chỉ trả hồ sơ của chính phiên. Route `:market` là ý định, hồ sơ
+  cột vào session → minh hoạ bài toán #1. Web: `lib/country-client.ts` + rewire màn V02 (bỏ
+  StateBar demo, thành màn thật: needLogin/loading/ready) gọi API thật, hiện context từ DB +
+  format tiền theo locale. Nền i18n `lib/i18n.ts` (vi/en + fallback + `formatMoney` theo locale).
+  Kết quả: **API 14/14**, **E2E 7/7** (thêm: chọn VN tạo profile thật + hiện `500.000 ₫`;
+  country yêu cầu login), typecheck/lint/build sạch. Kế: N8 module KYC (creator nộp → Ops
+  duyệt/từ chối theo field → nộp lại).
+
 ## Current State & Hand-off (cập nhật trước compact — 2026-07-18)
 
 **1. Vừa xong / trạng thái:**
@@ -171,9 +183,9 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
 - Mockup (tái dùng ở N6+): `apps/web/src/mockup/**` + `apps/web/src/app/mockup/**` (12 màn).
 - **Gotcha DB**: `db:*` (prisma CLI) cần nạp `.env` thủ công vào session PowerShell trước khi chạy (config đọc `env("DATABASE_URL")`). `migrate reset` Prisma 7 KHÔNG có `--skip-seed` → dùng `db execute DROP SCHEMA public CASCADE` để wipe.
 
-**3. Nhiệm vụ đầu tiên phiên sau — N7 (Tuần B):**
-- N6 XONG: ARCHITECTURE.md + auth mock SSO + session (API 9/9 xanh). Auth đã có: `POST /auth/mock-login`, `GET /auth/me`, `POST /auth/logout` + `SessionAuthGuard`/`@CurrentAuth()`.
-- N7: **country context end-to-end** — nối phiên vào chọn nước: creator login → chọn VN/PH → tạo `creator_country_profiles` → mọi query scope theo country của PHIÊN (không theo param client). Ops VN đọc dữ liệu PH bằng ID trực tiếp → 404 (test negative).
-- + nền i18n (vi/en, fallback) + format tiền theo locale (tái dùng `formatMoney` từ mockup).
-- + **web login UI**: trang login gọi `/auth/mock-login`, lưu token, gắn Bearer cho request sau (N6 mới làm API, web chưa nối).
-- Dùng lại `SessionAuthGuard` cho các route N7; thêm scope-by-country ở tầng service.
+**3. Nhiệm vụ đầu tiên phiên sau — N8 (Tuần B):**
+- N6+N7 XONG: auth + session + web login + country context end-to-end + i18n (API 14/14, E2E 7/7).
+  Đã có: `/auth/*`, `/me/country/:market`, `/me/countries`, `SessionAuthGuard`, `lib/{auth,country}-client.ts`, `lib/i18n.ts`.
+- N8: **module KYC** — creator nộp hồ sơ (`kyc_cases` + `kyc_fields`) → Ops duyệt/từ chối THEO TỪNG TRƯỜNG (state ACCEPTED/NEEDS_CHANGES + reason) → creator nộp lại đúng trường bị từ chối. QĐ-2: chặn Join khi case chưa APPROVED (áp ở N9-10).
+- Bảng đã có sẵn: `kyc_cases` (UNIQUE profile_id), `kyc_fields` (UNIQUE case_id+key). Dùng lại guard; kyc gắn vào `creator_country_profile` của phiên+nước.
+- Web: rewire màn V03 KYC (creator) + V10 Ops review (dùng session, scope theo nước).

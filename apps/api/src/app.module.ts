@@ -7,9 +7,11 @@ import { MarketsService } from "./markets.service";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
 import { SessionAuthGuard } from "./auth/session-auth.guard";
+import { ProfileController } from "./country/profile.controller";
+import { ProfileService } from "./country/profile.service";
 
 @Module({
-  controllers: [AppController, HealthController, MarketsController, AuthController],
-  providers: [PrismaService, MarketsService, AuthService, SessionAuthGuard],
+  controllers: [AppController, HealthController, MarketsController, AuthController, ProfileController],
+  providers: [PrismaService, MarketsService, AuthService, SessionAuthGuard, ProfileService],
 })
 export class AppModule {}
