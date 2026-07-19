@@ -221,4 +221,12 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   - Chống gian lận: **strike**, sau **2 lần** bị thu hồi vì ì thì cấm join lại campaign đó (đếm trên row participation giữ lại; re-join = EXPIRED→JOINED cùng row).
   - Chi tiết đầy đủ: `docs/PRODUCT.md` QĐ-4.
 - Web: nút Join ở V05 (đang disabled) → gọi API thật; màn My Campaigns hiện deadline/đếm ngược + trạng thái (kể cả EXPIRED); nút "Rời suất".
-- Đây là **demo giữa kỳ**: login→KYC→join chạy thật 2 nước. Sau N10 là hết Tuần B.
+- **QĐ-5 (đã brainstorm+chốt) — tranh suất cuối + danh sách chờ** (chi tiết `docs/PRODUCT.md` QĐ-5):
+  - Join race-safe: transaction + `SELECT campaign FOR UPDATE` (serial-hóa) + đếm hold còn hiệu lực + UNIQUE(profile,campaign) → không oversell; FCFS.
+  - Mã lỗi có kiểu: `SLOT_FULL`/`KYC_REQUIRED`/`CAMPAIGN_NOT_JOINABLE`/`ALREADY_JOINED`/`JOIN_BLOCKED_STRIKE`.
+  - Loser: từ chối rõ + **danh sách chờ** (participation state `WAITLISTED` + `waitlisted_at`) + **tự đôn** người đầu hàng khi có suất trả lại (snapshot lúc đôn) + **gợi ý campaign tương tự** (cùng nước/còn suất/cùng nền tảng hoặc reward gần). Strike KHÔNG áp cho thua-race.
+  - Schema thêm state `WAITLISTED` + `waitlisted_at`.
+- **Đề xuất chia việc (scope lớn — giữ "mỗi ngày demo được + giải thích được"):**
+  - **N10 (demo giữa kỳ):** Join race-safe (FOR UPDATE) + idempotent + snapshot + chặn-KYC + mã lỗi có kiểu + màn My Campaigns + tự rời. Migration schema delta (ends_at, EXPIRED/WAITLISTED, deadlines, strike_count, waitlisted_at) làm luôn ở đây.
+  - **N10b:** worker thu hồi suất (QĐ-4) + auto-đôn waitlist (QĐ-5) + strike + gợi ý campaign tương tự.
+  - → dịch money spine (N11-15) trễ ~1 ngày, hấp thụ vào buffer N20. Xong N10+N10b là hết Tuần B.

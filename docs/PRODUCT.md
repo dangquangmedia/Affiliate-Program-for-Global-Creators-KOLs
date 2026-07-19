@@ -141,6 +141,44 @@ cần hành động; **đang chờ Ops duyệt thì DỪNG đồng hồ** (khôn
 **Hệ quả schema (làm ở N10):** `campaigns.ends_at`; `participations` thêm state `EXPIRED`,
 `submit_deadline_at`/`fix_deadline_at`, `strike_count`; SLA để hằng số Phase 1.
 
+### QĐ-5. Tranh suất cuối (concurrency) + danh sách chờ
+
+**Vấn đề:** ≥2 creator cùng bấm Join suất cuối. Làm ngây thơ (đọc `slotsLeft` → ghi) → cả hai
+cùng thấy "còn 1" → **oversell** (2 người giữ 1 suất, ngân sách vỡ). Không thể ngăn 2 cú click
+đồng thời — chỉ phân xử đúng tại điểm commit.
+
+**Cơ chế (lời giải đúng, không phải lựa chọn) — bài toán khó #3:**
+Join chạy trong 1 transaction, serial-hóa bằng **khóa hàng campaign**:
+1. `SELECT campaign … FOR UPDATE` → creator thứ 2 xếp hàng chờ khóa.
+2. Trong khóa: đếm **hold còn hiệu lực** (loại `EXPIRED` theo QĐ-4) → suất khả dụng suy ra.
+3. Còn ≥1 → tạo participation `JOINED` + snapshot → commit → nhả khóa.
+4. Người thứ 2 vào khóa, đọc lại = 0 → từ chối `SLOT_FULL`.
+Cộng `UNIQUE(profile,campaign)` → 1 người bấm 2 lần không tạo 2 (idempotent). **Không bao giờ
+oversell** dù 100 người bấm cùng lúc.
+
+**Công bằng = FCFS** (chốt Quang): thứ tự thắng = thứ tự giành khóa ở DB ≈ thứ tự request. Tầng
+DB không có "hòa" thật → luôn có 1 thứ tự tổng. Dễ hiểu, dễ giải thích.
+
+**Mã lỗi có kiểu** (để loser thấy đúng lý do, không phải "lỗi 500"): `SLOT_FULL` ·
+`KYC_REQUIRED` (QĐ-2) · `CAMPAIGN_NOT_JOINABLE` (dừng/kết thúc/hết hạn) · `ALREADY_JOINED` ·
+`JOIN_BLOCKED_STRIKE` (QĐ-4).
+
+**Xử lý loser (chốt Quang — kết hợp từ-chối-rõ + danh-sách-chờ + gợi-ý):**
+- Từ chối rõ `SLOT_FULL` ("suất cuối vừa có người giữ trước bạn").
+- **Đưa vào danh sách chờ FCFS**: tái dùng `participations` state `WAITLISTED` + `waitlisted_at`
+  (không bảng mới). Hiện **vị trí trong hàng chờ**.
+- **Tự đôn lên**: khi 1 suất bị thu hồi (QĐ-4) hoặc có người tự rời → trong transaction có khóa
+  campaign, lấy `WAITLISTED` **sớm nhất** → `JOINED` + **snapshot điều khoản lúc được đôn**.
+- **Gợi ý campaign tương tự**: truy vấn read-only — cùng nước, **còn suất**, ưu tiên cùng nền
+  tảng hoặc reward gần giá trị (top 3).
+- **Strike KHÔNG áp** cho thua-race/đang-chờ (không phải lỗi creator) — chỉ phạt *ì sau khi đã
+  giữ suất* (QĐ-4).
+- **Không push (cắt P1)** → creator thấy mình được đôn lên ở màn **My Campaigns** (state đổi +
+  deadline mới).
+
+**Schema delta (bổ sung QĐ-4, làm ở N10):** `participations` thêm state `WAITLISTED` +
+`waitlisted_at`. Gợi ý campaign là truy vấn, không cần bảng.
+
 ## 4. Luồng lõi (con đường của một đồng tiền)
 
 ```mermaid
