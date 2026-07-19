@@ -210,48 +210,25 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   slots_taken làm bộ đếm quyền uy (tăng/giảm trong khóa); "Đầy" vẫn suy ra (>=slots_total).
   Kế: **N10b** — worker thu hồi suất (QĐ-4) + waitlist tự đôn (QĐ-5) + strike active + gợi ý campaign.
 
-## Current State & Hand-off (cập nhật trước compact — 2026-07-18)
+## Current State & Hand-off (cập nhật trước compact — 2026-07-19, sau N10 core)
 
 **1. Vừa xong / trạng thái:**
-- Xong hết **Tuần A (N1-N5)**: PRODUCT.md + 12 màn mockup + DATA_MODEL.md + **schema lean 18 bảng đã migrate + seed**.
-- Reward model chốt: CORE = `CONTENT_APPROVED + FLAT`, bảng `reward_rule` 3 trục (trigger/pricing/cap) — view-gate & CPS là config/model-only. Đã vào schema thật.
-- Toàn xanh: lint/typecheck/build + API 4/4 + E2E 4/4. DB Postgres healthy, 20 base table, seed VN/PH configs.
-- Không có việc dở dang. (Chưa commit N5 tại thời điểm viết — commit ngay sau.)
+- Xong Tuần A (N1-N5) + N6-N9 + **N10 core**. Git tới `3f5cdb1` (main), sạch, đã commit hết.
+- Spine chạy thật tới trình duyệt: login (mock SSO) → chọn nước → KYC nộp↔Ops duyệt theo field → discover/detail lọc nước → **Join race-safe + snapshot + KYC-gate** → My Campaigns.
+- Toàn xanh: **API 41/41, E2E 11/11**, lint/typecheck/api-build sạch. DB 20 model, seed VN/PH + Ops/Admin demo + 5 campaign. Postgres chạy Docker (cần Docker Desktop bật).
+- Không có việc dở. Đã brainstorm+chốt **QĐ-4 (thu hồi suất)** và **QĐ-5 (tranh suất cuối + waitlist)** — xem `docs/PRODUCT.md`; N10 core mới làm phần race-safe/snapshot, phần reclaim+waitlist là N10b.
 
-**2. File/khái niệm quan trọng đang thao tác:**
-- Schema thật: `apps/api/prisma/schema.prisma` (18 bảng, 6 nhóm A-F) + migration `20260718095722_init_lean_18_tables` + `apps/api/prisma/seed.sql` (chỉ countries+configs).
-- Walking skeleton đã cập nhật cho schema mới: `apps/api/src/markets.service.ts` (đọc `config` 1:1, locale từ `countries`). Response 8-field KHÔNG đổi.
-- Product docs: `docs/PRODUCT.md`, `docs/DATA_MODEL.md`, `Plan/KE_HOACH_V2.md`.
-- Mockup (tái dùng ở N6+): `apps/web/src/mockup/**` + `apps/web/src/app/mockup/**` (12 màn).
-- **Gotcha DB**: `db:*` (prisma CLI) cần nạp `.env` thủ công vào session PowerShell trước khi chạy (config đọc `env("DATABASE_URL")`). `migrate reset` Prisma 7 KHÔNG có `--skip-seed` → dùng `db execute DROP SCHEMA public CASCADE` để wipe.
+**2. File/biến quan trọng:**
+- API modules: `apps/api/src/{auth,country,kyc,campaign}/*`. Join ở `campaign/join.service.ts` (+`join.controller.ts`): `$transaction` + `SELECT campaign FOR UPDATE`, mã lỗi có kiểu (SLOT_FULL/KYC_REQUIRED/CAMPAIGN_NOT_JOINABLE/JOIN_BLOCKED_STRIKE), `slots_taken` là bộ đếm tăng/giảm trong khóa.
+- Prisma facade `apps/api/src/prisma.service.ts` (`PrismaClientLike` gõ tay + `$transaction`); schema `apps/api/prisma/schema.prisma`; seed `apps/api/prisma/seed.sql`.
+- Web clients `apps/web/src/lib/{auth,country,kyc,campaign}-client.ts`, i18n `lib/i18n.ts`; màn: `app/mockup/creator/{login,country,kyc,discover,campaign,my-campaigns}`, `ops/review`, `admin/campaign-builder`.
+- Cột N10b đã sẵn (migration `join_slots_waitlist`): `participations.{state EXPIRED/WAITLISTED, submit_deadline_at, fix_deadline_at, waitlisted_at, strike_count}`, `campaigns.ends_at`.
+- **Gotcha**: (a) prisma CLI `db:*` phải nạp `.env` thủ công vào session PowerShell; (b) ĐỪNG `pnpm build`/xóa `.next` khi dev:web đang chạy (gây Internal Server Error — gotcha #9); (c) test E2E/API hàng đợi tích luỹ giữa các lần chạy → luôn dùng email/campaign/tên unique + trỏ id seed cho assertion cố định.
 
-**3. Nhiệm vụ đầu tiên phiên sau — N10b (hết Tuần B):**
-- N10 core XONG (join race-safe/snapshot/KYC-gate/My Campaigns, API 41/41, E2E 11/11). Migration `join_slots_waitlist` đã có sẵn cột: `participations.{state EXPIRED/WAITLISTED, submit_deadline_at, fix_deadline_at, waitlisted_at, strike_count}`, `campaigns.ends_at`.
-- N10b làm 4 việc (theo QĐ-4/QĐ-5, chi tiết `docs/PRODUCT.md`):
-  1. **Worker thu hồi suất** (QĐ-4): 1 service method reclaim thuần (test được) + scheduler mỏng. Quét participation JOINED quá `submit_deadline_at` / REJECTED quá `fix_deadline_at` → EXPIRED + giảm slots_taken + **tăng strike_count**. CHỈ thu hồi khi bóng ở chân creator (CONTENT_SUBMITTED/APPROVED miễn nhiễm).
-  2. **Waitlist** (QĐ-5): join khi hết suất → tạo participation `WAITLISTED` + `waitlisted_at` (thay vì trả SLOT_FULL luôn); trả kèm vị trí hàng chờ.
-  3. **Tự đôn**: khi reclaim/leave trả 1 suất → trong khóa campaign, lấy WAITLISTED sớm nhất → JOINED + snapshot lúc đôn + hạn nộp mới.
-  4. **Gợi ý campaign tương tự** (read-only): cùng nước, còn suất, ưu tiên cùng platform hoặc reward gần.
-- Cần đặt SLA test-được: cho phép override `submit_deadline_at` (vd tạo participation với deadline quá khứ) để test reclaim không phải chờ 48h. Đã có sẵn cột deadline nên chỉ cần seed/set thẳng.
-- Web: V05 khi SLOT_FULL → hiện "đã vào hàng chờ vị trí K" + gợi ý; My Campaigns hiện WAITLISTED/EXPIRED; (đã có STATE_BADGE sẵn cho 2 state này).
-- Fixture/gotcha: test E2E hàng đợi tích luỹ giữa các lần chạy → luôn dùng email/campaign unique + set deadline quá khứ để test reclaim.
-
-**(cũ) — N10 core (ĐÃ XONG):**
-- N6-N9 XONG. Đã có: `/auth/*`, `/me/country/*`, `/me/country/:market/kyc`, `/ops/:market/kyc/*`, `/markets/:market/campaigns[/:id]`, `auth/rbac.ts`, `lib/{auth,country,kyc,campaign}-client.ts`, seed Ops+Admin+5 campaign.
-- N10: **Join campaign** — creator Join 1 campaign của nước mình: (1) **idempotent** giữ 1 suất (UNIQUE(profile,campaign) → bấm 2 lần không tạo 2 participation; chặn khi hết suất — **suất khả dụng = suy ra từ hold còn hiệu lực**, không tin bộ đếm); (2) **snapshot điều khoản** lúc Join (copy reward_minor/currency/trigger/pricing vào `participations.snapshot_*`); (3) **chặn Join khi KYC chưa APPROVED** (QĐ-2). + màn "My Campaigns".
-- **QĐ-4 (đã brainstorm+chốt với Quang) — thu hồi suất chống ôm suất**, làm cùng N10:
-  - Schema delta: `campaigns.ends_at`; `participations` thêm state `EXPIRED` + `submit_deadline_at`/`fix_deadline_at` + `strike_count`. → cần migration (như N6 thêm session).
-  - Hạn: SLA theo creator **48h nộp / 24h sửa** (hằng số Phase 1) + `ends_at` campaign.
-  - Cơ chế: **worker quét nền định kỳ** (scheduler mỏng gọi 1 service method reclaim test được) đánh dấu `EXPIRED` + trả suất; **chỉ thu hồi khi bóng ở chân creator** (chờ Ops thì DỪNG đồng hồ — CONTENT_SUBMITTED/APPROVED không bị thu hồi).
-  - Chống gian lận: **strike**, sau **2 lần** bị thu hồi vì ì thì cấm join lại campaign đó (đếm trên row participation giữ lại; re-join = EXPIRED→JOINED cùng row).
-  - Chi tiết đầy đủ: `docs/PRODUCT.md` QĐ-4.
-- Web: nút Join ở V05 (đang disabled) → gọi API thật; màn My Campaigns hiện deadline/đếm ngược + trạng thái (kể cả EXPIRED); nút "Rời suất".
-- **QĐ-5 (đã brainstorm+chốt) — tranh suất cuối + danh sách chờ** (chi tiết `docs/PRODUCT.md` QĐ-5):
-  - Join race-safe: transaction + `SELECT campaign FOR UPDATE` (serial-hóa) + đếm hold còn hiệu lực + UNIQUE(profile,campaign) → không oversell; FCFS.
-  - Mã lỗi có kiểu: `SLOT_FULL`/`KYC_REQUIRED`/`CAMPAIGN_NOT_JOINABLE`/`ALREADY_JOINED`/`JOIN_BLOCKED_STRIKE`.
-  - Loser: từ chối rõ + **danh sách chờ** (participation state `WAITLISTED` + `waitlisted_at`) + **tự đôn** người đầu hàng khi có suất trả lại (snapshot lúc đôn) + **gợi ý campaign tương tự** (cùng nước/còn suất/cùng nền tảng hoặc reward gần). Strike KHÔNG áp cho thua-race.
-  - Schema thêm state `WAITLISTED` + `waitlisted_at`.
-- **Đề xuất chia việc (scope lớn — giữ "mỗi ngày demo được + giải thích được"):**
-  - **N10 (demo giữa kỳ):** Join race-safe (FOR UPDATE) + idempotent + snapshot + chặn-KYC + mã lỗi có kiểu + màn My Campaigns + tự rời. Migration schema delta (ends_at, EXPIRED/WAITLISTED, deadlines, strike_count, waitlisted_at) làm luôn ở đây.
-  - **N10b:** worker thu hồi suất (QĐ-4) + auto-đôn waitlist (QĐ-5) + strike + gợi ý campaign tương tự.
-  - → dịch money spine (N11-15) trễ ~1 ngày, hấp thụ vào buffer N20. Xong N10+N10b là hết Tuần B.
+**3. Nhiệm vụ đầu tiên phiên sau — N10b (nốt Tuần B):**
+- (1) **Worker thu hồi suất** (QĐ-4): 1 service method reclaim THUẦN (test được) + scheduler mỏng. Quét JOINED quá `submit_deadline_at` / REJECTED quá `fix_deadline_at` → `EXPIRED` + giảm `slots_taken` + tăng `strike_count`. CHỈ thu hồi khi bóng ở chân creator (CONTENT_SUBMITTED/APPROVED miễn nhiễm).
+- (2) **Waitlist** (QĐ-5): join khi hết suất → `WAITLISTED` + `waitlisted_at` + trả vị trí hàng chờ (thay vì chỉ SLOT_FULL).
+- (3) **Tự đôn**: reclaim/leave trả 1 suất → trong khóa campaign lấy WAITLISTED sớm nhất → JOINED + snapshot lúc đôn + hạn nộp mới.
+- (4) **Gợi ý campaign tương tự** (read-only): cùng nước, còn suất, ưu tiên cùng platform/reward gần.
+- Mẹo test: set `submit_deadline_at` quá khứ khi tạo participation để test reclaim khỏi chờ 48h. Web: V05 SLOT_FULL→"vào hàng chờ vị trí K"+gợi ý; My Campaigns đã có STATE_BADGE cho WAITLISTED/EXPIRED.
+- N10b không cần migration (cột đã có). Xong N10b là hết Tuần B → sang money spine N11-15 (trễ ~1 ngày, hấp thụ vào buffer N20).
