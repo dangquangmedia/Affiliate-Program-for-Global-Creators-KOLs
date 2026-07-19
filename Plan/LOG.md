@@ -269,7 +269,7 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
 ## Current State & Hand-off (cập nhật 2026-07-19 — sau N11, Tuần C đang chạy)
 
 **1. Vừa xong / trạng thái:**
-- Xong **Tuần A + Tuần B + N11** (mở màn Tuần C money spine). Đã commit tới N10b + Report + docs QĐ-6/7/8 (`8381122`→`484dd4d`); **N11 chưa commit** (commit ngay đầu phiên sau nếu chưa).
+- Xong **Tuần A + Tuần B + N11** (mở màn Tuần C money spine). **Đã commit HẾT, cây sạch**: `8381122` (N10b) → `2001f3f` (Report) → `484dd4d` (docs QĐ-6/7/8) → `85fba6a` (N11). Chỉ còn `.claude/settings.local.json` modified (settings máy — không commit).
 - **N11**: content spine chạy thật — V06 nộp link (kiểm nền tảng chặn sớm, hashtag advisory) → V10 hàng đợi content thật → Ops approve tạo **Earning exactly-once** (claim `UPDATE WHERE state='SUBMITTED'` + `UNIQUE(submission_id)`; RACE 2 approve song song → đúng 1 earning) / reject có lý do → `fix_deadline_at=now+24h` nối worker QĐ-4 (test chứng minh quá hạn → EXPIRED).
 - Đã chốt + ghi docs **QĐ-6 (Apply→duyệt), QĐ-7 (take-rate brand), QĐ-8 (prepaid escrow)** — `docs/PRODUCT.md` §3; lát mỏng code xếp sau (xem mục 3).
 - Toàn xanh: **API 56/56, E2E 13/13**, lint + 2×typecheck sạch. Postgres Docker 54329 (nhớ bật Docker Desktop sau khi khởi động máy). Bộ báo cáo mentor ở `Report/` (PPTX 18 slide + MENTOR_QA.md).
@@ -280,7 +280,7 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
 - Test: `test/content.smoke.test.ts` (12 case) + e2e `content-flow.spec.ts`.
 - **Gotcha**: (a) prisma CLI `db:*` nạp `.env` thủ công; (b) đừng build/xóa `.next` khi dev:web chạy; (c) test dùng email/tên unique; (d) `listMine` ẩn LEFT; (e) `corepack pnpm`; (f) **test cách ly gọi route nước MÌNH của staff** (PH route + PH token + tài nguyên VN → 404; route VN + token PH là 403 — ngữ nghĩa khác).
 
-**3. Nhiệm vụ đầu tiên phiên sau — commit N11 rồi N12:**
-- **Commit N11** (nếu chưa): module content + web V06/V10 + tests + LOG.
-- **N12 — Ledger append-only + dashboard earnings (V07)**: mỗi earning sinh bút toán `EARNING_ACCRUE` (+gross) và `TAX` (−tax) vào `ledger_entry` (append-only, `UNIQUE(ref_type,ref_id,entry_type)` chống ghi trùng); V07 rewire màn thật: danh sách earning + tổng Gross–Thuế–Net theo nước, ghi chú thuế synthetic. Cân nhắc: backfill ledger cho earning đã tạo ở N11 (script nhỏ hoặc ghi lúc đọc — chọn lúc code).
+**3. Nhiệm vụ đầu tiên phiên sau — N12:**
+- **Trước khi code**: bật Docker Desktop (Postgres 54329) — hôm nay quên bật làm test 500 hàng loạt.
+- **N12 — Ledger append-only + dashboard earnings (V07)**: mỗi earning sinh bút toán `EARNING_ACCRUE` (+gross) và `TAX` (−tax) vào `ledger_entry` (append-only, `UNIQUE(ref_type,ref_id,entry_type)` chống ghi trùng); ghi bút toán NGAY TRONG transaction approve của `content.service.review()` (cùng chỗ tạo earning). V07 rewire màn thật: danh sách earning + tổng Gross–Thuế–Net theo nước, ghi chú thuế synthetic. Cân nhắc: backfill ledger cho earning đã tạo ở N11 (script nhỏ hoặc bỏ qua — dữ liệu test không quan trọng, chọn lúc code).
 - **Lát mỏng QĐ-7 ghép N12/N13**: `platform_fee_bps` + enum `PLATFORM_FEE` + tổng chi brand ở builder. **QĐ-8 ghép N13/N14**: `PENDING_FUNDING` + `funded_at` + nút "Nạp quỹ" mock. **QĐ-6 apply-flow**: lát riêng sau N12 hoặc dồn buffer N20 (xem PRODUCT.md §3).
