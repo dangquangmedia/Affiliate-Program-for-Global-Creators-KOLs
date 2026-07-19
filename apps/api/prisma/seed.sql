@@ -57,3 +57,17 @@ ON CONFLICT (country_id) DO UPDATE SET
   feature_cps = EXCLUDED.feature_cps,
   config_version = EXCLUDED.config_version,
   updated_at = CURRENT_TIMESTAMP;
+
+-- Tài khoản Ops demo (N8). Đăng nhập vai Ops = mock-login bằng chính email này (upsert khớp
+-- theo provider+subject), khi đó session mang sẵn role_assignment LOCAL_OPS của nước tương ứng.
+INSERT INTO app_user (id, email, display_name, auth_provider, provider_subject, created_at)
+VALUES
+  ('30000000-0000-4000-8000-000000000001', 'ops.vn@demo.affiliate.gl', 'Ops VN', 'mock-google', 'ops.vn@demo.affiliate.gl', CURRENT_TIMESTAMP),
+  ('30000000-0000-4000-8000-000000000002', 'ops.ph@demo.affiliate.gl', 'Ops PH', 'mock-google', 'ops.ph@demo.affiliate.gl', CURRENT_TIMESTAMP)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO role_assignment (id, user_id, country_id, role, created_at)
+VALUES
+  ('31000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 'LOCAL_OPS', CURRENT_TIMESTAMP),
+  ('31000000-0000-4000-8000-000000000002', '30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'LOCAL_OPS', CURRENT_TIMESTAMP)
+ON CONFLICT (user_id, country_id, role) DO NOTHING;

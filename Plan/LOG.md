@@ -9,10 +9,10 @@
   Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
 - Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
   V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
-- **Xong Tuần A (N1-N5) + N6 + N7**: Product + 12 màn mockup + ERD + schema lean (19 model) +
-  ARCHITECTURE.md + **auth/session + web login + country context end-to-end + i18n** (spine
-  chạy thật tới trình duyệt: login→chọn nước→profile trong DB). API 14/14, E2E 7/7. Đang trong
-  Tuần B. Kế: N8 KYC → N9-10 campaign/join.
+- **Xong Tuần A (N1-N5) + N6-N8**: Product + 12 mockup + ERD + schema lean (19 model) +
+  ARCHITECTURE.md + auth/session + web login + country context + i18n + **KYC (creator nộp ↔
+  Ops duyệt theo field, RBAC + cách ly)**. Spine chạy thật tới trình duyệt: login→chọn nước→
+  KYC nộp→Ops duyệt→Approved. **API 23/23, E2E 8/8**. Đang Tuần B. Kế: N9 campaign → N10 join.
 - Code hiện có: walking skeleton chạy trên **schema mới 18 bảng** (Next.js `/vn` `/ph` →
   NestJS → Postgres). Schema 45 bảng cũ **ĐÃ XÓA & thay** bằng lean N5 (migration
   `20260718095722_init_lean_18_tables`, DB có 20 base table gồm _prisma_migrations).
@@ -170,6 +170,18 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   country yêu cầu login), typecheck/lint/build sạch. Kế: N8 module KYC (creator nộp → Ops
   duyệt/từ chối theo field → nộp lại).
 
+- **N8 — module KYC (2026-07-19)**: API `kyc/` — creator: `GET/POST /me/country/:market/kyc`
+  (get-or-create case + 4 field checklist; nộp/nộp lại chỉ field CHƯA duyệt, ACCEPTED bị khoá kể
+  cả khi client cố ghi đè); Ops: `GET /ops/:market/kyc/queue` + `POST /ops/:market/kyc/:caseId/review`
+  (duyệt/từ chối THEO TỪNG FIELD, reject bắt buộc lý do; all ACCEPTED→APPROVED, còn lại→REJECTED).
+  RBAC + cách ly ở `auth/rbac.ts` (`assertStaffForCountry`): Ops chỉ nước mình; Ops PH mở case
+  VN→404; creator vào queue→403. Seed 2 Ops demo (`ops.vn@`/`ops.ph@demo.affiliate.gl` +
+  role_assignment LOCAL_OPS) → "đăng nhập vai Ops" = mock-login bằng email đó. Web: `lib/kyc-client.ts`
+  + rewire V03 (form thật, khoá/mở field theo trạng thái) + V10 (Ops queue + duyệt theo field,
+  nút đăng nhập vai Ops; content queue vẫn mock→N11). Kết quả: **API 23/23**, **E2E 8/8** (thêm
+  luồng KYC end-to-end: creator nộp→Ops duyệt→creator thấy Approved), typecheck/lint/api-build sạch.
+  Kế: N9 campaign (admin tạo/builder + creator discover theo nước).
+
 ## Current State & Hand-off (cập nhật trước compact — 2026-07-18)
 
 **1. Vừa xong / trạng thái:**
@@ -185,9 +197,9 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
 - Mockup (tái dùng ở N6+): `apps/web/src/mockup/**` + `apps/web/src/app/mockup/**` (12 màn).
 - **Gotcha DB**: `db:*` (prisma CLI) cần nạp `.env` thủ công vào session PowerShell trước khi chạy (config đọc `env("DATABASE_URL")`). `migrate reset` Prisma 7 KHÔNG có `--skip-seed` → dùng `db execute DROP SCHEMA public CASCADE` để wipe.
 
-**3. Nhiệm vụ đầu tiên phiên sau — N8 (Tuần B):**
-- N6+N7 XONG: auth + session + web login + country context end-to-end + i18n (API 14/14, E2E 7/7).
-  Đã có: `/auth/*`, `/me/country/:market`, `/me/countries`, `SessionAuthGuard`, `lib/{auth,country}-client.ts`, `lib/i18n.ts`.
-- N8: **module KYC** — creator nộp hồ sơ (`kyc_cases` + `kyc_fields`) → Ops duyệt/từ chối THEO TỪNG TRƯỜNG (state ACCEPTED/NEEDS_CHANGES + reason) → creator nộp lại đúng trường bị từ chối. QĐ-2: chặn Join khi case chưa APPROVED (áp ở N9-10).
-- Bảng đã có sẵn: `kyc_cases` (UNIQUE profile_id), `kyc_fields` (UNIQUE case_id+key). Dùng lại guard; kyc gắn vào `creator_country_profile` của phiên+nước.
-- Web: rewire màn V03 KYC (creator) + V10 Ops review (dùng session, scope theo nước).
+**3. Nhiệm vụ đầu tiên phiên sau — N9 (Tuần B):**
+- N6-N8 XONG (auth/session/login/country/i18n/KYC). Đã có: `/auth/*`, `/me/country/*`, `/me/country/:market/kyc`, `/ops/:market/kyc/*`, `auth/rbac.ts`, `lib/{auth,country,kyc}-client.ts`, seed 2 Ops demo.
+- N9: **module Campaign** — Local Admin tạo campaign (builder cơ bản: title/brand/reward/slots/platform/hashtag + reward_rule 3 trục Phase-1 CONTENT_APPROVED+FLAT+SLOTS×giá) gắn ĐÚNG nước; creator discover/detail theo nước (lọc `campaigns` theo country phiên → VN không thấy PH). "Đầy" = suy ra slots_taken≥slots_total, KHÔNG lưu.
+- Bảng sẵn: `campaigns` (country_id), `reward_rules` (UNIQUE campaign_id, 3 trục). Seed vài campaign VN/PH để creator discover có dữ liệu.
+- Web: rewire V04 discover + V05 detail (creator) + V11 campaign-builder (admin — cần role LOCAL_ADMIN, seed thêm admin demo giống Ops).
+- Lưu ý: Join (giữ suất + snapshot điều khoản) là N10, không làm ở N9. Chặn Join khi KYC chưa APPROVED áp ở N10.

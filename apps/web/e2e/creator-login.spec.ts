@@ -17,10 +17,17 @@ test("V01 login: clicking mock Google actually authenticates via the API", async
 });
 
 // N7: sau đăng nhập, chọn nước tạo creator_country_profile THẬT + hiện ngữ cảnh từ DB.
+// Dùng email MỚI mỗi lần (login qua API) để chưa có hồ sơ -> nút "Tạo hồ sơ" luôn xuất hiện.
 test("V02 country: choosing VN creates a real profile scoped to the session", async ({ page }) => {
   await page.goto("/mockup/creator/login");
-  await page.getByRole("button", { name: /Đăng nhập với Google/ }).click();
-  await expect(page.getByText("Đã đăng nhập")).toBeVisible();
+  await page.evaluate(async () => {
+    const s = await fetch("http://localhost:3001/auth/mock-login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: `e2e-country-${Date.now()}@example.com`, displayName: "E2E Country" }),
+    }).then((r) => r.json());
+    window.localStorage.setItem("ag_session", JSON.stringify({ token: s.token, user: s.user }));
+  });
 
   await page.goto("/mockup/creator/country");
   await page.getByRole("button", { name: /Tạo hồ sơ/ }).first().click();

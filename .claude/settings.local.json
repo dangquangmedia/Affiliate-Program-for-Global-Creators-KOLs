@@ -43,7 +43,11 @@
       "Bash(cd \"d:/VSF/Xây Dựng Hệ Thống Affiliate\\(GLOBAL\\)/apps/api/src\" && ls -la && echo \"=== KE_HOACH N6 section ===\" && grep -n \"N6\\\\|N7\\\\|Tuần B\" \"../../../Plan/KE_HOACH_V2.md\" | head -20)",
       "Read(//d/Plan/**)",
       "Bash(git commit -q -m ' *)",
-      "Bash(awk '/export function Btn\\\\b/,/^}/' ui.tsx)"
+      "Bash(awk '/export function Btn\\\\b/,/^}/' ui.tsx)",
+      "Bash(netstat -ano)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "PowerShell(Set-Location \"d:\\\\VSF\\\\Xây Dựng Hệ Thống Affiliate\\(GLOBAL\\)\\\\apps\\\\web\"; try { Stop-Process -Id 15776 -Force -ErrorAction Stop; Write-Output \"killed 15776\" } catch { Write-Output \"pid 15776 not running: $_\" }; Start-Sleep -Seconds 1; if \\(Test-Path \".next\"\\) { Remove-Item -Recurse -Force \".next\" }; Write-Output \".next cleaned; port check:\"; \\(netstat -ano | Select-String ':3000\\\\s'\\).Line)",
+      "PowerShell(Set-Location \"d:\\\\VSF\\\\Xây Dựng Hệ Thống Affiliate\\(GLOBAL\\)\"; corepack pnpm --filter @affiliate-global/api run build 2>&1 | Select-Object -Last 3; Write-Output \"=== web still alive? ===\"; try { \\(Invoke-WebRequest -UseBasicParsing http://localhost:3000/ -TimeoutSec 5\\).StatusCode } catch { \"web not responding: $_\" })"
     ]
   }
 }

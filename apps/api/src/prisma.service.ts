@@ -58,6 +58,15 @@ type PrismaClientLike = {
     }): Promise<ProfileRow>;
     findMany(args: { where: { userId: string }; include?: unknown }): Promise<unknown>;
   };
+  kycCase: {
+    findUnique(args: { where: { id?: string; profileId?: string }; include?: unknown }): Promise<unknown>;
+    findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
+    create(args: { data: unknown; include?: unknown }): Promise<unknown>;
+    update(args: { where: { id: string }; data: unknown; include?: unknown }): Promise<unknown>;
+  };
+  kycField: {
+    update(args: { where: { caseId_key: { caseId: string; key: string } }; data: unknown }): Promise<unknown>;
+  };
 };
 
 /**
