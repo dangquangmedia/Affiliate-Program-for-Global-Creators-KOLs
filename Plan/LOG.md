@@ -9,9 +9,9 @@
   Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
 - Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
   V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
-- **Xong Tuần A (N1-N5)**: Product (PRODUCT.md) + 12 màn mockup + ERD (DATA_MODEL.md) +
-  **schema lean thật đã migrate**. Kế: Tuần B (N6-N10) — ARCHITECTURE.md + auth/country/KYC/
-  campaign/join spine thật.
+- **Xong Tuần A (N1-N5) + N6**: Product + 12 màn mockup + ERD + schema lean (19 model, đã
+  migrate) + **ARCHITECTURE.md + auth mock SSO/session thật** (login→me→logout chạy trên DB).
+  Đang trong Tuần B. Kế: N7 country context end-to-end + i18n + web login UI, rồi N8 KYC.
 - Code hiện có: walking skeleton chạy trên **schema mới 18 bảng** (Next.js `/vn` `/ph` →
   NestJS → Postgres). Schema 45 bảng cũ **ĐÃ XÓA & thay** bằng lean N5 (migration
   `20260718095722_init_lean_18_tables`, DB có 20 base table gồm _prisma_migrations).
@@ -135,6 +135,17 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   3 unique trụ cột đã vào schema: `earning.submission_id`, `participation(profile,campaign)`,
   `payout_attempt.provider_ref`. Kế: N6 ARCHITECTURE.md + auth mock SSO + session.
 
+- **N6 (2026-07-19)**: Mở màn Tuần B. (1) Viết `docs/ARCHITECTURE.md` 1 trang — modular
+  monolith (vì sao KHÔNG microservices: bài toán tiền cần transaction 1 DB), sơ đồ module,
+  "đường đi của lòng tin" (server không tin danh tính/vai/nước từ client). (2) Auth mock SSO +
+  session THẬT: thêm bảng `sessions` (migration `add_session`), `apps/api/src/auth/*` —
+  `auth.service.ts` (mockLogin upsert user + cấp session, resolveSession, logout),
+  `session-auth.guard.ts` + `current-auth.decorator.ts`, `auth.controller.ts` (POST
+  /auth/mock-login · GET /auth/me · POST /auth/logout). Session lưu DB (sha256 token) thay JWT
+  để thu hồi tức thì. Mở rộng `PrismaClientLike` (user/session delegate). Kết quả: lint/api-
+  typecheck/api-build sạch, **API 9/9** (5 auth + 4 market), login→me→logout→me-401 chạy thật
+  trên DB. Kế: N7 country context end-to-end (route→session→query scoped) + i18n + web login UI.
+
 ## Current State & Hand-off (cập nhật trước compact — 2026-07-18)
 
 **1. Vừa xong / trạng thái:**
@@ -150,7 +161,9 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
 - Mockup (tái dùng ở N6+): `apps/web/src/mockup/**` + `apps/web/src/app/mockup/**` (12 màn).
 - **Gotcha DB**: `db:*` (prisma CLI) cần nạp `.env` thủ công vào session PowerShell trước khi chạy (config đọc `env("DATABASE_URL")`). `migrate reset` Prisma 7 KHÔNG có `--skip-seed` → dùng `db execute DROP SCHEMA public CASCADE` để wipe.
 
-**3. Nhiệm vụ đầu tiên phiên sau — N6 (Tuần B):**
-- Viết `docs/ARCHITECTURE.md` 1 trang (modular monolith — vì sao không microservices; sơ đồ module; luồng country context) + code auth mock SSO + session (bảng `users` + phiên).
-- Bắt đầu spine thật: login → session → country context end-to-end (route→session→mọi query scoped theo country phiên).
-- Schema đã có `users`, `role_assignments`, `creator_country_profiles` sẵn sàng cho auth/RBAC.
+**3. Nhiệm vụ đầu tiên phiên sau — N7 (Tuần B):**
+- N6 XONG: ARCHITECTURE.md + auth mock SSO + session (API 9/9 xanh). Auth đã có: `POST /auth/mock-login`, `GET /auth/me`, `POST /auth/logout` + `SessionAuthGuard`/`@CurrentAuth()`.
+- N7: **country context end-to-end** — nối phiên vào chọn nước: creator login → chọn VN/PH → tạo `creator_country_profiles` → mọi query scope theo country của PHIÊN (không theo param client). Ops VN đọc dữ liệu PH bằng ID trực tiếp → 404 (test negative).
+- + nền i18n (vi/en, fallback) + format tiền theo locale (tái dùng `formatMoney` từ mockup).
+- + **web login UI**: trang login gọi `/auth/mock-login`, lưu token, gắn Bearer cho request sau (N6 mới làm API, web chưa nối).
+- Dùng lại `SessionAuthGuard` cho các route N7; thêm scope-by-country ở tầng service.

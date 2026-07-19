@@ -207,6 +207,15 @@ erDiagram
 
 ### Nhóm F — Cắt ngang (mọi màn dùng)
 
+**`sessions`** — phiên đăng nhập lưu server (thêm ở N6, khi làm auth thật).
+- Màn: nền của **V01 Login** + mọi màn cần biết "ai đang đăng nhập".
+- Cột: `user_id`, `token_hash` (SHA-256 của token, KHÔNG lưu token thô), `expires_at`,
+  `revoked_at` (NULL đến khi logout/thu hồi), `created_at`.
+- **UNIQUE(`token_hash`)**. Chọn session DB thay JWT stateless để **thu hồi tức thì** (logout/
+  khoá tài khoản có hiệu lực ngay; JWT phải chờ hết hạn). Token chỉ là con trỏ, sự thật ở DB.
+- *Ghi chú thiết kế*: N4 thiết kế trên giấy chưa liệt kê `sessions` (chưa làm auth); thêm ở
+  N6 là đúng nhịp "màn nào cần thì bảng đó ra" — V01 login lúc này mới thực sự cần phiên.
+
 **18. `otp_codes`** — OTP mock cho rút tiền.
 - Màn: **V08** (OTP hiển thị màn dev).
 - Cột: `user_id`, `purpose` ∈ {`PAYOUT`}, `code`, `expires_at`, `consumed_at` (NULL đến khi
@@ -259,8 +268,9 @@ erDiagram
 - **Versioned config history** → Phase 1 chỉ giữ `config_version` (int) trên 1 dòng; chưa tách
   bảng lịch sử config (đủ để trả lời "đang ở version mấy", chưa cần diff từng lần đổi).
 
-## 6. Việc kế (N5)
+## 6. Tình trạng hiện thực hóa
 
-Viết `apps/api/prisma/schema.prisma` MỚI theo đúng 18 bảng trên (xóa schema 45 bảng cũ + 3
-migration cũ) → migrate từ DB rỗng → seed VN/PH + `country_configs`. Tự kiểm: chỉ vào bất kỳ
-bảng nào, giải thích được "màn nào cần" và "unique nào chống bug gì" trong 10 giây.
+- **N5 ✅**: `schema.prisma` = 18 bảng trên đã migrate (`init_lean_18_tables`) + seed VN/PH.
+- **N6 ✅**: thêm bảng `sessions` (`add_session`) cho auth thật. Tổng 19 model.
+- Bảng nghiệp vụ còn lại được *nối logic* dần theo lịch (KYC N8, campaign/join N9-10, tiền
+  N11-15) — cấu trúc đã có sẵn, chỉ thêm service/controller đọc-ghi.

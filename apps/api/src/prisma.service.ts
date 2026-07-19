@@ -3,12 +3,46 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
 
+// Delegate được gõ tay (client sinh ra là ESM .ts, nạp bằng dynamic import — xem ghi chú dưới).
+// Chỉ khai báo phần đang dùng; mở rộng khi cần bảng mới.
+export interface UserRow {
+  id: string;
+  email: string;
+  displayName: string;
+  authProvider: string;
+  providerSubject: string;
+}
+export interface SessionRow {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  revokedAt: Date | null;
+}
+export interface RoleRow {
+  countryId: string | null;
+  role: string;
+}
+
 type PrismaClientLike = {
   $connect(): Promise<void>;
   $disconnect(): Promise<void>;
   $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>;
   country: {
     findUnique(args: { where: { code: string }; include?: unknown }): Promise<unknown>;
+  };
+  user: {
+    upsert(args: {
+      where: { authProvider_providerSubject: { authProvider: string; providerSubject: string } };
+      create: Omit<UserRow, "id">;
+      update: Partial<Omit<UserRow, "id">>;
+    }): Promise<UserRow>;
+    findUnique(args: { where: { id: string }; include?: unknown }): Promise<unknown>;
+  };
+  session: {
+    create(args: { data: Omit<SessionRow, "id" | "revokedAt"> }): Promise<SessionRow>;
+    findUnique(args: { where: { tokenHash: string }; include?: unknown }): Promise<unknown>;
+    update(args: { where: { id: string }; data: Partial<SessionRow> }): Promise<SessionRow>;
   };
 };
 
