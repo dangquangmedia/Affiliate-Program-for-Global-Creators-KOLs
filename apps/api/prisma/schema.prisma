@@ -64,6 +64,8 @@ enum ParticipationState {
   APPROVED
   REJECTED
   LEFT
+  EXPIRED // suất bị thu hồi do creator ì (QĐ-4)
+  WAITLISTED // đang xếp hàng chờ suất trả lại (QĐ-5)
 }
 
 enum SubmissionState {
@@ -270,6 +272,7 @@ model Campaign {
   platform        String
   requiredHashtag String         @map("required_hashtag")
   brief           String
+  endsAt          DateTime?      @map("ends_at") @db.Timestamptz(3) // trần thời gian campaign (QĐ-4)
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   country         Country        @relation(fields: [countryId], references: [id], onDelete: Restrict)
   rewardRule      RewardRule?
@@ -305,10 +308,15 @@ model Participation {
   countryId            String             @map("country_id") @db.Uuid
   state                ParticipationState @default(JOINED)
   joinedAt             DateTime           @default(now()) @map("joined_at") @db.Timestamptz(3)
-  snapshotRewardMinor  BigInt             @map("snapshot_reward_minor")  // earning tính từ đây
-  snapshotCurrency     String             @map("snapshot_currency") @db.Char(3)
-  snapshotTriggerType  TriggerType        @map("snapshot_trigger_type")
-  snapshotPricingType  PricingType        @map("snapshot_pricing_type")
+  // Snapshot điều khoản lúc GIỮ SUẤT (JOINED/được đôn từ waitlist). NULL khi WAITLISTED (chưa có suất).
+  snapshotRewardMinor  BigInt?            @map("snapshot_reward_minor")
+  snapshotCurrency     String?            @map("snapshot_currency") @db.Char(3)
+  snapshotTriggerType  TriggerType?       @map("snapshot_trigger_type")
+  snapshotPricingType  PricingType?       @map("snapshot_pricing_type")
+  submitDeadlineAt     DateTime?          @map("submit_deadline_at") @db.Timestamptz(3) // SLA nộp (QĐ-4)
+  fixDeadlineAt        DateTime?          @map("fix_deadline_at") @db.Timestamptz(3)     // SLA sửa sau reject
+  waitlistedAt         DateTime?          @map("waitlisted_at") @db.Timestamptz(3)       // FCFS hàng chờ (QĐ-5)
+  strikeCount          Int                @default(0) @map("strike_count")               // số lần bị thu hồi vì ì
   rowVersion           Int                @default(0) @map("row_version")
   profile              CreatorCountryProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
   campaign             Campaign           @relation(fields: [campaignId], references: [id], onDelete: Restrict)

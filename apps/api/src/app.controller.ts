@@ -17,6 +17,7 @@ export class AppController {
         "GET|POST /me/country/{market}/kyc (auth, creator)",
         "GET /ops/{market}/kyc/queue · POST /ops/{market}/kyc/{caseId}/review (auth, staff)",
         "GET /markets/{market}/campaigns · GET .../{id} (auth) · POST .../campaigns (admin)",
+        "POST /markets/{market}/campaigns/{id}/join · /leave · GET /me/country/{market}/participations",
       ],
     };
   }

@@ -60,6 +60,11 @@ export default function DiscoverScreen() {
       {status === "ready" && (
         <>
           <ContextBanner market={market} />
+          <p style={{ fontSize: 13, margin: "0 0 12px" }}>
+            <Link href="/mockup/creator/my-campaigns" style={{ color: "#6aa6ff" }}>
+              → Chiến dịch của tôi
+            </Link>
+          </p>
           {campaigns.length === 0 ? (
             <Card>
               <Empty icon="🔍">Chưa có campaign nào ở nước {market} lúc này. Quay lại sau nhé.</Empty>

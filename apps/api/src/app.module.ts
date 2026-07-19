@@ -13,6 +13,8 @@ import { CreatorKycController, OpsKycController } from "./kyc/kyc.controller";
 import { KycService } from "./kyc/kyc.service";
 import { CampaignController } from "./campaign/campaign.controller";
 import { CampaignService } from "./campaign/campaign.service";
+import { JoinController } from "./campaign/join.controller";
+import { JoinService } from "./campaign/join.service";
 
 @Module({
   controllers: [
@@ -24,6 +26,7 @@ import { CampaignService } from "./campaign/campaign.service";
     CreatorKycController,
     OpsKycController,
     CampaignController,
+    JoinController,
   ],
   providers: [
     PrismaService,
@@ -33,6 +36,7 @@ import { CampaignService } from "./campaign/campaign.service";
     ProfileService,
     KycService,
     CampaignService,
+    JoinService,
   ],
 })
 export class AppModule {}

@@ -55,10 +55,12 @@ test("a full campaign is derived (slotsLeft<=0), not a stored flag", async () =>
   assert.equal(cafe.full, true);
 });
 
+// Dùng THẲNG id seed "Review son mùa hè" (500000 × 50 suất) — tất định, không lẫn campaign do
+// builder test tạo cùng tên.
+const SEED_SON_VN = "40000000-0000-4000-8000-000000000001";
+
 test("detail exposes the 3-axis reward + derived budget cap", async () => {
-  const list = await (await fetch(`${baseUrl}/markets/vn/campaigns`, { headers: bearer(creatorToken) })).json();
-  const son = list.find((c: { title: string }) => c.title === "Review son mùa hè");
-  const res = await fetch(`${baseUrl}/markets/vn/campaigns/${son.id}`, { headers: bearer(creatorToken) });
+  const res = await fetch(`${baseUrl}/markets/vn/campaigns/${SEED_SON_VN}`, { headers: bearer(creatorToken) });
   assert.equal(res.status, 200);
   const d = await res.json();
   assert.equal(d.reward.triggerType, "CONTENT_APPROVED");
@@ -67,9 +69,7 @@ test("detail exposes the 3-axis reward + derived budget cap", async () => {
 });
 
 test("a VN campaign id under /ph is a controlled 404 (isolation on detail)", async () => {
-  const list = await (await fetch(`${baseUrl}/markets/vn/campaigns`, { headers: bearer(creatorToken) })).json();
-  const son = list.find((c: { title: string }) => c.title === "Review son mùa hè");
-  const res = await fetch(`${baseUrl}/markets/ph/campaigns/${son.id}`, { headers: bearer(creatorToken) });
+  const res = await fetch(`${baseUrl}/markets/ph/campaigns/${SEED_SON_VN}`, { headers: bearer(creatorToken) });
   assert.equal(res.status, 404);
 });
 

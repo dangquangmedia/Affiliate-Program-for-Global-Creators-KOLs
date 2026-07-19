@@ -30,6 +30,8 @@ test("V04 discover: lists VN campaigns from API, shows derived Full", async ({ p
 test("V11 builder: Admin logs in and creates a campaign", async ({ page }) => {
   await page.goto("/mockup/admin/campaign-builder");
   await page.getByRole("button", { name: /Đăng nhập vai Admin VN/ }).click();
+  // Chờ phiên admin lưu xong (login là async) trước khi tạo, tránh race gọi API khi chưa có session.
+  await page.waitForFunction(() => (window.localStorage.getItem("ag_session") ?? "").includes("Admin VN"));
   await page.getByRole("button", { name: /Tạo campaign/ }).click();
 
   await expect(page.getByText("Đã tạo campaign")).toBeVisible();

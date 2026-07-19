@@ -60,6 +60,50 @@ export async function getCampaign(market: string, id: string): Promise<CampaignD
   return (await res.json()) as CampaignDetail;
 }
 
+export interface Participation {
+  campaignId: string;
+  campaignTitle?: string;
+  state: string;
+  snapshotRewardMinor: number | null;
+  currency: string | null;
+  submitDeadlineAt: string | null;
+  waitlistedAt: string | null;
+  joinedAt: string | null;
+  strikeCount: number;
+}
+
+export type JoinResult =
+  | { ok: true; participation: Participation }
+  | { ok: false; code: string; status: number };
+
+export async function joinCampaign(market: string, id: string): Promise<JoinResult> {
+  const res = await fetch(`${API_BASE}/markets/${market.toLowerCase()}/campaigns/${id}/join`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (res.ok) return { ok: true, participation: (await res.json()) as Participation };
+  let code = "UNKNOWN";
+  try {
+    code = (await res.json())?.error?.code ?? "UNKNOWN";
+  } catch {
+    /* ignore */
+  }
+  return { ok: false, code, status: res.status };
+}
+
+export async function leaveCampaign(market: string, id: string): Promise<void> {
+  await fetch(`${API_BASE}/markets/${market.toLowerCase()}/campaigns/${id}/leave`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+}
+
+export async function myParticipations(market: string): Promise<Participation[]> {
+  const res = await fetch(`${API_BASE}/me/country/${market.toLowerCase()}/participations`, { headers: authHeaders() });
+  if (!res.ok) return [];
+  return (await res.json()) as Participation[];
+}
+
 export async function createCampaign(
   market: string,
   input: CreateCampaignInput,

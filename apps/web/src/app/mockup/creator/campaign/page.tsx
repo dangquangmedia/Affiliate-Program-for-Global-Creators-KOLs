@@ -6,8 +6,24 @@ import { useSearchParams } from "next/navigation";
 import { MARKETS, type Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, KV, ContextBanner } from "../../../../mockup/ui";
 import { loadSession } from "../../../../lib/auth-client";
-import { getCampaign, type CampaignDetail } from "../../../../lib/campaign-client";
+import {
+  getCampaign,
+  joinCampaign,
+  leaveCampaign,
+  myParticipations,
+  type CampaignDetail,
+  type Participation,
+} from "../../../../lib/campaign-client";
 import { formatMoney } from "../../../../lib/i18n";
+
+// Thông báo rõ nguyên nhân theo mã lỗi có kiểu (QĐ-5).
+const JOIN_ERROR_MSG: Record<string, string> = {
+  SLOT_FULL: "Suất cuối vừa được creator khác giữ trước bạn.",
+  KYC_REQUIRED: "Bạn cần hoàn tất KYC (được duyệt) trước khi Join.",
+  CAMPAIGN_NOT_JOINABLE: "Campaign đang tạm dừng, đã kết thúc hoặc hết hạn.",
+  JOIN_BLOCKED_STRIKE: "Bạn đã bị thu hồi suất nhiều lần ở campaign này nên không thể join lại.",
+};
+const HOLDING = new Set(["JOINED", "CONTENT_SUBMITTED", "APPROVED", "REJECTED"]);
 
 function isMarket(v: string | null): v is Market {
   return v === "VN" || v === "PH";
@@ -21,6 +37,9 @@ function CampaignDetailInner() {
   const [market, setMarket] = useState<Market>(initialMarket);
   const [status, setStatus] = useState<"loading" | "needLogin" | "missing" | "notFound" | "ready">("loading");
   const [c, setC] = useState<CampaignDetail | null>(null);
+  const [joined, setJoined] = useState<Participation | null>(null);
+  const [joinBusy, setJoinBusy] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {
@@ -34,8 +53,39 @@ function CampaignDetailInner() {
       return;
     }
     setC(d);
+    const mine = await myParticipations(market);
+    setJoined(mine.find((p) => p.campaignId === id && HOLDING.has(p.state)) ?? null);
     setStatus("ready");
   }, [id, market]);
+
+  async function doJoin() {
+    if (!id) return;
+    setJoinBusy(true);
+    setJoinError(null);
+    try {
+      const res = await joinCampaign(market, id);
+      if (res.ok) {
+        setJoined(res.participation);
+        await load();
+      } else {
+        setJoinError(JOIN_ERROR_MSG[res.code] ?? "Không join được, thử lại sau.");
+      }
+    } finally {
+      setJoinBusy(false);
+    }
+  }
+
+  async function doLeave() {
+    if (!id) return;
+    setJoinBusy(true);
+    try {
+      await leaveCampaign(market, id);
+      setJoined(null);
+      await load();
+    } finally {
+      setJoinBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!loadSession()) {
@@ -119,22 +169,60 @@ function CampaignDetailInner() {
             </KV>
           </Card>
 
-          <Card title="Tham gia" sub="Join (giữ suất + snapshot điều khoản) được nối ở N10.">
-            <p style={{ color: "#a9b6c4", fontSize: 14 }}>
-              Trước khi Join cần KYC Approved (QĐ-2) và còn suất (QĐ-3). Luồng Join thật (idempotent
-              + snapshot) sẽ bật ở N10.
-            </p>
-            <BtnRow>
-              <Btn variant="primary" disabled>
-                Tham gia campaign (mở ở N10)
-              </Btn>
-              <Btn variant="ghost">
-                <Link href="/mockup/creator/kyc" style={{ color: "inherit", textDecoration: "none" }}>
-                  Kiểm tra KYC
-                </Link>
-              </Btn>
-            </BtnRow>
-          </Card>
+          {joined ? (
+            <Card title="Đã tham gia" sub="Bạn đã giữ 1 suất — điều khoản đã được snapshot lúc Join.">
+              <Badge kind="success">✓ Đang giữ suất ({joined.state})</Badge>
+              <p style={{ color: "#a9b6c4", fontSize: 14, margin: "10px 0" }}>
+                Snapshot khi Join: {joined.snapshotRewardMinor != null && joined.currency
+                  ? formatMoney(joined.snapshotRewardMinor, joined.currency, locale)
+                  : "—"}
+                {joined.submitDeadlineAt && (
+                  <> · hạn nộp bài: {new Date(joined.submitDeadlineAt).toLocaleString(locale)}</>
+                )}
+                . Bấm Join lại nhiều lần cũng chỉ 1 suất (idempotent).
+              </p>
+              <BtnRow>
+                <Btn variant="primary">
+                  <Link href="/mockup/creator/submit" style={{ color: "#fff", textDecoration: "none" }}>
+                    Nộp nội dung →
+                  </Link>
+                </Btn>
+                <Btn variant="ghost" disabled={joinBusy} onClick={doLeave}>
+                  {joinBusy ? "…" : "Rời suất"}
+                </Btn>
+              </BtnRow>
+            </Card>
+          ) : (
+            <Card title="Tham gia" sub="Join = giữ 1 suất + snapshot điều khoản (QĐ-2/3/5).">
+              {joinError && (
+                <div style={{ marginBottom: 10 }}>
+                  <Badge kind="danger">{joinError}</Badge>
+                  {joinError === JOIN_ERROR_MSG.KYC_REQUIRED && (
+                    <p style={{ fontSize: 13, marginTop: 6 }}>
+                      →{" "}
+                      <Link href="/mockup/creator/kyc" style={{ color: "#6aa6ff" }}>
+                        Hoàn tất KYC
+                      </Link>
+                    </p>
+                  )}
+                </div>
+              )}
+              <p style={{ color: "#a9b6c4", fontSize: 14, marginBottom: 10 }}>
+                Trước khi Join cần KYC Approved (QĐ-2) và còn suất. Tranh suất cuối được phân xử
+                công bằng (ai tới trước) — nếu thua bạn sẽ thấy lý do rõ ràng.
+              </p>
+              <BtnRow>
+                <Btn variant="primary" disabled={joinBusy || c.full || c.status !== "ACTIVE"} onClick={doJoin}>
+                  {joinBusy ? "Đang join…" : c.full ? "Đã đầy suất" : "Tham gia campaign"}
+                </Btn>
+                <Btn variant="ghost">
+                  <Link href="/mockup/creator/kyc" style={{ color: "inherit", textDecoration: "none" }}>
+                    Kiểm tra KYC
+                  </Link>
+                </Btn>
+              </BtnRow>
+            </Card>
+          )}
         </>
       )}
     </Frame>

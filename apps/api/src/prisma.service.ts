@@ -30,7 +30,7 @@ export interface ProfileRow {
   onboardingState: string;
 }
 
-type PrismaClientLike = {
+export type PrismaClientLike = {
   $connect(): Promise<void>;
   $disconnect(): Promise<void>;
   $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>;
@@ -70,8 +70,20 @@ type PrismaClientLike = {
   campaign: {
     findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
     findFirst(args: { where?: unknown; include?: unknown }): Promise<unknown>;
+    findUnique(args: { where: { id: string }; include?: unknown }): Promise<unknown>;
     create(args: { data: unknown; include?: unknown }): Promise<unknown>;
+    update(args: { where: { id: string }; data: unknown }): Promise<unknown>;
   };
+  participation: {
+    findFirst(args: { where?: unknown; include?: unknown }): Promise<unknown>;
+    findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
+    count(args: { where?: unknown }): Promise<number>;
+    create(args: { data: unknown; include?: unknown }): Promise<unknown>;
+    update(args: { where: unknown; data: unknown; include?: unknown }): Promise<unknown>;
+  };
+  // Interactive transaction: callback nhận 1 client-like đã ở trong transaction (dùng cho
+  // SELECT ... FOR UPDATE + đọc/ghi nguyên tử khi tranh suất — QĐ-5).
+  $transaction<T>(fn: (tx: PrismaClientLike) => Promise<T>): Promise<T>;
 };
 
 /**
