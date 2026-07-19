@@ -69,10 +69,12 @@ bảng seed VN/PH · git tới `5c3b487`. Câu tự kiểm để qua tuần: *"c
 6. **`.env` bị gitignore** → mất là mất luôn password volume Postgres cũ (`P1000` khi lệch). Hỏi user trước khi `docker compose down -v`.
 7. **`apps/api` tự nạp `.env`** qua `src/load-env.ts` (import đầu trong main.ts + test) → `dev:api`/`dev:web`/`pnpm test` không cần source env; riêng `db:*` (prisma CLI) vẫn cần.
 8. **`git rm` nhiều pathspec: 1 cái sai = abort cả cụm** — tách lệnh khi xóa hàng loạt.
-9. **`Cannot find module './xxx.js'` ở `.next/server/webpack-runtime.js`** = `.next` cache lẫn
-   giữa `next build` (production) và `next dev` chạy đồng thời trên cùng thư mục. Fix: dừng dev,
-   `Remove-Item -Recurse -Force apps/web/.next`, chạy lại `dev:web`. **Đừng `pnpm build` khi
-   dev server web đang chạy.**
+9. **`Cannot find module './xxx.js'` HOẶC `Internal Server Error` ở localhost:3000** = `.next`
+   bị `next build` (production) ghi đè, hoặc bị xóa, **trong khi `next dev` đang chạy** → runtime
+   dev mất chunk. **Đừng `pnpm build` (và đừng xóa `.next`) khi dev server web đang chạy.** Fix:
+   kill process web dev (`Stop-Process -Id <pid> -Force`; tìm pid bằng `netstat -ano | grep :3000`)
+   → `Remove-Item -Recurse -Force apps/web/.next` → chạy lại `corepack pnpm dev:web`. Nếu cần
+   build để verify, làm khi dev server tắt, hoặc restart dev sau khi build.
 
 ## Nhịp cập nhật
 
