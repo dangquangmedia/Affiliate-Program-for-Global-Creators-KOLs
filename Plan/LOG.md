@@ -146,6 +146,16 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   typecheck/api-build sạch, **API 9/9** (5 auth + 4 market), login→me→logout→me-401 chạy thật
   trên DB. Kế: N7 country context end-to-end (route→session→query scoped) + i18n + web login UI.
 
+- **N7 phần 1 — web login nối API thật (2026-07-19)**: Sếp báo nút Google/TikTok ở V01 bấm
+  không đăng nhập được (vì mockup N2 là hình tĩnh, chưa nối auth N6). Đã tạo
+  `apps/web/src/lib/auth-client.ts` (mockLogin/fetchMe/save·load·clearSession qua
+  `NEXT_PUBLIC_API_BASE_URL`, token ở localStorage) và nối `mockup/creator/login/page.tsx`:
+  nút SSO gọi `/auth/mock-login` THẬT → tạo user+session trong DB → hiện card "Đã đăng nhập"
+  + email + nút Đăng xuất. Thêm E2E `creator-login.spec.ts`. Kết quả: web typecheck + lint
+  sạch, **E2E 5/5** (thêm login), DB xác nhận có user `creator.google@demo.affiliate.gl` +
+  session active. Kế N7 phần 2: chọn nước → tạo `creator_country_profiles` gắn phiên → query
+  scope theo country phiên + i18n.
+
 ## Current State & Hand-off (cập nhật trước compact — 2026-07-18)
 
 **1. Vừa xong / trạng thái:**
