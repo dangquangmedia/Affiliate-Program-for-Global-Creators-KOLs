@@ -1,0 +1,74 @@
+// Client trình duyệt cho campaign (N9). Bearer từ session đã lưu.
+import { loadSession } from "./auth-client";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+
+export interface CampaignSummary {
+  id: string;
+  title: string;
+  brand: string;
+  platform: string;
+  requiredHashtag: string;
+  currency: string;
+  rewardMinor: number;
+  status: "ACTIVE" | "PAUSED" | "ENDED";
+  slotsTotal: number;
+  slotsTaken: number;
+  slotsLeft: number;
+  full: boolean;
+}
+export interface RewardRule {
+  triggerType: string;
+  pricingType: string;
+  capType: string;
+  flatAmountMinor: number | null;
+  capSlots: number | null;
+  budgetCapMinor: number | null;
+}
+export interface CampaignDetail extends CampaignSummary {
+  brief: string;
+  reward: RewardRule | null;
+}
+export interface CreateCampaignInput {
+  title: string;
+  brand: string;
+  platform: string;
+  requiredHashtag: string;
+  brief: string;
+  rewardMinor: number;
+  slotsTotal: number;
+}
+
+function authHeaders(json = false): Record<string, string> {
+  const s = loadSession();
+  return {
+    ...(s ? { authorization: `Bearer ${s.token}` } : {}),
+    ...(json ? { "content-type": "application/json" } : {}),
+  };
+}
+
+export async function listCampaigns(market: string): Promise<CampaignSummary[] | { unauthorized: true }> {
+  const res = await fetch(`${API_BASE}/markets/${market.toLowerCase()}/campaigns`, { headers: authHeaders() });
+  if (res.status === 401) return { unauthorized: true };
+  if (!res.ok) return [];
+  return (await res.json()) as CampaignSummary[];
+}
+
+export async function getCampaign(market: string, id: string): Promise<CampaignDetail | null> {
+  const res = await fetch(`${API_BASE}/markets/${market.toLowerCase()}/campaigns/${id}`, { headers: authHeaders() });
+  if (!res.ok) return null;
+  return (await res.json()) as CampaignDetail;
+}
+
+export async function createCampaign(
+  market: string,
+  input: CreateCampaignInput,
+): Promise<{ ok: true; campaign: CampaignDetail } | { ok: false; status: number }> {
+  const res = await fetch(`${API_BASE}/markets/${market.toLowerCase()}/campaigns`, {
+    method: "POST",
+    headers: authHeaders(true),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return { ok: false, status: res.status };
+  return { ok: true, campaign: (await res.json()) as CampaignDetail };
+}

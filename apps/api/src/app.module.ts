@@ -11,6 +11,8 @@ import { ProfileController } from "./country/profile.controller";
 import { ProfileService } from "./country/profile.service";
 import { CreatorKycController, OpsKycController } from "./kyc/kyc.controller";
 import { KycService } from "./kyc/kyc.service";
+import { CampaignController } from "./campaign/campaign.controller";
+import { CampaignService } from "./campaign/campaign.service";
 
 @Module({
   controllers: [
@@ -21,7 +23,16 @@ import { KycService } from "./kyc/kyc.service";
     ProfileController,
     CreatorKycController,
     OpsKycController,
+    CampaignController,
   ],
-  providers: [PrismaService, MarketsService, AuthService, SessionAuthGuard, ProfileService, KycService],
+  providers: [
+    PrismaService,
+    MarketsService,
+    AuthService,
+    SessionAuthGuard,
+    ProfileService,
+    KycService,
+    CampaignService,
+  ],
 })
 export class AppModule {}

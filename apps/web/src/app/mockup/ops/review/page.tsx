@@ -111,7 +111,11 @@ export default function OpsReviewScreen() {
           <Card title={`Hàng đợi KYC (${queue.length})`} sub="Duyệt/từ chối theo từng field rồi gửi quyết định.">
             {queue.length === 0 && <p style={{ color: "#8b96a3" }}>Không có hồ sơ chờ duyệt.</p>}
             {queue.map((c) => (
-              <div key={c.caseId} style={{ borderTop: "1px solid #1b2430", paddingTop: 12, marginTop: 12 }}>
+              <div
+                key={c.caseId}
+                data-creator={c.creatorName}
+                style={{ borderTop: "1px solid #1b2430", paddingTop: 12, marginTop: 12 }}
+              >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <strong>{c.creatorName}</strong>
                   {c.state === "RESUBMITTED" ? <Badge kind="info">Nộp lại</Badge> : <Badge kind="warn">Chờ duyệt</Badge>}

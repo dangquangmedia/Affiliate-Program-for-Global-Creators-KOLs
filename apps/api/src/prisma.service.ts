@@ -67,6 +67,11 @@ type PrismaClientLike = {
   kycField: {
     update(args: { where: { caseId_key: { caseId: string; key: string } }; data: unknown }): Promise<unknown>;
   };
+  campaign: {
+    findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
+    findFirst(args: { where?: unknown; include?: unknown }): Promise<unknown>;
+    create(args: { data: unknown; include?: unknown }): Promise<unknown>;
+  };
 };
 
 /**

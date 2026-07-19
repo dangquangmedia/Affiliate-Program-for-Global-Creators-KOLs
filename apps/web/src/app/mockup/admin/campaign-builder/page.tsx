@@ -1,138 +1,180 @@
 "use client";
 
 import { useState } from "react";
-import {
-  MARKETS,
-  PRICING_OPTIONS,
-  TRIGGER_OPTIONS,
-  formatMoney,
-  type Market,
-  type PricingType,
-  type TriggerType,
-} from "../../../../mockup/data";
-import { Frame, Note, StateBar, Card, Btn, BtnRow, Badge, Field, KV, mk } from "../../../../mockup/ui";
-
-type View = "form" | "invalid" | "draft" | "active";
+import Link from "next/link";
+import { MARKETS, PRICING_OPTIONS, TRIGGER_OPTIONS, type Market } from "../../../../mockup/data";
+import { Frame, Note, Card, Btn, BtnRow, Badge, KV, mk } from "../../../../mockup/ui";
+import { mockLogin, saveSession } from "../../../../lib/auth-client";
+import { createCampaign, type CampaignDetail } from "../../../../lib/campaign-client";
+import { formatMoney } from "../../../../lib/i18n";
 
 export default function CampaignBuilderScreen() {
   const [market, setMarket] = useState<Market>("VN");
-  const [view, setView] = useState<View>("form");
-  const [trigger, setTrigger] = useState<TriggerType>("CONTENT_APPROVED");
-  const [pricing, setPricing] = useState<PricingType>("FLAT");
-
   const currency = MARKETS[market].currency;
-  const priceMinor = currency === "VND" ? 500000 : 120000;
-  const slots = 30;
-  const budgetCap = priceMinor * slots; // ③ ngân sách = suất × đơn giá (tự suy ra)
+  const locale = MARKETS[market].locale;
+
+  const [title, setTitle] = useState("Review son mùa hè");
+  const [brand, setBrand] = useState("GlowUp Cosmetics");
+  const [platform, setPlatform] = useState("TikTok");
+  const [hashtag, setHashtag] = useState("#GlowUpHe2026");
+  const [price, setPrice] = useState(currency === "VND" ? "500000" : "120000");
+  const [slots, setSlots] = useState("30");
+
+  const [busy, setBusy] = useState(false);
+  const [created, setCreated] = useState<CampaignDetail | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const priceMinor = Number(price) || 0;
+  const slotsN = Number(slots) || 0;
+  const budgetCap = priceMinor * slotsN; // ③ trần = suất × đơn giá (tự suy ra)
+
+  async function loginAsAdmin() {
+    saveSession(await mockLogin(`admin.${market.toLowerCase()}@demo.affiliate.gl`, `Admin ${market}`));
+    setErr(null);
+  }
+
+  async function submit() {
+    setBusy(true);
+    setErr(null);
+    setCreated(null);
+    try {
+      const res = await createCampaign(market, {
+        title,
+        brand,
+        platform,
+        requiredHashtag: hashtag,
+        brief: "",
+        rewardMinor: priceMinor,
+        slotsTotal: slotsN,
+      });
+      if (res.ok) {
+        setCreated(res.campaign);
+      } else if (res.status === 403) {
+        setErr("forbidden");
+      } else if (res.status === 401) {
+        setErr("unauthorized");
+      } else {
+        setErr("Dữ liệu chưa hợp lệ (đơn giá & số suất phải > 0).");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const field = (label: string, value: string, set: (v: string) => void, type = "text") => (
+    <div className={mk.field}>
+      <label className={mk.fieldLabel}>{label}</label>
+      <input className={mk.input} value={value} type={type} onChange={(e) => set(e.target.value)} />
+    </div>
+  );
 
   return (
     <Frame screen="V11 Campaign builder" title="Tạo campaign (Local Admin)" market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> nhãn hàng/admin dựng campaign và quy tắc thưởng thế nào?
-        → Chọn quy tắc thưởng theo <strong>3 trục</strong> (① điều kiện · ② định giá · ③ trần
-        ngân sách). <em>Đây là QĐ-1 sống trong UI: Phase 1 chỉ bật content-flat; view-gate &amp;
-        CPS hiển thị nhưng khoá — cho mentor thấy đã &quot;chừa đường&quot; chứ không bỏ sót.</em>
+        <strong>Màn này trả lời:</strong> admin dựng campaign & quy tắc thưởng thế nào? → Quy tắc
+        thưởng theo <strong>3 trục</strong> (① điều kiện · ② định giá · ③ trần ngân sách). <em>QĐ-1
+        sống trong UI: Phase 1 chỉ bật content-flat; view-gate & CPS hiển thị nhưng khoá. Nút gọi
+        API thật, cần vai Local Admin của nước — mở đúng bài toán RBAC + cách ly.</em>
       </Note>
 
-      <StateBar
-        value={view}
-        onChange={setView}
-        options={[
-          { key: "form", label: "Đang tạo" },
-          { key: "invalid", label: "Lỗi hợp lệ" },
-          { key: "draft", label: "Đã lưu nháp" },
-          { key: "active", label: "Kích hoạt" },
-        ]}
-      />
+      <div style={{ marginBottom: 12 }}>
+        <Btn variant="ghost" onClick={loginAsAdmin}>
+          Đăng nhập vai Admin {market}
+        </Btn>
+      </div>
 
-      {(view === "form" || view === "invalid") && (
+      {created ? (
+        <Card title="Đã tạo campaign">
+          <Badge kind="success">ACTIVE</Badge>
+          <p style={{ fontSize: 14, color: "#a9b6c4", margin: "10px 0" }}>
+            <strong>{created.title}</strong> ({created.currency}) — trần ngân sách{" "}
+            {created.reward?.budgetCapMinor != null
+              ? formatMoney(created.reward.budgetCapMinor, created.currency, locale)
+              : "—"}
+            . Creator nước {market} sẽ thấy ở màn Khám phá.
+          </p>
+          <BtnRow>
+            <Btn variant="primary">
+              <Link href="/mockup/creator/discover" style={{ color: "#fff", textDecoration: "none" }}>
+                Xem ở Khám phá (V04) →
+              </Link>
+            </Btn>
+            <Btn variant="ghost" onClick={() => setCreated(null)}>
+              Tạo cái khác
+            </Btn>
+          </BtnRow>
+        </Card>
+      ) : (
         <>
+          {err === "forbidden" && (
+            <div style={{ marginBottom: 12 }}>
+              <Badge kind="danger">Cần vai Local Admin {market}</Badge>
+              <p style={{ color: "#ff9ba3", fontSize: 13, marginTop: 6 }}>
+                Phiên hiện tại không phải Admin nước này. Bấm &quot;Đăng nhập vai Admin {market}&quot; ở trên.
+              </p>
+            </div>
+          )}
+          {err === "unauthorized" && (
+            <div style={{ marginBottom: 12 }}>
+              <Badge kind="danger">Chưa đăng nhập</Badge>
+            </div>
+          )}
+          {err && err !== "forbidden" && err !== "unauthorized" && (
+            <div style={{ marginBottom: 12 }}>
+              <Badge kind="danger">{err}</Badge>
+            </div>
+          )}
+
           <Card title="Thông tin campaign">
-            <Field label="Tên campaign" value={view === "invalid" ? "" : "Review son mùa hè"} error={view === "invalid" ? "Bắt buộc nhập tên." : undefined} />
-            <Field label="Nhãn hàng" value="GlowUp Cosmetics" />
-            <Field label="Nền tảng" value="TikTok" />
-            <Field label="Hashtag bắt buộc" value="#GlowUpHe2026" />
+            {field("Tên campaign", title, setTitle)}
+            {field("Nhãn hàng", brand, setBrand)}
+            {field("Nền tảng", platform, setPlatform)}
+            {field("Hashtag bắt buộc", hashtag, setHashtag)}
           </Card>
 
-          <Card title="Quy tắc thưởng — 3 trục" sub="Phase 1 chạy: ① Content duyệt + ② Flat. Các lựa chọn khác bị khoá (chừa đường mở rộng).">
+          <Card title="Quy tắc thưởng — 3 trục" sub="Phase 1: ① Content duyệt + ② Flat. Lựa chọn khác khoá (chừa đường).">
             <div style={{ fontSize: 12, color: "#7d8896", marginBottom: 6 }}>① Điều kiện kích hoạt</div>
             <div className={mk.optRow}>
               {TRIGGER_OPTIONS.map((o) => (
-                <button
-                  key={o.key}
-                  disabled={!o.enabled}
-                  onClick={() => o.enabled && setTrigger(o.key)}
-                  className={`${mk.opt} ${trigger === o.key ? mk.optOn : ""} ${!o.enabled ? mk.optDisabled : ""}`}
-                >
+                <div key={o.key} className={`${mk.opt} ${o.enabled ? mk.optOn : mk.optDisabled}`}>
                   <span className={mk.optLabel}>
-                    {o.label} {!o.enabled && <Badge kind="neutral">khoá</Badge>}
-                    {o.enabled && <Badge kind="success">đang dùng</Badge>}
+                    {o.label} {o.enabled ? <Badge kind="success">đang dùng</Badge> : <Badge kind="neutral">khoá</Badge>}
                   </span>
                   <span className={mk.optNote}>{o.note}</span>
-                </button>
+                </div>
               ))}
             </div>
-
             <div style={{ fontSize: 12, color: "#7d8896", margin: "12px 0 6px" }}>② Cách định giá</div>
             <div className={mk.optRow}>
               {PRICING_OPTIONS.map((o) => (
-                <button
-                  key={o.key}
-                  disabled={!o.enabled}
-                  onClick={() => o.enabled && setPricing(o.key)}
-                  className={`${mk.opt} ${pricing === o.key ? mk.optOn : ""} ${!o.enabled ? mk.optDisabled : ""}`}
-                >
+                <div key={o.key} className={`${mk.opt} ${o.enabled ? mk.optOn : mk.optDisabled}`}>
                   <span className={mk.optLabel}>
-                    {o.label} {!o.enabled && <Badge kind="neutral">khoá</Badge>}
-                    {o.enabled && <Badge kind="success">đang dùng</Badge>}
+                    {o.label} {o.enabled ? <Badge kind="success">đang dùng</Badge> : <Badge kind="neutral">khoá</Badge>}
                   </span>
                   <span className={mk.optNote}>{o.note}</span>
-                </button>
+                </div>
               ))}
             </div>
           </Card>
 
-          <Card title="③ Ngân sách = số suất × đơn giá" sub="Trần ngân sách tự suy ra — không nhập tay tổng, tránh lệch.">
-            <Field label={`Đơn giá / content (${currency})`} value={String(priceMinor)} />
-            <Field label="Số suất" value={String(slots)} error={view === "invalid" ? "Số suất phải > 0." : undefined} />
+          <Card title="③ Ngân sách = số suất × đơn giá" sub="Trần tự suy ra — không nhập tay tổng, tránh lệch.">
+            {field(`Đơn giá / content (${currency}, minor)`, price, setPrice, "number")}
+            {field("Số suất", slots, setSlots, "number")}
             <KV k="Trần ngân sách (tự tính)" strong>
-              {formatMoney(budgetCap, currency)}
+              {formatMoney(budgetCap, currency, locale)}
             </KV>
             <div style={{ fontSize: 12, color: "#6b7684", marginTop: 6 }}>
-              = {formatMoney(priceMinor, currency)} × {slots} suất. Vì pricing là FLAT nên trần này
-              CỐ ĐỊNH — không thể vỡ (đây là câu trả lời cho điểm &quot;cấn&quot; của mentor).
+              = {formatMoney(priceMinor, currency, locale)} × {slotsN} suất. Vì pricing FLAT nên trần
+              CỐ ĐỊNH — không thể vỡ (câu trả lời điểm &quot;cấn&quot; của mentor).
             </div>
           </Card>
 
           <BtnRow>
-            <Btn variant="primary" onClick={() => setView(view === "invalid" ? "invalid" : "draft")}>
-              Lưu nháp
+            <Btn variant="primary" disabled={busy} onClick={submit}>
+              {busy ? "Đang tạo…" : "Tạo campaign (Active)"}
             </Btn>
           </BtnRow>
         </>
-      )}
-
-      {view === "draft" && (
-        <Card title="Đã lưu nháp">
-          <Badge kind="neutral">DRAFT</Badge>
-          <p style={{ fontSize: 14, color: "#a9b6c4", marginTop: 10 }}>
-            Campaign đang ở trạng thái nháp — creator chưa thấy. Kích hoạt để mở cho creator join.
-          </p>
-          <BtnRow>
-            <Btn variant="primary" onClick={() => setView("active")}>Kích hoạt (Draft → Active)</Btn>
-          </BtnRow>
-        </Card>
-      )}
-
-      {view === "active" && (
-        <Card title="Đã kích hoạt">
-          <Badge kind="success">ACTIVE</Badge>
-          <p style={{ fontSize: 14, color: "#a9b6c4", marginTop: 10 }}>
-            Campaign đã mở. Creator nước {market} sẽ thấy ở màn Khám phá (V04). Vòng đời:{" "}
-            <b>DRAFT → ACTIVE ↔ PAUSED → CLOSED</b>. Trạng thái &quot;Đầy&quot; là suy ra từ số
-            suất, không phải một trạng thái đặt tay.
-          </p>
-        </Card>
       )}
     </Frame>
   );
