@@ -105,6 +105,42 @@ chịu trách nhiệm sản phẩm để ngỏ tương lai mà không ôm đồm
   trước từ lúc tạo campaign. Mô hình quỹ tiền trừ dần linh hoạt hơn nhưng phải xử lý race
   condition chạm đáy quỹ — không đáng độ phức tạp cho Phase 1.
 
+### QĐ-4. Suất campaign phải "sống" — thu hồi khi creator ì (chống ôm suất)
+
+**Vấn đề (mentor/PO sẽ soi):** suất là tài nguyên khan hiếm có ngân sách + thời gian cố định
+đứng sau (QĐ-3). Creator join giữ 1 suất nhưng không đăng bài, hoặc bị từ chối mà không sửa,
+thì suất đó = **vốn chết + chặn creator khác**. Rủi ro: hết hạn campaign mà nhiều suất vẫn
+"bị giữ nhưng chưa giao", trong khi người muốn làm thì không join được.
+
+**Nguyên tắc lõi — chỉ thu hồi khi "bóng đang ở chân creator":** đồng hồ chỉ chạy khi creator
+cần hành động; **đang chờ Ops duyệt thì DỪNG đồng hồ** (không phạt oan creator vì Ops chậm).
+
+| Trạng thái participation | Ai giữ nhịp | Thu hồi? |
+|---|---|---|
+| JOINED, còn hạn nộp | creator | chưa |
+| JOINED, **quá hạn nộp** (SLA nộp) | creator ì | **THU HỒI** |
+| CONTENT_SUBMITTED (chờ Ops) | Ops | **không** (dừng đồng hồ) |
+| REJECTED, **quá hạn sửa** (SLA sửa) | creator ì | **THU HỒI** |
+| APPROVED | đã giao | không (đã tiêu 1 suất) |
+| Tự rời (LEFT) / hết hạn campaign | — | **THU HỒI** |
+
+**Chốt (Quang):**
+- **Mô hình hạn:** SLA cuốn theo từng creator kể từ lúc join — **48h để nộp**, **24h để sửa**
+  sau khi bị từ chối — CỘNG **`ends_at`** của campaign làm trần thời gian/ngân sách.
+- **Cơ chế:** **worker quét nền định kỳ** đánh dấu participation `EXPIRED` và trả suất về pool.
+  (Kỹ thuật: logic reclaim là 1 hàm thuần/1 service method test được; scheduler chỉ là lớp mỏng
+  gọi định kỳ. Join vẫn phòng thủ: đếm suất khả dụng theo hold CÒN HIỆU LỰC để không oversell
+  trong khe thời gian giữa 2 lần quét.)
+- **Suất khả dụng = suy ra** = `slots_total − (hold còn hiệu lực: JOINED trong hạn · SUBMITTED ·
+  REJECTED trong hạn · APPROVED)`. Đồng nhất "Đầy suy ra, không lưu" (QĐ-3).
+- **Chống gian lận:** đếm số lần bị thu hồi vì ì trên từng (creator, campaign); sau **N lần
+  (mặc định 2)** thì **cấm join lại** campaign đó (strike). Giữ nguyên row participation
+  (EXPIRED) để đếm strike; re-join = chuyển EXPIRED→JOINED trên cùng row (UNIQUE(profile,campaign)
+  vẫn giữ).
+
+**Hệ quả schema (làm ở N10):** `campaigns.ends_at`; `participations` thêm state `EXPIRED`,
+`submit_deadline_at`/`fix_deadline_at`, `strike_count`; SLA để hằng số Phase 1.
+
 ## 4. Luồng lõi (con đường của một đồng tiền)
 
 ```mermaid

@@ -213,7 +213,12 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
 
 **3. Nhiệm vụ đầu tiên phiên sau — N10 (hết Tuần B):**
 - N6-N9 XONG. Đã có: `/auth/*`, `/me/country/*`, `/me/country/:market/kyc`, `/ops/:market/kyc/*`, `/markets/:market/campaigns[/:id]`, `auth/rbac.ts`, `lib/{auth,country,kyc,campaign}-client.ts`, seed Ops+Admin+5 campaign.
-- N10: **Join campaign** — creator Join 1 campaign của nước mình: (1) **idempotent** giữ 1 suất (UNIQUE(profile,campaign) → bấm 2 lần không tạo 2 participation/không trừ 2 suất; slots_taken++ trong transaction, chặn khi hết suất); (2) **snapshot điều khoản** lúc Join (copy reward_minor/currency/trigger/pricing vào `participations.snapshot_*` — admin sửa sau không đổi); (3) **chặn Join khi KYC chưa APPROVED** (QĐ-2, đọc kyc_case của profile). + màn "My Campaigns".
-- Bảng sẵn: `participations` (UNIQUE profile+campaign, snapshot_* cột). Dùng transaction cho giữ-suất + tạo participation.
-- Web: nối nút Join ở V05 detail (đang disabled "mở ở N10") → gọi API thật; thêm màn My Campaigns.
+- N10: **Join campaign** — creator Join 1 campaign của nước mình: (1) **idempotent** giữ 1 suất (UNIQUE(profile,campaign) → bấm 2 lần không tạo 2 participation; chặn khi hết suất — **suất khả dụng = suy ra từ hold còn hiệu lực**, không tin bộ đếm); (2) **snapshot điều khoản** lúc Join (copy reward_minor/currency/trigger/pricing vào `participations.snapshot_*`); (3) **chặn Join khi KYC chưa APPROVED** (QĐ-2). + màn "My Campaigns".
+- **QĐ-4 (đã brainstorm+chốt với Quang) — thu hồi suất chống ôm suất**, làm cùng N10:
+  - Schema delta: `campaigns.ends_at`; `participations` thêm state `EXPIRED` + `submit_deadline_at`/`fix_deadline_at` + `strike_count`. → cần migration (như N6 thêm session).
+  - Hạn: SLA theo creator **48h nộp / 24h sửa** (hằng số Phase 1) + `ends_at` campaign.
+  - Cơ chế: **worker quét nền định kỳ** (scheduler mỏng gọi 1 service method reclaim test được) đánh dấu `EXPIRED` + trả suất; **chỉ thu hồi khi bóng ở chân creator** (chờ Ops thì DỪNG đồng hồ — CONTENT_SUBMITTED/APPROVED không bị thu hồi).
+  - Chống gian lận: **strike**, sau **2 lần** bị thu hồi vì ì thì cấm join lại campaign đó (đếm trên row participation giữ lại; re-join = EXPIRED→JOINED cùng row).
+  - Chi tiết đầy đủ: `docs/PRODUCT.md` QĐ-4.
+- Web: nút Join ở V05 (đang disabled) → gọi API thật; màn My Campaigns hiện deadline/đếm ngược + trạng thái (kể cả EXPIRED); nút "Rời suất".
 - Đây là **demo giữa kỳ**: login→KYC→join chạy thật 2 nước. Sau N10 là hết Tuần B.
