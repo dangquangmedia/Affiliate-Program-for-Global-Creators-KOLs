@@ -11,7 +11,9 @@ import {
   joinCampaign,
   leaveCampaign,
   myParticipations,
+  suggestSimilar,
   type CampaignDetail,
+  type CampaignSummary,
   type Participation,
 } from "../../../../lib/campaign-client";
 import { formatMoney } from "../../../../lib/i18n";
@@ -38,6 +40,8 @@ function CampaignDetailInner() {
   const [status, setStatus] = useState<"loading" | "needLogin" | "missing" | "notFound" | "ready">("loading");
   const [c, setC] = useState<CampaignDetail | null>(null);
   const [joined, setJoined] = useState<Participation | null>(null);
+  const [waitlisted, setWaitlisted] = useState<Participation | null>(null);
+  const [suggestions, setSuggestions] = useState<CampaignSummary[]>([]);
   const [joinBusy, setJoinBusy] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const locale = MARKETS[market].locale;
@@ -54,7 +58,11 @@ function CampaignDetailInner() {
     }
     setC(d);
     const mine = await myParticipations(market);
+    const wl = mine.find((p) => p.campaignId === id && p.state === "WAITLISTED") ?? null;
     setJoined(mine.find((p) => p.campaignId === id && HOLDING.has(p.state)) ?? null);
+    setWaitlisted(wl);
+    // Gợi ý campaign khác khi hết suất hoặc đang chờ (QĐ-5).
+    setSuggestions(d.full || wl ? await suggestSimilar(market, id) : []);
     setStatus("ready");
   }, [id, market]);
 
@@ -65,7 +73,8 @@ function CampaignDetailInner() {
     try {
       const res = await joinCampaign(market, id);
       if (res.ok) {
-        setJoined(res.participation);
+        if (res.participation.state === "WAITLISTED") setWaitlisted(res.participation);
+        else setJoined(res.participation);
         await load();
       } else {
         setJoinError(JOIN_ERROR_MSG[res.code] ?? "Không join được, thử lại sau.");
@@ -81,6 +90,7 @@ function CampaignDetailInner() {
     try {
       await leaveCampaign(market, id);
       setJoined(null);
+      setWaitlisted(null);
       await load();
     } finally {
       setJoinBusy(false);
@@ -192,6 +202,25 @@ function CampaignDetailInner() {
                 </Btn>
               </BtnRow>
             </Card>
+          ) : waitlisted ? (
+            <Card title="Bạn đang trong hàng chờ" sub="Suất đầy — bạn được xếp hàng FCFS (QĐ-5).">
+              <Badge kind="info">
+                ⏳ Hàng chờ{waitlisted.waitlistPosition != null ? ` · vị trí #${waitlisted.waitlistPosition}` : ""}
+              </Badge>
+              <p style={{ color: "#a9b6c4", fontSize: 14, margin: "10px 0" }}>
+                Khi có creator rời hoặc bị thu hồi suất, người đứng đầu hàng chờ được TỰ ĐỘNG đôn lên
+                (JOINED + snapshot điều khoản lúc đó + hạn nộp mới). Bạn sẽ thấy thay đổi ở{" "}
+                <Link href="/mockup/creator/my-campaigns" style={{ color: "#6aa6ff" }}>
+                  Chiến dịch của tôi
+                </Link>
+                . Vào hàng chờ KHÔNG bị tính strike.
+              </p>
+              <BtnRow>
+                <Btn variant="ghost" disabled={joinBusy} onClick={doLeave}>
+                  {joinBusy ? "…" : "Rời hàng chờ"}
+                </Btn>
+              </BtnRow>
+            </Card>
           ) : (
             <Card title="Tham gia" sub="Join = giữ 1 suất + snapshot điều khoản (QĐ-2/3/5).">
               {joinError && (
@@ -208,12 +237,12 @@ function CampaignDetailInner() {
                 </div>
               )}
               <p style={{ color: "#a9b6c4", fontSize: 14, marginBottom: 10 }}>
-                Trước khi Join cần KYC Approved (QĐ-2) và còn suất. Tranh suất cuối được phân xử
-                công bằng (ai tới trước) — nếu thua bạn sẽ thấy lý do rõ ràng.
+                Trước khi Join cần KYC Approved (QĐ-2). Còn suất → giữ ngay; HẾT suất → vào hàng chờ
+                FCFS và tự được đôn khi có suất trả lại (QĐ-5).
               </p>
               <BtnRow>
-                <Btn variant="primary" disabled={joinBusy || c.full || c.status !== "ACTIVE"} onClick={doJoin}>
-                  {joinBusy ? "Đang join…" : c.full ? "Đã đầy suất" : "Tham gia campaign"}
+                <Btn variant="primary" disabled={joinBusy || c.status !== "ACTIVE"} onClick={doJoin}>
+                  {joinBusy ? "Đang xử lý…" : c.full ? "Vào hàng chờ" : "Tham gia campaign"}
                 </Btn>
                 <Btn variant="ghost">
                   <Link href="/mockup/creator/kyc" style={{ color: "inherit", textDecoration: "none" }}>
@@ -221,6 +250,33 @@ function CampaignDetailInner() {
                   </Link>
                 </Btn>
               </BtnRow>
+            </Card>
+          )}
+
+          {suggestions.length > 0 && (
+            <Card title="Campaign tương tự còn suất" sub="Cùng nước, còn nhận — ưu tiên cùng nền tảng / mức thưởng gần (QĐ-5).">
+              <div style={{ display: "grid", gap: 10 }}>
+                {suggestions.map((s) => (
+                  <div
+                    key={s.id}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{s.title}</div>
+                      <div style={{ fontSize: 13, color: "#8b96a3" }}>
+                        {s.brand} · {s.platform} · {formatMoney(s.rewardMinor, s.currency, locale)} · {s.slotsLeft}/
+                        {s.slotsTotal} suất
+                      </div>
+                    </div>
+                    <Link
+                      href={`/mockup/creator/campaign?id=${s.id}&m=${market}`}
+                      style={{ color: "#6aa6ff", fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}
+                    >
+                      Xem →
+                    </Link>
+                  </div>
+                ))}
+              </div>
             </Card>
           )}
         </>

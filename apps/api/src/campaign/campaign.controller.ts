@@ -33,6 +33,12 @@ export class CampaignController {
     return this.campaigns.getForMarket(market, id);
   }
 
+  // Gợi ý campaign tương tự (dùng khi hết suất / đang chờ) — QĐ-5.
+  @Get(":id/similar")
+  similar(@Param("market") market: string, @Param("id") id: string): Promise<CampaignSummary[]> {
+    return this.campaigns.suggestSimilar(market, id);
+  }
+
   @Post()
   create(
     @CurrentAuth() auth: AuthContext,

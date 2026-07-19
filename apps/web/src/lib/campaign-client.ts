@@ -68,6 +68,7 @@ export interface Participation {
   currency: string | null;
   submitDeadlineAt: string | null;
   waitlistedAt: string | null;
+  waitlistPosition: number | null;
   joinedAt: string | null;
   strikeCount: number;
 }
@@ -96,6 +97,14 @@ export async function leaveCampaign(market: string, id: string): Promise<void> {
     method: "POST",
     headers: authHeaders(),
   });
+}
+
+export async function suggestSimilar(market: string, id: string): Promise<CampaignSummary[]> {
+  const res = await fetch(`${API_BASE}/markets/${market.toLowerCase()}/campaigns/${id}/similar`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) return [];
+  return (await res.json()) as CampaignSummary[];
 }
 
 export async function myParticipations(market: string): Promise<Participation[]> {

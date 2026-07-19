@@ -129,6 +129,35 @@ export class CampaignService {
     return rows.map((c) => this.toSummary(c));
   }
 
+  /**
+   * Gợi ý campaign tương tự (QĐ-5, read-only): dùng khi creator hết suất/đang chờ. Cùng nước,
+   * còn ĐANG NHẬN + CÒN SUẤT, khác chính nó; ưu tiên cùng nền tảng rồi reward gần giá trị. Top 3.
+   */
+  async suggestSimilar(market: string, id: string): Promise<CampaignSummary[]> {
+    const country = await this.requireCountry(market);
+    const target = (await this.prisma.db.campaign.findFirst({
+      where: { id, countryId: country.id },
+    })) as CampaignRow | null;
+    if (!target) {
+      throw new NotFoundException({ code: "RESOURCE_NOT_FOUND", message: "Campaign not found in this country." });
+    }
+    const rows = (await this.prisma.db.campaign.findMany({
+      where: { countryId: country.id, status: "ACTIVE" },
+      include: { rewardRule: true },
+      orderBy: { createdAt: "desc" },
+    })) as CampaignRow[];
+
+    const targetReward = Number(target.rewardMinor);
+    const withRoom = rows.filter((c) => c.id !== id && c.slotsTaken < c.slotsTotal);
+    withRoom.sort((a, b) => {
+      const pa = a.platform === target.platform ? 0 : 1;
+      const pb = b.platform === target.platform ? 0 : 1;
+      if (pa !== pb) return pa - pb; // cùng nền tảng lên trước
+      return Math.abs(Number(a.rewardMinor) - targetReward) - Math.abs(Number(b.rewardMinor) - targetReward);
+    });
+    return withRoom.slice(0, 3).map((c) => this.toSummary(c));
+  }
+
   /** Detail: 404 nếu campaign không thuộc nước này (id PH mở dưới /vn → không lộ). */
   async getForMarket(market: string, id: string): Promise<CampaignDetail> {
     const country = await this.requireCountry(market);

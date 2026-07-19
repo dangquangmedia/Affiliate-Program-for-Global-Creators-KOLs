@@ -15,6 +15,7 @@ import { CampaignController } from "./campaign/campaign.controller";
 import { CampaignService } from "./campaign/campaign.service";
 import { JoinController } from "./campaign/join.controller";
 import { JoinService } from "./campaign/join.service";
+import { ReclaimScheduler } from "./campaign/reclaim.scheduler";
 
 @Module({
   controllers: [
@@ -37,6 +38,7 @@ import { JoinService } from "./campaign/join.service";
     KycService,
     CampaignService,
     JoinService,
+    ReclaimScheduler,
   ],
 })
 export class AppModule {}

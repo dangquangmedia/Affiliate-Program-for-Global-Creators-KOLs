@@ -75,7 +75,7 @@ export type PrismaClientLike = {
     update(args: { where: { id: string }; data: unknown }): Promise<unknown>;
   };
   participation: {
-    findFirst(args: { where?: unknown; include?: unknown }): Promise<unknown>;
+    findFirst(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
     findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
     count(args: { where?: unknown }): Promise<number>;
     create(args: { data: unknown; include?: unknown }): Promise<unknown>;

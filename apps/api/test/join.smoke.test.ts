@@ -6,6 +6,8 @@ import { NestFactory } from "@nestjs/core";
 import type { INestApplication } from "@nestjs/common";
 import { AppModule } from "../src/app.module";
 import { HttpExceptionFilter } from "../src/http-exception.filter";
+import { JoinService } from "../src/campaign/join.service";
+import { PrismaService } from "../src/prisma.service";
 
 let app: INestApplication;
 let baseUrl: string;
@@ -49,6 +51,21 @@ async function createCampaign(slotsTotal: number, title: string): Promise<string
     body: JSON.stringify({ title, brand: "B", platform: "TikTok", requiredHashtag: "#x", brief: "", rewardMinor: 100000, slotsTotal }),
   });
   return (await r.json()).id;
+}
+
+async function joinJson(token: string, cid: string): Promise<{ status: number; body: { state?: string; waitlistPosition?: number | null } }> {
+  const r = await fetch(`${baseUrl}/markets/vn/campaigns/${cid}/join`, { method: "POST", headers: bearer(token) });
+  return { status: r.status, body: await r.json() };
+}
+
+async function slotsLeft(token: string, cid: string): Promise<number> {
+  const list = await (await fetch(`${baseUrl}/markets/vn/campaigns`, { headers: bearer(token) })).json();
+  return list.find((x: { id: string }) => x.id === cid).slotsLeft;
+}
+
+async function myState(token: string, cid: string): Promise<{ state: string; strikeCount: number } | undefined> {
+  const mine = await (await fetch(`${baseUrl}/me/country/vn/participations`, { headers: bearer(token) })).json();
+  return mine.find((p: { campaignId: string }) => p.campaignId === cid);
 }
 
 before(async () => {
@@ -121,25 +138,71 @@ test("My Campaigns lists the creator's participations", async () => {
   assert.ok(mine.some((p: { campaignId: string; state: string }) => p.campaignId === cid && p.state === "JOINED"));
 });
 
-test("RACE: 3 creators join the last slot -> exactly 1 wins, 2 get SLOT_FULL", async () => {
+test("RACE: 3 creators join the last slot -> exactly 1 JOINED, 2 WAITLISTED (no oversell)", async () => {
   const cid = await createCampaign(1, `race-${Date.now()}`); // đúng 1 suất
   const tokens = await Promise.all([
     approvedCreator(`n10-race1-${Date.now()}@example.com`),
     approvedCreator(`n10-race2-${Date.now()}@example.com`),
     approvedCreator(`n10-race3-${Date.now()}@example.com`),
   ]);
-  // Bắn 3 request join CÙNG LÚC.
-  const results = await Promise.all(
-    tokens.map((t) => fetch(`${baseUrl}/markets/vn/campaigns/${cid}/join`, { method: "POST", headers: bearer(t) })),
-  );
-  const statuses = results.map((r) => r.status);
-  const wins = statuses.filter((s) => s === 201).length;
-  const fulls = statuses.filter((s) => s === 409).length;
-  assert.equal(wins, 1, `exactly one winner, got ${wins}`);
-  assert.equal(fulls, 2, `two SLOT_FULL, got ${fulls}`);
-
+  // Bắn 3 request join CÙNG LÚC. Khóa FOR UPDATE serial-hóa -> 1 giữ suất, 2 vào hàng chờ.
+  const results = await Promise.all(tokens.map((t) => joinJson(t, cid)));
+  const joined = results.filter((r) => r.body.state === "JOINED").length;
+  const waited = results.filter((r) => r.body.state === "WAITLISTED");
+  assert.equal(joined, 1, `exactly one JOINED, got ${joined}`);
+  assert.equal(waited.length, 2, `two WAITLISTED, got ${waited.length}`);
+  // Hàng chờ FCFS có vị trí phân biệt.
+  assert.deepEqual(waited.map((r) => r.body.waitlistPosition).sort(), [1, 2]);
   // Không oversell: slotsLeft = 0.
-  const list = await (await fetch(`${baseUrl}/markets/vn/campaigns`, { headers: bearer(tokens[0]) })).json();
-  const c = list.find((x: { id: string }) => x.id === cid);
-  assert.equal(c.slotsLeft, 0);
+  assert.equal(await slotsLeft(tokens[0], cid), 0);
+});
+
+test("full campaign -> WAITLISTED with queue position (QĐ-5)", async () => {
+  const cid = await createCampaign(1, `wl-${Date.now()}`);
+  const a = await approvedCreator(`n10b-wl-a-${Date.now()}@example.com`);
+  const b = await approvedCreator(`n10b-wl-b-${Date.now()}@example.com`);
+  const ra = await joinJson(a, cid);
+  assert.equal(ra.body.state, "JOINED");
+  const rb = await joinJson(b, cid);
+  assert.equal(rb.status, 201);
+  assert.equal(rb.body.state, "WAITLISTED");
+  assert.equal(rb.body.waitlistPosition, 1);
+  assert.equal(await slotsLeft(a, cid), 0);
+});
+
+test("leave auto-promotes the earliest waitlisted creator (QĐ-5)", async () => {
+  const cid = await createCampaign(1, `promote-${Date.now()}`);
+  const a = await approvedCreator(`n10b-pr-a-${Date.now()}@example.com`);
+  const b = await approvedCreator(`n10b-pr-b-${Date.now()}@example.com`);
+  await joinJson(a, cid); // A JOINED
+  await joinJson(b, cid); // B WAITLISTED #1
+  // A rời -> B tự được đôn lên JOINED, suất vẫn đầy (net 0).
+  await fetch(`${baseUrl}/markets/vn/campaigns/${cid}/leave`, { method: "POST", headers: bearer(a) });
+  assert.equal((await myState(b, cid))?.state, "JOINED", "B phải được đôn lên JOINED");
+  assert.equal(await myState(a, cid), undefined, "A đã LEFT nên ẩn khỏi My Campaigns");
+  assert.equal(await slotsLeft(a, cid), 0, "suất vẫn đầy vì đã đôn người chờ");
+});
+
+test("worker reclaims an overdue JOINED slot -> EXPIRED + strike, promotes waitlist (QĐ-4)", async () => {
+  const cid = await createCampaign(1, `reclaim-${Date.now()}`);
+  const a = await approvedCreator(`n10b-rc-a-${Date.now()}@example.com`);
+  const b = await approvedCreator(`n10b-rc-b-${Date.now()}@example.com`);
+  await joinJson(a, cid); // A JOINED
+  await joinJson(b, cid); // B WAITLISTED #1
+
+  // Giả lập A ì: đẩy hạn nộp về quá khứ (mẹo test khỏi chờ 48h).
+  const prisma = app.get(PrismaService);
+  await prisma.db.$queryRaw`
+    UPDATE participation SET submit_deadline_at = now() - interval '1 hour'
+    WHERE campaign_id = ${cid}::uuid AND state = 'JOINED' RETURNING id
+  `;
+
+  const res = await app.get(JoinService).reclaimExpired();
+  assert.ok(res.reclaimed >= 1, "phải thu hồi ít nhất 1 suất");
+
+  const sa = await myState(a, cid);
+  assert.equal(sa?.state, "EXPIRED", "A bị thu hồi -> EXPIRED");
+  assert.equal(sa?.strikeCount, 1, "A bị +1 strike");
+  assert.equal((await myState(b, cid))?.state, "JOINED", "B được đôn lên thay A");
+  assert.equal(await slotsLeft(a, cid), 0, "suất vẫn đầy sau khi đôn");
 });

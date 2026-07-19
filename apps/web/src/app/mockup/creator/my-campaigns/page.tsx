@@ -101,6 +101,17 @@ export default function MyCampaignsScreen() {
                       ⏳ Hạn nộp bài: {new Date(p.submitDeadlineAt).toLocaleString(locale)}
                     </p>
                   )}
+                  {p.state === "WAITLISTED" && (
+                    <p style={{ color: "#7fb2ff", fontSize: 13, marginTop: 8 }}>
+                      ⏳ Hàng chờ{p.waitlistPosition != null ? ` · vị trí #${p.waitlistPosition}` : ""} — tự được đôn
+                      lên khi có suất trả lại (QĐ-5).
+                    </p>
+                  )}
+                  {p.state === "EXPIRED" && (
+                    <p style={{ color: "#e8a0a0", fontSize: 13, marginTop: 8 }}>
+                      Suất bị thu hồi do quá hạn nộp (QĐ-4). Bị thu hồi ≥ 2 lần sẽ không join lại được campaign này.
+                    </p>
+                  )}
                   <BtnRow>
                     {p.state === "JOINED" && (
                       <Btn variant="primary">
@@ -112,6 +123,11 @@ export default function MyCampaignsScreen() {
                     {HOLDING.has(p.state) && (
                       <Btn variant="ghost" disabled={busy === p.campaignId} onClick={() => leave(p.campaignId)}>
                         {busy === p.campaignId ? "…" : "Rời suất"}
+                      </Btn>
+                    )}
+                    {p.state === "WAITLISTED" && (
+                      <Btn variant="ghost" disabled={busy === p.campaignId} onClick={() => leave(p.campaignId)}>
+                        {busy === p.campaignId ? "…" : "Rời hàng chờ"}
                       </Btn>
                     )}
                   </BtnRow>
