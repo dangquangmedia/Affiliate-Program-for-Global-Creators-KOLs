@@ -164,9 +164,10 @@ DB không có "hòa" thật → luôn có 1 thứ tự tổng. Dễ hiểu, dễ
 `JOIN_BLOCKED_STRIKE` (QĐ-4).
 
 **Xử lý loser (chốt Quang — kết hợp từ-chối-rõ + danh-sách-chờ + gợi-ý):**
-- Từ chối rõ `SLOT_FULL` ("suất cuối vừa có người giữ trước bạn").
-- **Đưa vào danh sách chờ FCFS**: tái dùng `participations` state `WAITLISTED` + `waitlisted_at`
-  (không bảng mới). Hiện **vị trí trong hàng chờ**.
+- **Đưa thẳng vào danh sách chờ FCFS** (đã làm N10b): hết suất → bấm Join trả về `WAITLISTED` +
+  `waitlisted_at` + **vị trí hàng chờ** (thay cho việc chỉ báo `SLOT_FULL`). Tái dùng
+  `participations`, không bảng mới. (`SLOT_FULL` chỉ còn là khả năng logic; hành vi hiện tại =
+  vào hàng chờ.)
 - **Tự đôn lên**: khi 1 suất bị thu hồi (QĐ-4) hoặc có người tự rời → trong transaction có khóa
   campaign, lấy `WAITLISTED` **sớm nhất** → `JOINED` + **snapshot điều khoản lúc được đôn**.
 - **Gợi ý campaign tương tự**: truy vấn read-only — cùng nước, **còn suất**, ưu tiên cùng nền
@@ -178,6 +179,89 @@ DB không có "hòa" thật → luôn có 1 thứ tự tổng. Dễ hiểu, dễ
 
 **Schema delta (bổ sung QĐ-4, làm ở N10):** `participations` thêm state `WAITLISTED` +
 `waitlisted_at`. Gợi ý campaign là truy vấn, không cần bảng.
+
+### QĐ-6. Điều kiện tham gia campaign đặc thù — Apply → duyệt (chốt 2026-07-19)
+
+**Vấn đề:** không phải creator nào cũng hợp campaign đặc thù (chuyên môn lệch, follower không
+đủ). Thả nổi → content kém → Ops reject hàng loạt → tốn suất, brand mất niềm tin. Đây là bài
+matching 2 chiều, không chỉ là cái cổng chặn.
+
+**Điểm cấn thật nằm ở NGUỒN DỮ LIỆU** — follower/chuyên môn là dữ liệu NGOÀI hệ thống:
+- API social thật: chuẩn nhất nhưng Phase 1 không kịp (app review hàng tuần).
+- **Tự khai + Ops xác minh tay** (mô hình y hệt KYC field): rẻ, làm được ngay, screenshot vẫn giả được.
+- **Nội sinh** (lịch sử trên nền tảng: hoàn thành, tỉ lệ duyệt, strike): KHÔNG giả được, đã có sẵn.
+
+**Nguyên tắc rút ra (câu trả lời hiểu-sâu cho mentor):** *đừng xây cổng cứng trên dữ liệu mình
+không kiểm soát.* Tự khai láo sẽ tự triệt tiêu: vào campaign → content kém → reject → strike/
+tier tụt → tự đào thải. Lịch sử nội sinh là bộ lọc sự thật cuối cùng.
+
+**Chốt (Quang): mô hình Apply → duyệt (kiểu AccessTrade — advertiser duyệt publisher):**
+- Campaign có cờ `requires_approval` (builder bật cho campaign đặc thù; campaign mở giữ nguyên
+  join thẳng như hiện tại — không phải mọi campaign đều qua duyệt).
+- Join campaign đặc thù → tạo participation state **`APPLIED`** (nộp đơn, **KHÔNG chiếm suất**
+  khi chờ — giống WAITLISTED), kèm hồ sơ tự khai.
+- **Ops duyệt đơn dựa trên 2 nguồn:** hồ sơ social tự khai (platform, handle, follower, ngành —
+  gắn nhãn "chưa xác minh" nếu Ops chưa verify) + **lịch sử nội sinh** hiển thị kèm (số campaign
+  hoàn thành, tỉ lệ duyệt content, strike).
+- Duyệt → vào flow join chuẩn TRONG khóa campaign (kiểm suất → JOINED + snapshot + hạn nộp;
+  hết suất → WAITLISTED). Từ chối → `APPLICATION_REJECTED` + lý do (creator thấy rõ vì sao).
+- Fail/từ chối luôn kèm **gợi ý campaign vừa sức** (tái dùng `suggestSimilar`).
+
+**Hệ quả schema (lát mỏng sau N11):** `campaigns.requires_approval`; ParticipationState thêm
+`APPLIED`/`APPLICATION_REJECTED`; bảng nhỏ `social_profile` (profile_id, platform, handle,
+follower_claimed, category, verified_at?). Phase 2: hard-gate tự động trên hồ sơ đã verify +
+tier nội sinh Bronze/Silver/Gold.
+
+### QĐ-7. Thu phí — take-rate phía brand (chốt 2026-07-19)
+
+**Vấn đề:** nền tảng sống bằng gì, và thu sao để cả brand lẫn creator không khó chịu.
+
+**Nguyên tắc (chốt):**
+1. **Đánh phí vào bên có ngân sách + nhận giá trị đo được = brand** (họ quen trả agency 15–20%;
+   take-rate 5–10% là rẻ so với chuẩn đó).
+2. **Không bao giờ cắt vào con số creator NHÌN THẤY** — khó chịu sinh ra từ "khoảng hụt giữa số
+   niêm yết và số vào ví", không phải từ việc có phí. Niêm yết = nhận (trừ thuế có ghi chú,
+   Gross–Thuế–Net đã tách sẵn).
+3. **Phí biết trước lúc cam kết**, không phí ẩn.
+
+**Chốt (Quang): take-rate 5–10% trên budget campaign, thu từ brand.**
+- Brand nạp **`budget + phí`** (VD 15tr + 8% = 16,2tr); creator nhận đúng đơn giá niêm yết.
+- Nhờ QĐ-3 (budget = suất×giá cố định) → **phí cũng cố định, biết trước lúc tạo campaign**.
+- Phí rút tiền: KHÔNG phải nguồn thu — chỉ pass-through phí cổng thật; miễn phí từ ngưỡng
+  `min_payout_minor` (đã có trong `country_config`).
+- Nguồn phụ về sau: phí featured campaign, subscription cho brand chạy đều (giảm take-rate).
+- **Phí ≠ thuế** — 2 dòng riêng trong ledger, không trộn.
+
+**Hệ quả schema (lát mỏng, ghép N12/N13):** `country_config.platform_fee_bps` (theo nước);
+LedgerEntryType thêm `PLATFORM_FEE`; builder hiện "tổng chi brand = budget + phí".
+
+### QĐ-8. Tìm brand & đảm bảo thanh toán — prepaid escrow 100% (chốt 2026-07-19)
+
+**Vấn đề (2 bài tách biệt):** (a) tìm brand ở đâu/ký thế nào; (b) ký rồi làm sao chắc họ trả đủ.
+
+**(a) Go-to-market (chiến lược, không code):**
+- **Giai đoạn 0 — concierge/agency mode**: tự đi bán tay 3–5 brand đầu (F&B, mỹ phẩm nội địa,
+  app cần UGC), dùng nền tảng làm tool nội bộ — "do things that don't scale". (AccessTrade khởi
+  động được nhờ thừa hưởng mạng advertiser từ Interspace Nhật; mình không có thì bootstrap tay.)
+- Kênh: (1) brand ĐANG chạy KOL lẻ (soi ads TikTok/FB, group booking) — nhu cầu đã chứng minh;
+  (2) bắt tay agency/MCN — họ có brand, mình là tool; (3) seller sàn TMĐT cần UGC; (4) self-serve
+  + case study về sau.
+- **Pitch đắt nhất có sẵn trong sản phẩm:** *"anh chỉ trả cho content ĐÃ NGHIỆM THU"* — trigger
+  `CONTENT_APPROVED` là điểm bán hàng; cộng ngân sách trần cứng (QĐ-1/3) + dashboard minh bạch.
+
+**(b) Chốt (Quang): prepaid escrow 100%** — *hợp đồng không đòi được tiền; tiền nằm trong két
+mới chắc.*
+- Brand nạp đủ `budget + phí` TRƯỚC → campaign mới `ACTIVE` (thêm status **`PENDING_FUNDING`**).
+- Creator được đảm bảo tuyệt đối: mọi earning đều có tiền thật đứng sau; rủi ro quỵt = 0 cho cả
+  creator lẫn nền tảng. Khớp QĐ-3: số phải nạp biết chính xác từ lúc tạo.
+- Kết thúc campaign còn suất thừa → **hoàn brand phần chưa dùng** (ledger `REFUND`).
+- Escrow bảo vệ 2 CHIỀU: brand không sợ trả cho content rác (tiền chỉ giải ngân khi duyệt).
+  Tranh chấp "brand ép reject để giữ tiền": Phase 1 Ops là người nền tảng (trung lập); về sau
+  tiêu chí nghiệm thu ghi cứng trong brief + SLA duyệt + `audit_events` phân xử.
+- NET-terms/công nợ: chỉ cho brand có lịch sử tín nhiệm — Phase xa.
+
+**Hệ quả schema (lát mỏng, ghép N13/N14):** CampaignStatus thêm `PENDING_FUNDING` + cột
+`funded_at`; builder mock nút "Nạp quỹ"; bút toán escrow/refund nối vào ledger khi money spine sẵn.
 
 ## 4. Luồng lõi (con đường của một đồng tiền)
 

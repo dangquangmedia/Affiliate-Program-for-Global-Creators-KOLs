@@ -9,10 +9,11 @@
   Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
 - Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
   V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
-- **Xong Tuần A (N1-N5) + N6-N9 + N10 core**: schema lean (20 model) + auth/session/login +
+- **Xong Tuần A (N1-N5) + Tuần B (N6-N10b)**: schema lean (20 model) + auth/session/login +
   country + i18n + KYC + Campaign + **Join race-safe (FOR UPDATE) + snapshot + KYC-gate + My
-  Campaigns**. Spine tới trình duyệt: login→chọn nước→KYC→Approved→**join campaign (không
-  oversell)**. **API 41/41, E2E 11/11**. Đang Tuần B. Kế: N10b (thu hồi suất + waitlist) → hết Tuần B.
+  Campaigns + waitlist tự đôn (QĐ-5) + worker thu hồi suất+strike (QĐ-4) + gợi ý campaign**. Spine
+  tới trình duyệt: login→chọn nước→KYC→Approved→join (hết suất→hàng chờ, tự đôn khi có suất trả).
+  **API 44/44, E2E 12/12**. **HẾT Tuần B**. Kế: **Tuần C money spine N11** (content→review→Earning exactly-once).
 - Code hiện có: walking skeleton chạy trên **schema mới 18 bảng** (Next.js `/vn` `/ph` →
   NestJS → Postgres). Schema 45 bảng cũ **ĐÃ XÓA & thay** bằng lean N5 (migration
   `20260718095722_init_lean_18_tables`, DB có 20 base table gồm _prisma_migrations).
@@ -210,25 +211,56 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   slots_taken làm bộ đếm quyền uy (tăng/giảm trong khóa); "Đầy" vẫn suy ra (>=slots_total).
   Kế: **N10b** — worker thu hồi suất (QĐ-4) + waitlist tự đôn (QĐ-5) + strike active + gợi ý campaign.
 
-## Current State & Hand-off (cập nhật trước compact — 2026-07-19, sau N10 core)
+- **N10b — thu hồi suất + waitlist + tự đôn + gợi ý (2026-07-19, HẾT Tuần B)**: KHÔNG cần migration
+  (cột đã có từ N10). (1) **Waitlist (QĐ-5)**: `join()` khi hết suất KHÔNG báo `SLOT_FULL` nữa mà
+  tạo/ghi `WAITLISTED` + `waitlisted_at` (trong khóa) và trả **vị trí hàng chờ FCFS** (đếm
+  `waitlisted_at` sớm hơn +1). (2) **Tự đôn (QĐ-5)**: `promoteNextWaitlisted(tx)` — trong khóa
+  campaign, lấy `WAITLISTED` sớm nhất → `JOINED` + **snapshot điều khoản lúc đôn** + hạn nộp mới +
+  tăng slots_taken. Gọi từ `leave()` (đã bọc `$transaction`+`FOR UPDATE`) và từ reclaim → trả suất
+  rồi đôn = net 0, không kẹt oan. (3) **Worker thu hồi (QĐ-4)**: `reclaimExpired(now)` LOGIC THUẦN
+  (test in-process) quét `JOINED` quá `submit_deadline_at` / `REJECTED` quá `fix_deadline_at` →
+  mỗi suất khóa campaign, RE-KIỂM trong khóa (creator có thể vừa nộp/rời) → `EXPIRED` + `strike_count`+1
+  + trả suất + tự đôn. `CONTENT_SUBMITTED`/`APPROVED` MIỄN NHIỄM (đồng hồ dừng khi chờ Ops). Scheduler
+  `reclaim.scheduler.ts` MỎNG: `setInterval` chỉ bật khi có env `RECLAIM_SWEEP_MS` (test/demo không tự
+  quét). (4) **Gợi ý (QĐ-5)**: `GET /markets/:m/campaigns/:id/similar` — cùng nước, ACTIVE, còn suất,
+  ưu tiên cùng platform rồi reward gần, top 3. Web: V05 nút "Vào hàng chờ" + thẻ "Đang trong hàng chờ
+  · vị trí #K" + danh sách campaign gợi ý; My Campaigns hiện vị trí chờ + lý do EXPIRED + nút rời hàng
+  chờ. **API 44/44** (thêm: full→WAITLISTED+vị trí, leave tự đôn, reclaim→EXPIRED+strike+đôn; RACE đổi
+  thành 1 JOINED + 2 WAITLISTED vị trí {1,2}), **E2E 12/12** (thêm waitlist-flow). lint/2×typecheck sạch.
+  Mẹo test reclaim: `UPDATE participation SET submit_deadline_at = now() - interval '1 hour'` rồi gọi
+  `app.get(JoinService).reclaimExpired()`. Kế: **N11** — nộp content → review → Earning exactly-once (Tuần C money spine).
+
+- **Brainstorm QĐ-6/7/8 (2026-07-19, trước N11)**: chốt 3 quyết định sản phẩm mới, ghi đầy đủ ở
+  `docs/PRODUCT.md` §3. **QĐ-6 điều kiện tham gia**: mô hình **Apply → duyệt** (kiểu AccessTrade)
+  cho campaign có cờ `requires_approval` — `APPLIED` không chiếm suất, Ops duyệt dựa trên hồ sơ
+  social TỰ KHAI + lịch sử NỘI SINH (nguyên tắc: không xây cổng cứng trên dữ liệu mình không kiểm
+  soát; khai láo tự triệt qua strike/tier). **QĐ-7 thu phí**: take-rate 5–10% trên budget, thu từ
+  BRAND (nạp budget+phí); creator nhận đúng số niêm yết; rút tiền miễn phí trên ngưỡng; phí ≠ thuế.
+  **QĐ-8 escrow**: prepaid 100% — brand nạp đủ trước, campaign mới ACTIVE (`PENDING_FUNDING`);
+  hoàn phần chưa dùng khi kết thúc; GTM giai đoạn 0 = concierge/agency mode. **Phạm vi (chốt):**
+  docs cả 3 ngay (đã xong) + code LÁT MỎNG sau N11 (QĐ-6 apply-flow; QĐ-7 `platform_fee_bps`+builder
+  ghép N12/N13; QĐ-8 `PENDING_FUNDING`+nút nạp quỹ mock ghép N13/N14) — money spine không bị chậm.
+
+## Current State & Hand-off (cập nhật 2026-07-19 — HẾT Tuần B, sau N10b + báo cáo mentor)
 
 **1. Vừa xong / trạng thái:**
-- Xong Tuần A (N1-N5) + N6-N9 + **N10 core**. Git tới `3f5cdb1` (main), sạch, đã commit hết.
-- Spine chạy thật tới trình duyệt: login (mock SSO) → chọn nước → KYC nộp↔Ops duyệt theo field → discover/detail lọc nước → **Join race-safe + snapshot + KYC-gate** → My Campaigns.
-- Toàn xanh: **API 41/41, E2E 11/11**, lint/typecheck/api-build sạch. DB 20 model, seed VN/PH + Ops/Admin demo + 5 campaign. Postgres chạy Docker (cần Docker Desktop bật).
-- Không có việc dở. Đã brainstorm+chốt **QĐ-4 (thu hồi suất)** và **QĐ-5 (tranh suất cuối + waitlist)** — xem `docs/PRODUCT.md`; N10 core mới làm phần race-safe/snapshot, phần reclaim+waitlist là N10b.
+- Xong **Tuần A (N1-N5) + trọn Tuần B (N6-N10b)**. **CHƯA COMMIT** — working tree còn thay đổi N10b + `Report/` (an toàn, không mất khi tắt máy; xem lệnh git ở mục 3).
+- **Đã tạo bộ báo cáo mentor** trong `Report/`: `Affiliate_GLOBAL_Prototype_Review.pptx` (18 slide, theme tối, 13 screenshot thật nhúng sẵn) + `MENTOR_QA.md` (34 câu + 4 câu bẫy, giả lập buổi review) + `assets/` (13 ảnh PNG V01–V12). Dựng PPTX bằng `python-pptx` (script gốc ở scratchpad, không nằm trong repo). Chưa render preview được (máy không có LibreOffice) — mở bằng PowerPoint để soát font/tràn.
+- **Đã chạy /doctor**: gộp về 1 bản cài native `claude` 2.1.215 (gỡ bản npm trùng, thêm `~/.local/bin` vào PATH — hiệu lực ở terminal MỚI), bật `permissions.defaultMode:"auto"` ở `~/.claude/settings.json`. Lưu ý cosmetic: `~/.bashrc` dòng 1 có BOM UTF-16 nên mỗi lệnh Git-Bash in warning vô hại (chưa sửa).
+- **Quy ước mới (đã lưu memory)**: luôn giao tiếp + viết văn bản bằng **tiếng Việt**, chỉ giữ tiếng Anh cho code/thuật ngữ/mã bắt buộc.
+- Spine chạy thật tới trình duyệt: login (mock SSO) → chọn nước → KYC nộp↔Ops duyệt theo field → discover/detail lọc nước → **Join race-safe + snapshot + KYC-gate** → hết suất **vào hàng chờ FCFS** → **tự đôn** khi có suất trả (leave/thu hồi) → **worker thu hồi suất ì (+strike)** → **gợi ý campaign tương tự** → My Campaigns.
+- Toàn xanh: **API 44/44, E2E 12/12**, lint + 2×typecheck (api+web) sạch. DB 20 model, seed VN/PH + Ops/Admin demo + 5 campaign. Postgres chạy Docker cổng 54329 (đang UP).
+- **Không có việc dở.** QĐ-4 (thu hồi) + QĐ-5 (waitlist/tự đôn) đã hiện thực xong, khớp `docs/PRODUCT.md`.
 
-**2. File/biến quan trọng:**
-- API modules: `apps/api/src/{auth,country,kyc,campaign}/*`. Join ở `campaign/join.service.ts` (+`join.controller.ts`): `$transaction` + `SELECT campaign FOR UPDATE`, mã lỗi có kiểu (SLOT_FULL/KYC_REQUIRED/CAMPAIGN_NOT_JOINABLE/JOIN_BLOCKED_STRIKE), `slots_taken` là bộ đếm tăng/giảm trong khóa.
-- Prisma facade `apps/api/src/prisma.service.ts` (`PrismaClientLike` gõ tay + `$transaction`); schema `apps/api/prisma/schema.prisma`; seed `apps/api/prisma/seed.sql`.
-- Web clients `apps/web/src/lib/{auth,country,kyc,campaign}-client.ts`, i18n `lib/i18n.ts`; màn: `app/mockup/creator/{login,country,kyc,discover,campaign,my-campaigns}`, `ops/review`, `admin/campaign-builder`.
-- Cột N10b đã sẵn (migration `join_slots_waitlist`): `participations.{state EXPIRED/WAITLISTED, submit_deadline_at, fix_deadline_at, waitlisted_at, strike_count}`, `campaigns.ends_at`.
-- **Gotcha**: (a) prisma CLI `db:*` phải nạp `.env` thủ công vào session PowerShell; (b) ĐỪNG `pnpm build`/xóa `.next` khi dev:web đang chạy (gây Internal Server Error — gotcha #9); (c) test E2E/API hàng đợi tích luỹ giữa các lần chạy → luôn dùng email/campaign/tên unique + trỏ id seed cho assertion cố định.
+**2. File/biến quan trọng (N10b):**
+- `apps/api/src/campaign/join.service.ts`: `join()` (hết suất→WAITLISTED+vị trí, không còn ném SLOT_FULL), `leave()` (bọc `$transaction`+`FOR UPDATE`, trả suất rồi `promoteNextWaitlisted`), `reclaimExpired(now)` + `reclaimOne()` (LOGIC THUẦN, khóa từng campaign, RE-KIỂM trong khóa), `promoteNextWaitlisted(tx)`, `waitlistPosition(tx,...)`, `joinSnapshot(campaign)` dùng chung. Hằng: `SUBMIT_SLA_HOURS=48`, `FIX_SLA_HOURS=24`, `MAX_STRIKES=2`.
+- `apps/api/src/campaign/reclaim.scheduler.ts`: `setInterval` MỎNG, chỉ bật khi env `RECLAIM_SWEEP_MS>0` (mặc định tắt → test/demo không tự quét). Đăng ký ở `app.module.ts`.
+- `campaign.service.ts` `suggestSimilar()` + route `GET /markets/:m/campaigns/:id/similar`. `prisma.service.ts` facade: `participation.findFirst` đã thêm `orderBy`.
+- Web: `lib/campaign-client.ts` (`Participation.waitlistPosition`, `suggestSimilar()`); V05 `creator/campaign/page.tsx` (nút "Vào hàng chờ" + thẻ hàng chờ + gợi ý); `creator/my-campaigns/page.tsx` (vị trí chờ, lý do EXPIRED, rời hàng chờ). Test `test/join.smoke.test.ts` + e2e `waitlist-flow.spec.ts`.
+- **Gotcha**: (a) prisma CLI `db:*` phải nạp `.env` thủ công vào PowerShell; (b) ĐỪNG `pnpm build`/xóa `.next` khi dev:web đang chạy (gotcha #9) — chạy e2e OK vì Playwright `reuseExistingServer`; (c) test hàng đợi tích luỹ → email/tên unique; (d) `listMine` ẩn LEFT (đừng assert state LEFT — assert vắng mặt); (e) `pnpm` gọi qua `corepack pnpm` trong shell này.
 
-**3. Nhiệm vụ đầu tiên phiên sau — N10b (nốt Tuần B):**
-- (1) **Worker thu hồi suất** (QĐ-4): 1 service method reclaim THUẦN (test được) + scheduler mỏng. Quét JOINED quá `submit_deadline_at` / REJECTED quá `fix_deadline_at` → `EXPIRED` + giảm `slots_taken` + tăng `strike_count`. CHỈ thu hồi khi bóng ở chân creator (CONTENT_SUBMITTED/APPROVED miễn nhiễm).
-- (2) **Waitlist** (QĐ-5): join khi hết suất → `WAITLISTED` + `waitlisted_at` + trả vị trí hàng chờ (thay vì chỉ SLOT_FULL).
-- (3) **Tự đôn**: reclaim/leave trả 1 suất → trong khóa campaign lấy WAITLISTED sớm nhất → JOINED + snapshot lúc đôn + hạn nộp mới.
-- (4) **Gợi ý campaign tương tự** (read-only): cùng nước, còn suất, ưu tiên cùng platform/reward gần.
-- Mẹo test: set `submit_deadline_at` quá khứ khi tạo participation để test reclaim khỏi chờ 48h. Web: V05 SLOT_FULL→"vào hàng chờ vị trí K"+gợi ý; My Campaigns đã có STATE_BADGE cho WAITLISTED/EXPIRED.
-- N10b không cần migration (cột đã có). Xong N10b là hết Tuần B → sang money spine N11-15 (trễ ~1 ngày, hấp thụ vào buffer N20).
+**3. Nhiệm vụ đầu tiên phiên sau — N11 (mở màn Tuần C money spine):**
+- **Commit trước** (chưa commit): N10b (thu hồi suất + waitlist + tự đôn + gợi ý) **+ `Report/`**. Gợi ý tách 2 commit: 1 cho code N10b, 1 cho `docs(report)`. **Loại trừ** `.claude/settings.local.json` khỏi commit (settings máy). Kiểm `git status` trước.
+- Sau đó N11: creator **nộp content link** (V06) → **queue review** cho Ops (V10 phần content, hiện đang mock) → Ops **approve** tạo **Earning exactly-once** — khóa `earning.submission_id` UNIQUE + transaction (double-click Approve KHÔNG tạo 2 earning). Bảng `content_submission` + `earning` đã có trong schema. Đây là bài toán khó #3 (exactly-once).
+- Lưu ý nối: khi content APPROVED thì participation → `APPROVED` (đang có trong enum); reject → `REJECTED` + set `fix_deadline_at` (=now+24h) để worker QĐ-4 thu hồi được nếu creator không sửa.
+- **Lát mỏng QĐ-6/7/8 xếp lịch sau N11** (đã chốt, xem PRODUCT.md §3): QĐ-6 apply-flow (`requires_approval` + `APPLIED`/`APPLICATION_REJECTED` + bảng `social_profile` + Ops duyệt đơn); QĐ-7 `platform_fee_bps` + `PLATFORM_FEE` ledger + tổng chi ở builder (ghép N12/N13); QĐ-8 `PENDING_FUNDING` + `funded_at` + nút "Nạp quỹ" mock (ghép N13/N14). Dư thì dồn buffer N20.
