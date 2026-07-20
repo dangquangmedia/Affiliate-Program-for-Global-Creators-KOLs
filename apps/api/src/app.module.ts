@@ -21,6 +21,8 @@ import { ContentService } from "./content/content.service";
 import { LedgerService } from "./ledger/ledger.service";
 import { EarningsController } from "./earnings/earnings.controller";
 import { EarningsService } from "./earnings/earnings.service";
+import { ReconciliationController } from "./reconciliation/reconciliation.controller";
+import { ReconciliationService } from "./reconciliation/reconciliation.service";
 
 @Module({
   controllers: [
@@ -36,6 +38,7 @@ import { EarningsService } from "./earnings/earnings.service";
     CreatorContentController,
     OpsContentController,
     EarningsController,
+    ReconciliationController,
   ],
   providers: [
     PrismaService,
@@ -50,6 +53,7 @@ import { EarningsService } from "./earnings/earnings.service";
     ContentService,
     LedgerService,
     EarningsService,
+    ReconciliationService,
   ],
 })
 export class AppModule {}

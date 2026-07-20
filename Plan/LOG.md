@@ -9,11 +9,11 @@
   Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
 - Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
   V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
-- **Xong Tuần A (N1-N5) + Tuần B (N6-N10b) + N11-N12**: schema lean + auth/session + country +
-  i18n + KYC + Campaign + Join race-safe/waitlist/thu hồi (QĐ-4/5) + content→review→Earning
-  exactly-once (N11) + **ledger append-only + dashboard earnings V07 (N12)**. Spine tới trình
-  duyệt: login→chọn nước→KYC→join→nộp content→Ops duyệt→**thu nhập PENDING + ghi sổ cái +net**.
-  Đã chốt QĐ-6/7/8 trong PRODUCT.md. **API 62/62, E2E 14/14**. Đang **Tuần C**. Kế: **N13** đối soát.
+- **Xong Tuần A (N1-N5) + Tuần B (N6-N10b) + N11-N13**: schema lean + auth/session + country +
+  i18n + KYC + Campaign + Join (QĐ-4/5) + content→Earning exactly-once (N11) + ledger append-only
+  + V07 (N12) + **đối soát Finance batch→lock→AVAILABLE (N13)**. Spine tới trình duyệt:
+  login→…→nộp content→Ops duyệt→thu nhập PENDING+sổ cái→**Finance đối soát→AVAILABLE (rút được)**.
+  Đã chốt QĐ-6/7/8. **API 69/69, E2E 15/15**. Đang **Tuần C**. Kế: **N14** payout (reserve+OTP+provider).
 - Code hiện có: walking skeleton chạy trên **schema mới 18 bảng** (Next.js `/vn` `/ph` →
   NestJS → Postgres). Schema 45 bảng cũ **ĐÃ XÓA & thay** bằng lean N5 (migration
   `20260718095722_init_lean_18_tables`, DB có 20 base table gồm _prisma_migrations).
@@ -241,6 +241,25 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   docs cả 3 ngay (đã xong) + code LÁT MỎNG sau N11 (QĐ-6 apply-flow; QĐ-7 `platform_fee_bps`+builder
   ghép N12/N13; QĐ-8 `PENDING_FUNDING`+nút nạp quỹ mock ghép N13/N14) — money spine không bị chậm.
 
+- **N13 — Đối soát Finance (batch → lock → AVAILABLE) (2026-07-20)**: KHÔNG cần migration (bảng
+  `reconciliation_batch/line` đã có). Seed thêm 2 tài khoản `finance.vn@`/`finance.ph@` +
+  role_assignment `LOCAL_FINANCE` (đăng nhập vai như Ops/Admin) — đã re-seed DB. Module
+  `reconciliation/`: `createBatch` gom mọi earning **PENDING** của nước CHƯA nằm batch nào
+  (`where reconLine: { is: null }`) → tạo batch OPEN + 1 line/earning (`UNIQUE(earning_id)` chốt: 1
+  earning đúng 1 batch, kể cả 2 Finance bấm cùng lúc); rỗng → 409 `NOTHING_TO_RECONCILE` (không tạo
+  batch rỗng). `lockBatch` OPEN→LOCKED bằng **claim `UPDATE ... WHERE status='OPEN'`** (double-lock
+  → 409 `BATCH_ALREADY_LOCKED`) + trong CÙNG transaction flip earning dòng hợp lệ PENDING→**AVAILABLE**
+  (mở tiền rút N14). LOCKED = bất biến. **KHÔNG ghi bút toán sổ cái** khi flip: PENDING→AVAILABLE là
+  cổng quy trình, không phải chuyển tiền (net đã accrue vào sổ ở N12) — điểm hiểu-sâu cho mentor.
+  RBAC `LOCAL_FINANCE` (Ops/creator → 403); cách ly nước (Finance PH mở batch VN → 404). Routes
+  `GET/POST /ops/:market/reconciliation` + `GET/:id` + `POST/:id/lock`. Facade thêm delegate
+  `reconciliationBatch`/`reconciliationLine` + `earning.update`. Web: `lib/reconciliation-client.ts`;
+  V12 rewire màn thật (login vai Finance, tạo/xem/khoá batch, bảng dòng + tổng hợp lệ; payout để mock
+  N14). Kết quả: **API 69/69** (thêm 7: RBAC, create gom PENDING, lock→AVAILABLE, double-lock 409,
+  chỉ đối soát 1 lần, cách ly PH-VN, dashboard PENDING→AVAILABLE), **E2E 15/15** (thêm
+  reconciliation-flow V12). Vòng đời tiền: PENDING → **AVAILABLE** (rút được). Kế: **N14** payout
+  (reserve + OTP + provider mock) — dùng lại LedgerService (PAYOUT_RESERVE/PAID/RELEASE).
+
 - **N12 — Ledger append-only + dashboard earnings V07 (2026-07-20)**: KHÔNG cần migration (bảng
   `ledger_entry` đã có từ N5). Tạo **`LedgerService`** (`ledger/ledger.service.ts`) — tập trung
   logic ghi sổ APPEND-ONLY (bài toán #6), tái dùng cho payout N14-15: `post(tx, entry)` (chỉ
@@ -285,21 +304,20 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   token + tài nguyên VN → 404); gọi route VN bằng token PH là 403 — ngữ nghĩa khác. Kế: **N12**
   ledger append-only + dashboard earnings (V07) Gross–Thuế–Net.
 
-## Current State & Hand-off (cập nhật 2026-07-20 — sau N12, Tuần C đang chạy)
+## Current State & Hand-off (cập nhật 2026-07-20 — sau N13, Tuần C đang chạy)
 
 **1. Vừa xong / trạng thái:**
-- Xong **Tuần A + Tuần B + N11 + N12**. **Đã commit HẾT** tới N11 (`85fba6a`) + LOG (`4a03555`); **N12 chưa commit** (commit đầu phiên sau). Chỉ còn `.claude/settings.local.json` (settings máy — không commit).
-- **N12**: money truth chạy thật — approve content → earning PENDING **và** ghi cặp bút toán sổ cái `EARNING_ACCRUE (+gross)` / `TAX (−tax)` trong CÙNG transaction; V07 dashboard thật hiện Gross–Thuế–Net + **sổ cái append-only** (mỗi bút toán +/− + số dư luỹ kế). Số dư sổ = net (gross−tax); tất cả PENDING tới khi đối soát N13.
-- Toàn xanh: **API 62/62, E2E 14/14**, lint + 2×typecheck sạch. Postgres Docker 54329 (bật Docker Desktop sau khi khởi động máy). Báo cáo mentor ở `Report/`.
+- Xong **Tuần A + Tuần B + N11 + N12 + N13**. **Đã commit HẾT** tới N12 (`95bdf41`); **N13 chưa commit** (commit đầu phiên sau). Chỉ còn `.claude/settings.local.json` (settings máy — không commit).
+- **N13**: đối soát Finance chạy thật — tạo batch gom earning PENDING → khoá → PENDING→**AVAILABLE** (rút được). LOCKED bất biến; 1 earning đúng 1 batch (`UNIQUE(earning_id)`); không ghi sổ cái khi flip (chỉ cổng quy trình). Seed thêm `finance.vn@`/`finance.ph@` (LOCAL_FINANCE) — **đã re-seed DB**.
+- Toàn xanh: **API 69/69, E2E 15/15**, lint + 2×typecheck sạch. Postgres Docker 54329 (bật Docker Desktop sau khi khởi động máy). Báo cáo mentor ở `Report/`.
 
-**2. File/biến quan trọng (N12):**
-- `apps/api/src/ledger/ledger.service.ts` — **LedgerService** (tập trung ghi sổ append-only, tái dùng N14-15): `post(tx, input)` chỉ CREATE trong tx có sẵn; `postEarningAccrual(tx, earning)` ghi +gross/−tax; `view(profileId, countryId)` trả bút toán mới-nhất-trước + `balanceAfterMinor` (luỹ kế) + `balanceMinor` (tổng). Loại bút toán: `EARNING_ACCRUE|TAX|PAYOUT_RESERVE|PAYOUT_PAID|PAYOUT_RELEASE|REVERSAL`.
-- `content.service.review()` approve: bắt `earning.id` từ `tx.earning.create` rồi gọi `ledger.postEarningAccrual(tx,…)` trong cùng transaction (inject LedgerService).
-- `apps/api/src/earnings/{earnings.service.ts,earnings.controller.ts}`: `GET /me/country/:market/earnings` → `{ earnings[], summary(Gross/Thuế/Net + net theo status), ledger(view) }`.
-- Facade `prisma.service.ts` thêm delegate `ledgerEntry`. Web: `lib/earnings-client.ts`, V07 `creator/earnings/page.tsx` (màn thật + thẻ Sổ cái). Test `earnings.smoke.test.ts` (6) + e2e `earnings-flow.spec.ts`.
-- **Gotcha (giữ nguyên)**: (a) `.env` thủ công cho prisma CLI; (b) đừng build/xóa `.next` khi dev:web chạy; (c) test email/tên unique; (d) `listMine` ẩn LEFT; (e) `corepack pnpm`; (f) test cách ly staff gọi route nước MÌNH (VN res qua PH route → 404; VN route + PH token → 403); (g) ledger là single signed ledger/(profile,nước): `balanceMinor = Σ amount_minor`; "AVAILABLE để rút" ≠ balance sổ (chờ đối soát N13 flip status).
+**2. File/biến quan trọng (N13):**
+- `apps/api/src/reconciliation/{reconciliation.service.ts,reconciliation.controller.ts}`: `createBatch` (gom PENDING chưa đối soát: `where reconLine: { is: null }`; rỗng → 409 `NOTHING_TO_RECONCILE`), `lockBatch` (claim `UPDATE ... WHERE status='OPEN'` → double-lock 409 `BATCH_ALREADY_LOCKED`; flip earning hợp lệ PENDING→AVAILABLE trong cùng tx; KHÔNG ghi sổ cái), `getBatch`/`listBatches`. RBAC `LOCAL_FINANCE`; cách ly nước → 404. Routes `/ops/:market/reconciliation` (+`/:id`, `/:id/lock`).
+- Facade thêm `reconciliationBatch`/`reconciliationLine` + `earning.update`. Seed `apps/api/prisma/seed.sql` +2 finance account (id `34/35...`). Web: `lib/reconciliation-client.ts`, V12 `finance/workbench/page.tsx` (màn thật, payout còn mock N14). Test `reconciliation.smoke.test.ts` (7) + e2e `reconciliation-flow.spec.ts`.
+- **LedgerService** (N12, tái dùng cho N14): `post(tx, input)` append-only; loại bút toán `EARNING_ACCRUE|TAX|PAYOUT_RESERVE|PAYOUT_PAID|PAYOUT_RELEASE|REVERSAL`; `view()` trả số dư luỹ kế. `content.service.review()` approve đã ghi +gross/−tax.
+- **Gotcha (giữ nguyên)**: (a) `.env` thủ công cho prisma CLI (+ `db:seed` sau khi sửa seed.sql); (b) đừng build/xóa `.next` khi dev:web chạy; (c) test email/tên unique; (d) `listMine` ẩn LEFT; (e) `corepack pnpm`; (f) cách ly staff: gọi route nước MÌNH (VN res qua PH route → 404; route VN + token PH → 403); (g) test đối soát: `createBatch` gom TOÀN BỘ PENDING của nước (dữ liệu tích luỹ giữa test) → assert theo earning cụ thể, không theo tổng batch.
 
-**3. Nhiệm vụ đầu tiên phiên sau — N13:**
-- **Commit N12** (nếu chưa): ledger + earnings module + web V07 + tests + LOG.
-- **N13 — Đối soát đơn giản hoá (Finance)**: `GET/POST /ops/:market/reconciliation` — Finance tạo batch (gom earning PENDING của nước) → duyệt/lock (`ReconciliationBatch` OPEN→LOCKED, `ReconciliationLine` 1 earning vào ĐÚNG 1 batch nhờ `UNIQUE(earning_id)`) → earning PENDING→**AVAILABLE** (mở tiền rút). LOCKED = bất biến. Bảng `reconciliation_batch/line` đã có. V12 finance workbench rewire. RBAC vai `LOCAL_FINANCE` (chưa có seed account → thêm seed `finance.vn@`/`finance.ph@` + role_assignment như Ops/Admin).
-- **Lát mỏng QĐ-7 ghép N13**: `country_config.platform_fee_bps` (cần migration nhỏ) + enum ledger `PLATFORM_FEE` + tổng chi brand ở builder. **QĐ-8 ghép N13/N14**: `PENDING_FUNDING` + `funded_at`. **QĐ-6 apply-flow**: dồn buffer N20 nếu thiếu thời gian.
+**3. Nhiệm vụ đầu tiên phiên sau — N14:**
+- **Commit N13** (nếu chưa): reconciliation module + seed finance + web V12 + tests + LOG.
+- **N14 — Payout (rút tiền)**: creator có số dư AVAILABLE → tạo lệnh rút (`payout_request`, `idempotency_key` UNIQUE chống bấm 2 lần) + **OTP mock** (`otp_code`, mã cố định hiện màn dev) → **reserve** (ghi sổ `PAYOUT_RESERVE` −amount, giảm số dư khả dụng) → gọi **provider mock** (nút chọn success). Success → `PAYOUT_PAID` + earning/PayoutState PAID. Dùng lại **LedgerService.post()**. Kiểm `min_payout_minor` (country_config). Bảng `payout_request/attempt` + `otp_code` đã có. V08 wallet rewire. (Fail/UNKNOWN để **N15**.)
+- **Lát mỏng QĐ-7 (phí) + QĐ-8 (escrow)**: ghép khi làm payout/funding N14/N15 — `platform_fee_bps` (migration nhỏ) + `PLATFORM_FEE` ledger; `PENDING_FUNDING`+`funded_at`. **QĐ-6 apply-flow**: dồn buffer N20.

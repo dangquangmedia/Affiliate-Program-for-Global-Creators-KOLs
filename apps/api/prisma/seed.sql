@@ -85,6 +85,19 @@ VALUES
   ('33000000-0000-4000-8000-000000000002', '32000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'LOCAL_ADMIN', CURRENT_TIMESTAMP)
 ON CONFLICT (user_id, country_id, role) DO NOTHING;
 
+-- Tài khoản Local Finance demo (N13) — đăng nhập vai để đối soát + chi trả (V12).
+INSERT INTO app_user (id, email, display_name, auth_provider, provider_subject, created_at)
+VALUES
+  ('34000000-0000-4000-8000-000000000001', 'finance.vn@demo.affiliate.gl', 'Finance VN', 'mock-google', 'finance.vn@demo.affiliate.gl', CURRENT_TIMESTAMP),
+  ('34000000-0000-4000-8000-000000000002', 'finance.ph@demo.affiliate.gl', 'Finance PH', 'mock-google', 'finance.ph@demo.affiliate.gl', CURRENT_TIMESTAMP)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO role_assignment (id, user_id, country_id, role, created_at)
+VALUES
+  ('35000000-0000-4000-8000-000000000001', '34000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 'LOCAL_FINANCE', CURRENT_TIMESTAMP),
+  ('35000000-0000-4000-8000-000000000002', '34000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'LOCAL_FINANCE', CURRENT_TIMESTAMP)
+ON CONFLICT (user_id, country_id, role) DO NOTHING;
+
 -- Campaign demo (N9) để creator discover có dữ liệu ngay. Mỗi campaign 1 reward_rule 3 trục
 -- Phase 1: CONTENT_APPROVED + FLAT + SLOTS_X_PRICE (trần = suất × đơn giá). currency theo nước.
 INSERT INTO campaign (id, country_id, brand, title, reward_minor, currency, slots_total, slots_taken, status, platform, required_hashtag, brief, ends_at, created_at)

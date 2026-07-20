@@ -96,8 +96,18 @@ export type PrismaClientLike = {
     findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
     count(args: { where?: unknown }): Promise<number>;
     create(args: { data: unknown }): Promise<unknown>;
+    update(args: { where: unknown; data: unknown }): Promise<unknown>;
   };
   ledgerEntry: {
+    findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
+    create(args: { data: unknown }): Promise<unknown>;
+  };
+  reconciliationBatch: {
+    findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
+    findFirst(args: { where?: unknown; include?: unknown }): Promise<unknown>;
+    create(args: { data: unknown; include?: unknown }): Promise<unknown>;
+  };
+  reconciliationLine: {
     findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown }): Promise<unknown>;
     create(args: { data: unknown }): Promise<unknown>;
   };
