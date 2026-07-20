@@ -100,9 +100,10 @@ export function StateBar<T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  const { lang } = usePrefs();
   return (
     <div className={styles.stateBar}>
-      <span className={styles.stateBarLabel}>Trạng thái</span>
+      <span className={styles.stateBarLabel}>{t(lang, "common.state")}</span>
       {options.map((o) => (
         <button
           key={o.key}

@@ -18,6 +18,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     "nav.login": "Đăng nhập",
     "common.loading": "Đang tải…",
     "common.needLoginTitle": "Bạn cần đăng nhập",
+    "common.state": "Trạng thái",
     // -- ContextBanner --
     "ctx.label": "Ngữ cảnh",
     "ctx.language": "ngôn ngữ",
@@ -481,6 +482,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     "nav.login": "Log in",
     "common.loading": "Loading…",
     "common.needLoginTitle": "You need to log in",
+    "common.state": "State",
     "ctx.label": "Context",
     "ctx.language": "language",
     "ctx.currency": "currency",

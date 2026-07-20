@@ -37,3 +37,6 @@ Thumbs.db
 playwright-report/
 test-results/
 artifacts/private/
+
+# Playwright MCP screenshot/console artifacts
+.playwright-mcp/

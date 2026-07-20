@@ -31,6 +31,8 @@
 .marketPills {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .pill {
   border: 1px solid #2b3644;
@@ -296,3 +298,17 @@
 .indexItem:hover { border-color: #2f4a6b; background: #0f1620; }
 .indexCode { color: #6aa6ff; font-weight: 700; min-width: 40px; }
 .indexQ { color: #8b96a3; font-size: 13px; }
+
+/* Responsive — điện thoại: giảm padding/cỡ chữ, cho card chứa bảng rộng tự cuộn ngang
+   (thay vì đẩy cả trang), topbar dồn về phải và xuống dòng. */
+@media (max-width: 560px) {
+  .page { padding: 16px 12px 60px; }
+  .topbar { gap: 8px; }
+  .title { font-size: 19px; }
+  .card { padding: 14px; overflow-x: auto; }
+  .table { font-size: 12px; }
+  .table th, .table td { padding: 7px 6px; }
+  .kv { font-size: 13px; }
+  .kvStrong { font-size: 15px; }
+  .indexItem { flex-direction: column; gap: 4px; }
+}
