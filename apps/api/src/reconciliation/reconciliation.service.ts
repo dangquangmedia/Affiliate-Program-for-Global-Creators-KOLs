@@ -2,6 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from "@nestj
 import { PrismaService, PrismaClientLike } from "../prisma.service";
 import { AuthContext } from "../auth/auth.service";
 import { assertStaffForCountry } from "../auth/rbac";
+import { AuditService } from "../audit/audit.service";
 
 // Đối soát là việc của Local Finance (V12). Admin không kiêm — tách vai rõ.
 const FINANCE_ROLES = ["LOCAL_FINANCE"];
@@ -53,7 +54,10 @@ type BatchRow = {
 
 @Injectable()
 export class ReconciliationService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(AuditService) private readonly audit: AuditService,
+  ) {}
 
   private conflict(code: string, message: string): never {
     throw new ConflictException({ code, message });
@@ -160,6 +164,14 @@ export class ReconciliationService {
           },
         });
       }
+      await this.audit.record(tx, {
+        actorUserId: auth.user.id,
+        countryId: country.id,
+        action: "RECON_BATCH_CREATED",
+        targetType: "recon_batch",
+        targetId: batch.id,
+        metadata: { lineCount: pending.length },
+      });
       return batch.id;
     });
 
@@ -193,10 +205,20 @@ export class ReconciliationService {
         this.conflict("BATCH_ALREADY_LOCKED", "This batch is already locked (immutable).");
       }
       // Dòng hợp lệ -> earning AVAILABLE (tiền rút được). Dòng anomaly để nguyên PENDING.
+      let released = 0;
       for (const l of batch.lines ?? []) {
         if (l.anomaly) continue;
         await tx.earning.update({ where: { id: l.earningId }, data: { status: "AVAILABLE" } });
+        released += 1;
       }
+      await this.audit.record(tx, {
+        actorUserId: auth.user.id,
+        countryId: country.id,
+        action: "RECON_BATCH_LOCKED",
+        targetType: "recon_batch",
+        targetId: batchId,
+        metadata: { earningsReleased: released },
+      });
     });
 
     return this.getBatch(auth, market, batchId);

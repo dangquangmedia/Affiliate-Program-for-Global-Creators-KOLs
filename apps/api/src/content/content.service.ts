@@ -4,6 +4,7 @@ import { AuthContext } from "../auth/auth.service";
 import { assertStaffForCountry } from "../auth/rbac";
 import { FIX_SLA_HOURS } from "../campaign/join.service";
 import { LedgerService } from "../ledger/ledger.service";
+import { AuditService } from "../audit/audit.service";
 
 const OPS_ROLES = ["LOCAL_OPS", "LOCAL_ADMIN"];
 
@@ -74,6 +75,7 @@ export class ContentService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(LedgerService) private readonly ledger: LedgerService,
+    @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
   private conflict(code: string, message: string): never {
@@ -329,6 +331,16 @@ export class ContentService {
           },
         });
       }
+
+      // Vết audit ghi TRONG cùng transaction claim: duyệt/từ chối luôn kèm "ai quyết, lúc nào".
+      await this.audit.record(tx, {
+        actorUserId: auth.user.id,
+        countryId: country.id,
+        action: decision === "APPROVE" ? "CONTENT_APPROVED" : "CONTENT_REJECTED",
+        targetType: "submission",
+        targetId: submissionId,
+        metadata: decision === "REJECT" ? { reason: reason?.trim() ?? null } : {},
+      });
 
       return (await tx.submission.findFirst({ where: { id: submissionId } })) as SubmissionRow;
     });

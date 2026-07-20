@@ -271,6 +271,35 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   V01–V12 nên để tùy chọn) + 3 nhãn data trong `data.ts` (feature labels config, option labels
   builder) giữ VI khi EN. Kế: **N17 audit AD-02** (Must ❌ duy nhất).
 
+- **N17 — Audit trail AD-02 + bộ RBAC negative tests (2026-07-20, Tuần D)**: KHÔNG cần migration
+  (model `AuditEvent`/bảng `audit_event` đã có từ N5 nhưng **0 lệnh ghi** — chính là Must ❌ cuối).
+  Tạo **`AuditService`** (`audit/audit.service.ts`) song hành LedgerService: `record(client,
+  {actorUserId, countryId, action, targetType, targetId, metadata})` ghi **APPEND-ONLY**, nhận
+  `client` = **tx của hành động** nên vết audit + quyết định **cùng commit / cùng rollback** —
+  không có quyết định thiếu dấu, cũng không có dấu cho quyết định đã rollback (câu trả lời mentor).
+  Nối vào **5 điểm quyết định staff**, mỗi cái TRONG transaction: KYC review (bọc cập nhật case cuối
+  + audit vào 1 `$transaction`), content approve/reject (trong tx claim sẵn), reconcile create/lock
+  (tx sẵn), payout settle/resolve (thêm `actorUserId`+`action` vào `applyProviderOutcome`), campaign
+  create (bọc create + audit vào 1 `$transaction`). 8 action: `KYC_REVIEWED` · `CONTENT_APPROVED/
+  REJECTED` · `RECON_BATCH_CREATED/LOCKED` · `PAYOUT_SETTLED/RESOLVED` · `CAMPAIGN_CREATED`. Endpoint
+  `GET /admin/audit?market=` **chỉ GLOBAL_ADMIN** (thêm `assertGlobalAdmin` vào `rbac.ts` — vai duy
+  nhất vượt biên giới) + seed tài khoản `global.admin@demo.affiliate.gl` (country_id NULL, dùng
+  `ON CONFLICT (id)` vì NULL≠NULL nên unique 3 cột không bắt trùng — re-seed idempotent). Facade
+  thêm delegate `auditEvent`. Web: `lib/audit-client.ts` + màn **V13 `/mockup/admin/audit`** (login
+  vai Global Admin, bảng sự kiện mới-nhất-trước, lọc All/VN/PH) + i18n vi/en (khối `audit.*`) + thêm
+  V13 vào index. **Bộ negative tests gom rõ** (`test/rbac.negative.test.ts` — đọc 1 file thấy hết 3
+  lớp phòng thủ): **A cách ly nước** (Ops/Finance PH đụng tài nguyên VN → 404 không lộ tồn tại) ·
+  **B sai vai** (creator/ops/finance/local-admin thiếu vai → 403) · **C transition sai** (double
+  review/lock/settle → 409). `test/audit.test.ts`: view cần GLOBAL_ADMIN (401/403); mỗi quyết định
+  sinh đúng 1 vết action đúng; reject ghi lý do vào metadata; **double-approve 409 KHÔNG để lại vết
+  thứ 2** (chứng minh audit ATOMIC với quyết định); global admin lọc theo nước không lẫn. Kết quả:
+  **API 105/105** (88 cũ + 6 audit + 11 rbac negative), **E2E 17/17** (48.5s), typecheck+lint sạch.
+  **Sự cố môi trường**: giữa chừng Docker Desktop tắt → Postgres 54329 mất → `/health` 503 →
+  playwright webServer timeout 30s (KHÔNG phải lỗi test); mở lại Docker + `compose up -d postgres`
+  → API tự reconnect qua pool → E2E xanh. Bài học: E2E cần Docker sống; nếu `/health` 503 kiểm
+  `docker info` trước khi nghi code. Kế: **N18** seed demo đầy đủ + README máy sạch + docker
+  one-command; sửa bug tồn.
+
 - **N15 — Payout FAIL/UNKNOWN + hoàn tiền 1 lần + E2E cả spine tiền VN+PH (2026-07-20, đóng
   Tuần C)**: KHÔNG cần migration (enum `PayoutState` đã có `FAILED_RELEASED`/`UNKNOWN_HOLD`;
   `PayoutAttemptResult` đã có `FAIL`/`UNKNOWN`). Mở `settle` (payout.service.ts) cho **3 kết cục**
@@ -384,21 +413,22 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   token + tài nguyên VN → 404); gọi route VN bằng token PH là 403 — ngữ nghĩa khác. Kế: **N12**
   ledger append-only + dashboard earnings (V07) Gross–Thuế–Net.
 
-## Current State & Hand-off (cập nhật 2026-07-20 — **hết N16, đang mở Tuần D**)
+## Current State & Hand-off (cập nhật 2026-07-20 — **hết N17, đang giữa Tuần D**)
 
 **1. Vừa xong / trạng thái:**
-- Xong **Tuần A + B + C (N11–N15) + N16 trọn** (i18n + USD toggle + responsive). Vòng đời tiền TRỌN VẸN; **12 màn V01–V12 đổi VI/EN chạy thật + toggle $USD**; mobile không tràn (đã xác minh Playwright MCP 375px).
-- **N16**: `mockup/prefs.tsx`(`usePrefs`: lang+showUsd, localStorage) + `app/mockup/layout.tsx`; `lib/i18n.ts` `t(lang,key,params?)` interpolation `{param}` + `usdReference()` + DICT vi/en đủ 12 màn; `Frame` VI/EN + "$ USD" pills; `ContextBanner`/`UsdRef`/`StateBar` theo lang. Ngôn ngữ = công tắc TƯỜNG MINH mặc định vi ĐỘC LẬP market (nếu suy từ market thì PH→EN vỡ `payout-fail-flow`). Giữ chuỗi vi y hệt → E2E không đổi.
-- Toàn xanh: **API 88/88, E2E 17/17** (nhiều lượt), lint + 2×typecheck sạch. **Đã commit HẾT** — N16 = `7c35878`(phần1)→`be2204a`(creator)→`24d9b62`(staff)→`9c7ce69`(responsive). 4 report audit + `requirements/` đã commit ở `7c35878`. Chỉ còn `.claude/settings.local.json`. Postgres Docker 54329. `Report/` PPTX/Q&A chưa cập nhật N11–N16.
-- **Còn lẻ (tùy chọn)**: `mockup/page.tsx` index launcher chưa i18n (server component, ngoài V01–V12); 3 nhãn data trong `data.ts` (feature/option labels) giữ VI khi EN.
+- Xong **Tuần A + B + C (N11–N15) + N16 (i18n/USD/responsive) + N17 (audit AD-02 + RBAC negative tests)**. Vòng đời tiền TRỌN VẸN; **13 màn V01–V13** (thêm V13 nhật ký audit); **Must ❌ cuối (AD-02) đã đóng** — audit ghi ở cả 5 điểm quyết định staff.
+- **N17**: `AuditService.record(client, {...})` APPEND-ONLY, ghi TRONG tx của hành động (audit atomic với quyết định). Nối KYC review / content approve-reject / reconcile create-lock / payout settle-resolve / campaign create. `GET /admin/audit?market=` chỉ GLOBAL_ADMIN. Màn web V13 + i18n. Bộ negative tests gom rõ (A cách ly 404 · B sai vai 403 · C transition 409).
+- Toàn xanh: **API 105/105, E2E 17/17** (48.5s), lint + 2×typecheck sạch. **CHƯA commit** N17 (cây có thay đổi audit/*, 5 service, rbac.ts, prisma.service.ts, seed.sql, web audit + i18n + index, 2 test file). Postgres Docker 54329. `Report/` PPTX/Q&A chưa cập nhật N11–N17.
+- **Còn lẻ (tùy chọn)**: `mockup/page.tsx` index launcher chưa i18n (server component); 3 nhãn data trong `data.ts` giữ VI khi EN.
 
 **2. File/biến quan trọng:**
-- **N16**: `mockup/prefs.tsx` (`usePrefs`: lang+showUsd), `app/mockup/layout.tsx` (bọc PrefsProvider), `lib/i18n.ts` (`t(lang,key,params?)` interpolation `{param}` + `usdReference` + DICT vi/en), `mockup/ui.tsx` `Frame` (VI/EN + "$ USD" pills) / `ContextBanner` / `UsdRef` theo lang. Convert: `creator/{login,country,earnings,wallet}/page.tsx` (dùng `usePrefs().lang`, `t()`, `showUsd`→`<UsdRef>`). **Gotcha i18n**: (m) từ điển `vi` PHẢI khớp chuỗi UI cũ vì E2E assert văn bản Việt — trước khi convert 1 màn, grep e2e `getByText/getByRole/getByPlaceholder` để biết chuỗi khoá (VD kyc: "Thông tin định danh", "Nộp KYC"); (n) badge/label chuyển map `...KIND` (chỉ màu) + `t(lang,\`prefix.${key}\`)`; (o) chuỗi có markup `<strong>/<em>` tách thành 2–3 key (`.noteQ/.noteBody/.noteHard`).
-- **N15** (giữ nguyên): `payout.service.ts` (`settle` 3 kết cục + `resolveHold` + `applyProviderOutcome` claim `WHERE state=fromState`, cast enum **cả 2 vế** `= ${x}::"PayoutState"`; `provider_ref=mock-{id}-{attemptNo}` đếm `payoutAttempt.findMany`; FAIL→`PAYOUT_RELEASE +amount`; `OUTSTANDING={PROCESSING,PAID,UNKNOWN_HOLD}`), controller `settle/resolve/holds`, `payout-client.ts`, V12 nút 3 kết cục + card đối soát tay. Test `payout.smoke`(+6), `money-spine.test.ts`(VN+PH×{SUCCESS,FAIL}), e2e `payout-fail-flow`(PH).
-- **Gotcha (mang theo)**: (a) `.env` thủ công cho prisma CLI; (b) đừng xoá `.next` khi dev:web chạy; (c) test email/tên unique; (e) `corepack pnpm`; (f) cách ly staff route nước MÌNH; (g) queue/holds/createBatch gom TOÀN BỘ nước → assert bản ghi cụ thể; (h) **`--test-concurrency=1`** test API; (i) `createPayout` check: dup→amount→min→OTP→(tx)balance; (j) e2e song song DB chung — `payout-flow` settle MỌI lệnh PROCESSING của VN → spec payout khác dùng **PH**/`data-creator` duy nhất; (k) `next dev` compile-on-demand → giữ `workers:3`+`timeout:60s` chống timeout giả; (l) cast enum 2 vế trong `$queryRaw`.
+- **N17**: `audit/audit.service.ts` (`record(client,input)` append-only nhận tx; `list(auth,market?)` chỉ GLOBAL_ADMIN, `take:200`), `audit/audit.controller.ts` (`GET /admin/audit`), `auth/rbac.ts` (`isGlobalAdmin`/`assertGlobalAdmin`), `prisma.service.ts` (facade `auditEvent`), `prisma/seed.sql` (global.admin@ country NULL, `ON CONFLICT (id)`). Nối audit: `kyc.service.ts` + `campaign.service.ts` bọc hành động vào `$transaction` mới; `content/reconciliation/payout.service.ts` ghi trong tx CÓ SẴN (`applyProviderOutcome` nhận thêm `actorUserId`+`action`). Web `lib/audit-client.ts`, `app/mockup/admin/audit/page.tsx` (V13), `lib/i18n.ts` khối `audit.*` vi/en, `app/mockup/page.tsx` (+V13). Test `test/audit.test.ts`(6) + `test/rbac.negative.test.ts`(11). **Gotcha N17**: (p) audit atomic = truyền `tx` (không phải `this.prisma.db`) → rollback xoá cả vết; (q) `record` phải gọi TRƯỚC `return` trong tx nhưng SAU claim (claim trượt → conflict throw trước → không ghi); (r) role NULL country → `ON CONFLICT (id)` (unique 3 cột bỏ qua NULL).
+- **N16** (giữ nguyên): `mockup/prefs.tsx` (`usePrefs`: lang+showUsd), `app/mockup/layout.tsx`, `lib/i18n.ts` (`t(lang,key,params?)` interpolation + `usdReference` + DICT vi/en), `mockup/ui.tsx` `Frame`/`ContextBanner`/`UsdRef`/`StateBar` theo lang. **Gotcha i18n**: (m) chuỗi `vi` PHẢI khớp UI cũ (E2E assert tiếng Việt) — grep e2e trước khi convert; (n) badge map `...KIND` + `t(lang,\`prefix.${key}\`)`; (o) markup tách 2–3 key.
+- **N15** (giữ nguyên): `payout.service.ts` (`settle` 3 kết cục + `resolveHold` + `applyProviderOutcome` claim `WHERE state=fromState`, cast enum **cả 2 vế**; `provider_ref=mock-{id}-{attemptNo}`; FAIL→`PAYOUT_RELEASE +amount`; `OUTSTANDING={PROCESSING,PAID,UNKNOWN_HOLD}`).
+- **Gotcha (mang theo)**: (a) `.env` thủ công cho prisma CLI (`export $(grep DATABASE_URL .env|xargs)`); (b) đừng xoá `.next` khi dev:web chạy; (c) test email/tên unique; (e) `corepack pnpm`; (f) cách ly staff route nước MÌNH; (g) queue/holds/createBatch gom TOÀN BỘ nước → assert bản ghi cụ thể; (h) **`--test-concurrency=1`** test API; (i) `createPayout` check: dup→amount→min→OTP→(tx)balance; (j) e2e song song DB chung — dùng **PH**/`data-creator` duy nhất; (k) `next dev` compile-on-demand → `workers:3`+`timeout:60s`; (l) cast enum 2 vế `$queryRaw`; (s) **E2E cần Docker sống**: `/health` 503 → kiểm `docker info`, `compose up -d postgres`, API tự reconnect qua pool; (t) playwright webServer gate `/health` phải 2xx mới coi server sẵn sàng.
 
-**3. Nhiệm vụ đầu tiên phiên sau — N17 (audit + RBAC negative tests):**
-- **Trước khi code**: bật Docker Desktop (Postgres 54329) → `corepack pnpm test`(api, kỳ vọng 88/88) → mốc sạch.
-- **N17 — Audit trail AD-02 (Must ❌ DUY NHẤT còn lại)**: model `AuditEvent` đã có trong `schema.prisma` nhưng **0 lệnh ghi**. Ghi audit ở mọi hành động staff: KYC review, content approve/reject, reconcile create/lock, payout settle/resolve, campaign create. Nên gom 1 `AuditService.record(tx, {actorId, action, entityType, entityId, countryId, meta})` ghi trong CÙNG transaction hành động (giống LedgerService). Thêm màn/endpoint xem audit (Global Admin). + **RBAC negative tests** (cross-country 404, sai role 403, transition sai 409) gom thành bộ rõ ràng.
-- **Sau N17**: N18 seed+README máy sạch+docker one-command; N19 `docs/HARD_PROBLEMS.md` Q&A + kịch bản demo; N20 buffer+regression.
-- **Nợ kỹ thuật (lát mỏng, khi có giờ)**: QĐ-7 phí, QĐ-8 escrow, QĐ-6 apply-flow; i18n index launcher + 3 nhãn data.ts; cập nhật `Report/` PPTX+Q&A cho N11–N16. Ưu tiên: spine trọn — Tuần D là polish/defense, KHÔNG thêm thư viện lõi.
+**3. Nhiệm vụ đầu tiên phiên sau — commit N17 rồi N18:**
+- **Commit N17 trước** (chưa commit): audit AD-02 + RBAC negative tests. Trước commit đảm bảo Docker + Postgres 54329 sống.
+- **N18 — Seed + README máy sạch + docker one-command**: seed demo đầy đủ (đã có sẵn nhiều account/campaign; bổ sung nếu thiếu cho kịch bản demo), README cài từ máy sạch (clone → `docker compose up` → migrate → seed → dev), gộp lệnh chạy 1 phát; sửa bug tồn nếu có.
+- **Sau N18**: N19 `docs/HARD_PROBLEMS.md` Q&A (7 bài toán + audit AD-02 mới) + kịch bản demo; N20 buffer + regression + tổng duyệt.
+- **Nợ kỹ thuật (lát mỏng, khi có giờ)**: QĐ-7 phí, QĐ-8 escrow, QĐ-6 apply-flow; i18n index launcher + 3 nhãn data.ts; cập nhật `Report/` PPTX+Q&A cho N11–N17. Ưu tiên: spine trọn — Tuần D là polish/defense, KHÔNG thêm thư viện lõi.

@@ -20,6 +20,7 @@ const STAFF_SCREENS = [
   { code: "V10", href: "/mockup/ops/review", title: "Hàng đợi duyệt (Ops)", q: "Duyệt KYC+content, từ chối có lý do, xung đột 409." },
   { code: "V11", href: "/mockup/admin/campaign-builder", title: "Tạo campaign", q: "Quy tắc thưởng 3 trục sống trong UI; ngân sách = suất × đơn giá." },
   { code: "V12", href: "/mockup/finance/workbench", title: "Đối soát & chi trả", q: "Khoá batch (immutable) + payout 3 trạng thái." },
+  { code: "V13", href: "/mockup/admin/audit", title: "Nhật ký audit", q: "Global Admin — ai quyết gì, ở nước nào; vết append-only ghi cùng transaction (AD-02)." },
 ];
 
 // 2 kịch bản click xuyên màn — chứng minh luồng đi được, không dead-end.
@@ -93,7 +94,7 @@ export default function MockupIndex() {
       <h2 style={{ fontSize: 15, color: "#8b96a3", margin: "24px 0 10px" }}>8 màn Creator</h2>
       <ScreenList items={CREATOR_SCREENS} />
 
-      <h2 style={{ fontSize: 15, color: "#8b96a3", margin: "24px 0 10px" }}>4 màn Admin / Ops / Finance</h2>
+      <h2 style={{ fontSize: 15, color: "#8b96a3", margin: "24px 0 10px" }}>5 màn Admin / Ops / Finance</h2>
       <ScreenList items={STAFF_SCREENS} />
     </div>
   );

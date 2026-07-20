@@ -1,7 +1,8 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma.service";
+import { PrismaService, PrismaClientLike } from "../prisma.service";
 import { AuthContext } from "../auth/auth.service";
 import { assertStaffForCountry } from "../auth/rbac";
+import { AuditService } from "../audit/audit.service";
 
 // Bộ trường KYC chuẩn (khớp mockup V03). Thêm/bớt ở đây là nguồn sự thật cho cả tạo & duyệt.
 const KYC_CHECKLIST: { key: string; label: string }[] = [
@@ -49,7 +50,10 @@ type CaseWithProfile = CaseRow & { profile: { countryId: string; user: { display
 
 @Injectable()
 export class KycService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(AuditService) private readonly audit: AuditService,
+  ) {}
 
   private async requireCountry(market: string): Promise<CountryRow> {
     const code = market.toUpperCase();
@@ -212,9 +216,20 @@ export class KycService {
     })) as CaseRow;
     const allAccepted = reloaded.fields.every((f) => f.state === "ACCEPTED");
     const nextState: CaseState = allAccepted ? "APPROVED" : "REJECTED";
-    await this.prisma.db.kycCase.update({
-      where: { id: caseId },
-      data: { state: nextState, reviewedBy: auth.user.id, reviewedAt: new Date() },
+    // Kết luận case + vết audit ghi TRONG cùng transaction: mọi lần duyệt KYC đều để lại dấu.
+    await this.prisma.db.$transaction(async (tx: PrismaClientLike) => {
+      await tx.kycCase.update({
+        where: { id: caseId },
+        data: { state: nextState, reviewedBy: auth.user.id, reviewedAt: new Date() },
+      });
+      await this.audit.record(tx, {
+        actorUserId: auth.user.id,
+        countryId: country.id,
+        action: "KYC_REVIEWED",
+        targetType: "kyc_case",
+        targetId: caseId,
+        metadata: { outcome: nextState },
+      });
     });
 
     return this.toDto({ ...reloaded, state: nextState });

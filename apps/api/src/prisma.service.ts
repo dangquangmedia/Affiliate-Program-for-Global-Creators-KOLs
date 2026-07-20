@@ -125,6 +125,10 @@ export type PrismaClientLike = {
     findFirst(args: { where?: unknown; orderBy?: unknown }): Promise<unknown>;
     create(args: { data: unknown }): Promise<unknown>;
   };
+  auditEvent: {
+    create(args: { data: unknown }): Promise<unknown>;
+    findMany(args: { where?: unknown; include?: unknown; orderBy?: unknown; take?: number }): Promise<unknown[]>;
+  };
   // Interactive transaction: callback nhận 1 client-like đã ở trong transaction (dùng cho
   // SELECT ... FOR UPDATE + đọc/ghi nguyên tử khi tranh suất — QĐ-5).
   $transaction<T>(fn: (tx: PrismaClientLike) => Promise<T>): Promise<T>;

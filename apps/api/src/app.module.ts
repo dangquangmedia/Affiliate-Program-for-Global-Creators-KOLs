@@ -25,6 +25,8 @@ import { ReconciliationController } from "./reconciliation/reconciliation.contro
 import { ReconciliationService } from "./reconciliation/reconciliation.service";
 import { CreatorPayoutController, FinancePayoutController } from "./payout/payout.controller";
 import { PayoutService } from "./payout/payout.service";
+import { AuditController } from "./audit/audit.controller";
+import { AuditService } from "./audit/audit.service";
 
 @Module({
   controllers: [
@@ -43,6 +45,7 @@ import { PayoutService } from "./payout/payout.service";
     ReconciliationController,
     CreatorPayoutController,
     FinancePayoutController,
+    AuditController,
   ],
   providers: [
     PrismaService,
@@ -59,6 +62,7 @@ import { PayoutService } from "./payout/payout.service";
     EarningsService,
     ReconciliationService,
     PayoutService,
+    AuditService,
   ],
 })
 export class AppModule {}

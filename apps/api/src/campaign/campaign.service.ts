@@ -1,7 +1,8 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma.service";
+import { PrismaService, PrismaClientLike } from "../prisma.service";
 import { AuthContext } from "../auth/auth.service";
 import { assertStaffForCountry } from "../auth/rbac";
+import { AuditService } from "../audit/audit.service";
 
 // Tiền là BigInt trong DB; ra ngoài JSON dùng number (minor units, < 2^53 nên an toàn).
 export interface CampaignSummary {
@@ -67,7 +68,10 @@ type CampaignRow = {
 
 @Injectable()
 export class CampaignService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(AuditService) private readonly audit: AuditService,
+  ) {}
 
   private async requireCountry(market: string): Promise<CountryRow> {
     const code = market.toUpperCase();
@@ -189,31 +193,43 @@ export class CampaignService {
       throw new BadRequestException({ code: "VALIDATION_ERROR", message: "slotsTotal must be a positive integer." });
     }
 
-    const row = (await this.prisma.db.campaign.create({
-      data: {
-        countryId: country.id,
-        brand: input.brand?.trim() || "—",
-        title,
-        rewardMinor: BigInt(input.rewardMinor),
-        currency: country.currencyCode,
-        slotsTotal: input.slotsTotal,
-        slotsTaken: 0,
-        status: "ACTIVE",
-        platform: input.platform?.trim() || "—",
-        requiredHashtag: input.requiredHashtag?.trim() || "",
-        brief: input.brief?.trim() || "",
-        rewardRule: {
-          create: {
-            triggerType: "CONTENT_APPROVED",
-            pricingType: "FLAT",
-            flatAmountMinor: BigInt(input.rewardMinor),
-            capType: "SLOTS_X_PRICE",
-            capSlots: input.slotsTotal,
+    // Tạo campaign + ghi audit TRONG cùng transaction: không có campaign nào thiếu vết audit.
+    const row = await this.prisma.db.$transaction(async (tx: PrismaClientLike) => {
+      const created = (await tx.campaign.create({
+        data: {
+          countryId: country.id,
+          brand: input.brand?.trim() || "—",
+          title,
+          rewardMinor: BigInt(input.rewardMinor),
+          currency: country.currencyCode,
+          slotsTotal: input.slotsTotal,
+          slotsTaken: 0,
+          status: "ACTIVE",
+          platform: input.platform?.trim() || "—",
+          requiredHashtag: input.requiredHashtag?.trim() || "",
+          brief: input.brief?.trim() || "",
+          rewardRule: {
+            create: {
+              triggerType: "CONTENT_APPROVED",
+              pricingType: "FLAT",
+              flatAmountMinor: BigInt(input.rewardMinor),
+              capType: "SLOTS_X_PRICE",
+              capSlots: input.slotsTotal,
+            },
           },
         },
-      },
-      include: { rewardRule: true },
-    })) as CampaignRow;
+        include: { rewardRule: true },
+      })) as CampaignRow;
+      await this.audit.record(tx, {
+        actorUserId: auth.user.id,
+        countryId: country.id,
+        action: "CAMPAIGN_CREATED",
+        targetType: "campaign",
+        targetId: created.id,
+        metadata: { title, rewardMinor: input.rewardMinor, slotsTotal: input.slotsTotal },
+      });
+      return created;
+    });
 
     return this.toDetail(row);
   }

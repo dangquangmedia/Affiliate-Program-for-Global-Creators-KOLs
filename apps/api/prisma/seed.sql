@@ -98,6 +98,20 @@ VALUES
   ('35000000-0000-4000-8000-000000000002', '34000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'LOCAL_FINANCE', CURRENT_TIMESTAMP)
 ON CONFLICT (user_id, country_id, role) DO NOTHING;
 
+-- Tài khoản Global Admin demo (N17) — vai DUY NHẤT vượt biên giới (country_id NULL), dùng để
+-- xem nhật ký audit toàn cục (AD-02) mọi nước. Đăng nhập vai = mock-login bằng chính email này.
+INSERT INTO app_user (id, email, display_name, auth_provider, provider_subject, created_at)
+VALUES
+  ('36000000-0000-4000-8000-000000000001', 'global.admin@demo.affiliate.gl', 'Global Admin', 'mock-google', 'global.admin@demo.affiliate.gl', CURRENT_TIMESTAMP)
+ON CONFLICT (email) DO NOTHING;
+
+-- country_id NULL → unique (user_id, country_id, role) KHÔNG bắt trùng (NULL ≠ NULL trong Postgres),
+-- nên chốt idempotent bằng khóa chính cố định thay vì bộ 3 cột.
+INSERT INTO role_assignment (id, user_id, country_id, role, created_at)
+VALUES
+  ('37000000-0000-4000-8000-000000000001', '36000000-0000-4000-8000-000000000001', NULL, 'GLOBAL_ADMIN', CURRENT_TIMESTAMP)
+ON CONFLICT (id) DO NOTHING;
+
 -- Campaign demo (N9) để creator discover có dữ liệu ngay. Mỗi campaign 1 reward_rule 3 trục
 -- Phase 1: CONTENT_APPROVED + FLAT + SLOTS_X_PRICE (trần = suất × đơn giá). currency theo nước.
 INSERT INTO campaign (id, country_id, brand, title, reward_minor, currency, slots_total, slots_taken, status, platform, required_hashtag, brief, ends_at, created_at)

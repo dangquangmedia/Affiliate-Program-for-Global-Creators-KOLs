@@ -3,6 +3,7 @@ import { PrismaService, PrismaClientLike } from "../prisma.service";
 import { AuthContext } from "../auth/auth.service";
 import { assertStaffForCountry } from "../auth/rbac";
 import { LedgerService } from "../ledger/ledger.service";
+import { AuditService, AuditAction } from "../audit/audit.service";
 
 const FINANCE_ROLES = ["LOCAL_FINANCE"];
 const OTP_TTL_MINUTES = 10;
@@ -55,6 +56,7 @@ export class PayoutService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(LedgerService) private readonly ledger: LedgerService,
+    @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
   private conflict(code: string, message: string): never {
@@ -273,7 +275,7 @@ export class PayoutService {
     }
     const payout = await this.findInCountry(payoutId, country.id);
     return this.prisma.db.$transaction((tx: PrismaClientLike) =>
-      this.applyProviderOutcome(tx, payout, "PROCESSING", result, "ALREADY_SETTLED", "This payout has already been settled."),
+      this.applyProviderOutcome(tx, payout, "PROCESSING", result, "ALREADY_SETTLED", "This payout has already been settled", auth.user.id, "PAYOUT_SETTLED"),
     );
   }
 
@@ -289,7 +291,7 @@ export class PayoutService {
     if (result !== "SUCCESS" && result !== "FAIL") this.badRequest('result must be "SUCCESS" | "FAIL".');
     const payout = await this.findInCountry(payoutId, country.id);
     return this.prisma.db.$transaction((tx: PrismaClientLike) =>
-      this.applyProviderOutcome(tx, payout, "UNKNOWN_HOLD", result, "NOT_ON_HOLD", "This payout is not awaiting manual resolution."),
+      this.applyProviderOutcome(tx, payout, "UNKNOWN_HOLD", result, "NOT_ON_HOLD", "This payout is not awaiting manual resolution", auth.user.id, "PAYOUT_RESOLVED"),
     );
   }
 
@@ -315,6 +317,8 @@ export class PayoutService {
     result: SettleResult,
     conflictCode: string,
     conflictMsg: string,
+    actorUserId: string,
+    action: AuditAction,
   ): Promise<PayoutDto> {
     const toState = result === "SUCCESS" ? "PAID" : result === "FAIL" ? "FAILED_RELEASED" : "UNKNOWN_HOLD";
     const claimed = (await tx.$queryRaw`
@@ -347,6 +351,17 @@ export class PayoutService {
         refId: payout.id,
       });
     }
+
+    // Vết audit ghi TRONG cùng transaction claim: mọi kết cục payout (ai xử, thành gì) đều truy lại được.
+    await this.audit.record(tx, {
+      actorUserId,
+      countryId: payout.countryId,
+      action,
+      targetType: "payout",
+      targetId: payout.id,
+      metadata: { result, fromState, toState },
+    });
+
     return this.toDto({ ...payout, state: toState });
   }
 }

@@ -19,3 +19,17 @@ export function assertStaffForCountry(auth: AuthContext, countryId: string, allo
     });
   }
 }
+
+// GLOBAL_ADMIN là vai DUY NHẤT vượt biên giới — dùng cho nhật ký audit toàn cục (mọi nước).
+export function isGlobalAdmin(auth: AuthContext): boolean {
+  return auth.roles.some((r) => r.role === "GLOBAL_ADMIN" && r.countryId === null);
+}
+
+export function assertGlobalAdmin(auth: AuthContext): void {
+  if (!isGlobalAdmin(auth)) {
+    throw new ForbiddenException({
+      code: "FORBIDDEN",
+      message: "Only a global admin can access this resource.",
+    });
+  }
+}
