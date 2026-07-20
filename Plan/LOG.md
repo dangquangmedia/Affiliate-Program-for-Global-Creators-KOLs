@@ -3,23 +3,23 @@
 > Mục đích: phiên làm việc mới nắm trạng thái trong vài giây. Cập nhật sau mỗi mốc lớn.
 > Nếu file này mâu thuẫn với code/docs thực tế → tin thực tế, sửa lại file này.
 
-## Trạng thái ngay bây giờ (2026-07-18)
+## Trạng thái ngay bây giờ (2026-07-20 — **HOÀN THÀNH N1–N20, đóng dự án**)
 
-- **Đang chạy KẾ HOẠCH V2** (`Plan/KE_HOACH_V2.md` — plan duy nhất, 4 tuần N1-N20).
-  Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
-- Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
-  V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
-- **Xong Tuần A (N1-N5) + Tuần B (N6-N10b) + N11-N14**: schema lean + auth/session + country +
-  i18n + KYC + Campaign + Join (QĐ-4/5) + content→Earning exactly-once (N11) + ledger append-only
-  + V07 (N12) + đối soát Finance→AVAILABLE (N13) + **payout OTP+reserve+provider SUCCESS→PAID (N14)**.
-  Spine tới trình duyệt: login→…→nộp content→Ops duyệt→thu nhập→Finance đối soát→AVAILABLE→**rút
-  tiền (OTP+reserve)→Finance settle→PAID**. Đã chốt QĐ-6/7/8. **API 78/78, E2E 16/16**. Đang **Tuần
-  C**. Kế: **N15** payout FAIL/UNKNOWN + bút toán đảo + E2E cả spine tiền.
-- Code hiện có: walking skeleton chạy trên **schema mới 18 bảng** (Next.js `/vn` `/ph` →
-  NestJS → Postgres). Schema 45 bảng cũ **ĐÃ XÓA & thay** bằng lean N5 (migration
-  `20260718095722_init_lean_18_tables`, DB có 20 base table gồm _prisma_migrations).
-- Git: `main`; mốc: `aaa7b88` (tuần 1 ngày 1-4 cũ) → `08fd74e` (checkpoint trước V2) → các
-  commit V2 sau đó.
+- **KẾ HOẠCH V2 chạy XONG trọn 20 ngày** (`Plan/KE_HOACH_V2.md`). Tuần A (product+DB) → B (core
+  spine) → C (money spine) → D (i18n/audit/setup/docs/regression). **22/22 Must có bằng chứng.**
+- **Sản phẩm**: multi-country (VN/PH) affiliate, luồng tiền **chạy thật end-to-end** + **13 màn
+  prototype** (V01–V13). Vòng đời: login SSO mock → chọn nước → KYC → join (snapshot) → nộp content
+  → Ops duyệt (earning exactly-once) → sổ cái append-only → Finance đối soát → AVAILABLE → rút
+  (OTP+reserve) → provider 3 kết cục (PAID/FAIL-hoàn/UNKNOWN-giữ) → audit trail.
+- **Xác minh cuối (N20, DB sạch)**: `lint` + `2×typecheck` + **API 105/105** + **E2E 17/17** +
+  `build` (api+web) — tất cả xanh; 3 migration áp từ DB rỗng OK; V13 audit render thật (bắt trọn
+  quyết định của regression run). One-command `corepack pnpm bootstrap` dựng máy sạch.
+- **7 bài toán khó + audit**: `docs/HARD_PROBLEMS.md` (Q&A có file:dòng chứng minh + kịch bản demo).
+- **Schema**: lean 18 bảng, 3 migration (`init_lean_18_tables` → `add_session` → `join_slots_waitlist`).
+- Git: `main`; mốc N16–N20: `9c7ce69`(N16)→`ed57342`(N17)→`536a4d8`(N18)→`31eeaa7`(N19)→N20.
+- **Nợ kỹ thuật còn (không chặn chấm điểm)**: QĐ-7 phí / QĐ-8 escrow / QĐ-6 apply-flow (docs-only,
+  chưa code runtime); i18n index launcher + 3 nhãn `data.ts`; `Report/` PPTX + `MENTOR_QA.md` phủ
+  N1–N10b, chưa cập nhật N11–N19 (`HARD_PROBLEMS.md` đã phủ money-spine + audit).
 
 ## Tổng kết Tuần A — Product & Database (N1-N5) ✅ XONG
 
@@ -333,6 +333,17 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   global admin audit→PH/EN/USD) + câu chốt "DB làm trọng tài mọi chỗ đúng-1-lần". Kế: **N20** buffer
   + regression + tổng duyệt (Anh Quang tự trả lời 7 bài toán không nhìn tài liệu).
 
+- **N20 — Regression trên DB sạch + tổng duyệt (2026-07-20, ĐÓNG DỰ ÁN)**: chốt mốc cuối. **Reset
+  DB sạch** (`docker compose down -v` xoá volume) → `corepack pnpm bootstrap` → **3 migration áp từ
+  DB RỖNG thành công** (validate luôn đường cài máy sạch N18). Chạy regression đầy đủ (tách bước để
+  tránh `next build` đụng `.next` của dev — gotcha #9): **lint sạch · 2×typecheck sạch · API 105/105
+  · E2E 17/17 (44.9s) · build api+web OK** ("Compiled successfully", 19/19 static pages). API dev tự
+  reconnect DB mới qua pool sau reset. **Tổng duyệt V13 audit qua Playwright MCP**: đăng nhập Global
+  Admin, bảng render đủ cột, và audit log **bắt trọn quyết định của regression run** (KYC_REVIEWED×45,
+  CONTENT_APPROVED×34, CAMPAIGN_CREATED×39, RECON ×28/×28, PAYOUT_SETTLED×21, PAYOUT_RESOLVED×2) —
+  bằng chứng sống cho AD-02. Cập nhật mục "Trạng thái ngay bây giờ" ở đầu LOG (đóng dự án). **KẾ
+  HOẠCH V2 (N1–N20) HOÀN THÀNH.** Việc còn lại thuần optional/nợ nhẹ (xem mục đầu + hand-off §3).
+
 - **N15 — Payout FAIL/UNKNOWN + hoàn tiền 1 lần + E2E cả spine tiền VN+PH (2026-07-20, đóng
   Tuần C)**: KHÔNG cần migration (enum `PayoutState` đã có `FAILED_RELEASED`/`UNKNOWN_HOLD`;
   `PayoutAttemptResult` đã có `FAIL`/`UNKNOWN`). Mở `settle` (payout.service.ts) cho **3 kết cục**
@@ -446,15 +457,13 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   token + tài nguyên VN → 404); gọi route VN bằng token PH là 403 — ngữ nghĩa khác. Kế: **N12**
   ledger append-only + dashboard earnings (V07) Gross–Thuế–Net.
 
-## Current State & Hand-off (cập nhật 2026-07-20 — **hết N19, còn N20**)
+## Current State & Hand-off (cập nhật 2026-07-20 — **HOÀN THÀNH N1–N20, đóng dự án**)
 
 **1. Vừa xong / trạng thái:**
-- Xong **Tuần A + B + C (N11–N15) + N16 (i18n/USD) + N17 (audit AD-02 + RBAC negative) + N18 (one-command setup + README) + N19 (HARD_PROBLEMS Q&A + kịch bản demo)**. Vòng đời tiền TRỌN VẸN; **13 màn V01–V13**; **22/22 Must có bằng chứng**. Chỉ còn **N20** (buffer + regression + tổng duyệt).
-- **N17**: audit atomic 5 điểm staff, `GET /admin/audit` GLOBAL_ADMIN, V13, negative tests. Commit `ed57342`.
-- **N18**: `corepack pnpm bootstrap` dựng máy sạch 1 lệnh (đã test), README viết lại. Commit `536a4d8`.
-- **N19**: `docs/HARD_PROBLEMS.md` — 8 mục Q&A (7 bài toán + audit) có **file:dòng chứng minh (đã verify grep)** + bảng kịch bản demo 15 phút.
-- Toàn xanh: **API 105/105, E2E 17/17**, lint + 2×typecheck sạch. **N19 CHƯA commit** (cây: `docs/HARD_PROBLEMS.md` mới + `Plan/LOG.md`). Postgres Docker 54329. `Report/` PPTX/Q&A chưa cập nhật N11–N19.
-- **Còn lẻ (tùy chọn)**: `mockup/page.tsx` index launcher chưa i18n; 3 nhãn data trong `data.ts` giữ VI khi EN.
+- **XONG TRỌN N1–N20.** Tuần A+B+C + N16 (i18n/USD) + N17 (audit AD-02 + RBAC negative) + N18 (one-command setup + README) + N19 (HARD_PROBLEMS Q&A) + **N20 (regression DB sạch + tổng duyệt)**. Vòng đời tiền TRỌN VẸN; **13 màn V01–V13**; **22/22 Must có bằng chứng**.
+- **Xác minh cuối N20 (DB sạch)**: lint + 2×typecheck + **API 105/105** + **E2E 17/17** + build api+web — tất cả xanh; 3 migration từ DB rỗng OK; V13 audit render thật. Commit N17 `ed57342` · N18 `536a4d8` · N19 `31eeaa7` · N20 (commit cuối).
+- **N20 CHƯA commit** (cây: `Plan/LOG.md`). Postgres Docker 54329.
+- **Còn lẻ (tùy chọn, KHÔNG chặn chấm điểm)**: `mockup/page.tsx` index launcher chưa i18n; 3 nhãn `data.ts` giữ VI khi EN; `Report/` PPTX + `MENTOR_QA.md` phủ N1–N10b (chưa cập nhật N11–N19 — `HARD_PROBLEMS.md` đã phủ money-spine + audit).
 
 **2. File/biến quan trọng:**
 - **N17**: `audit/audit.service.ts` (`record(client,input)` append-only nhận tx; `list(auth,market?)` chỉ GLOBAL_ADMIN, `take:200`), `audit/audit.controller.ts` (`GET /admin/audit`), `auth/rbac.ts` (`isGlobalAdmin`/`assertGlobalAdmin`), `prisma.service.ts` (facade `auditEvent`), `prisma/seed.sql` (global.admin@ country NULL, `ON CONFLICT (id)`). Nối audit: `kyc.service.ts` + `campaign.service.ts` bọc hành động vào `$transaction` mới; `content/reconciliation/payout.service.ts` ghi trong tx CÓ SẴN (`applyProviderOutcome` nhận thêm `actorUserId`+`action`). Web `lib/audit-client.ts`, `app/mockup/admin/audit/page.tsx` (V13), `lib/i18n.ts` khối `audit.*` vi/en, `app/mockup/page.tsx` (+V13). Test `test/audit.test.ts`(6) + `test/rbac.negative.test.ts`(11). **Gotcha N17**: (p) audit atomic = truyền `tx` (không phải `this.prisma.db`) → rollback xoá cả vết; (q) `record` phải gọi TRƯỚC `return` trong tx nhưng SAU claim (claim trượt → conflict throw trước → không ghi); (r) role NULL country → `ON CONFLICT (id)` (unique 3 cột bỏ qua NULL).
@@ -462,7 +471,8 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
 - **N15** (giữ nguyên): `payout.service.ts` (`settle` 3 kết cục + `resolveHold` + `applyProviderOutcome` claim `WHERE state=fromState`, cast enum **cả 2 vế**; `provider_ref=mock-{id}-{attemptNo}`; FAIL→`PAYOUT_RELEASE +amount`; `OUTSTANDING={PROCESSING,PAID,UNKNOWN_HOLD}`).
 - **Gotcha (mang theo)**: (a) `.env` thủ công cho prisma CLI (`export $(grep DATABASE_URL .env|xargs)`); (b) đừng xoá `.next` khi dev:web chạy; (c) test email/tên unique; (e) `corepack pnpm`; (f) cách ly staff route nước MÌNH; (g) queue/holds/createBatch gom TOÀN BỘ nước → assert bản ghi cụ thể; (h) **`--test-concurrency=1`** test API; (i) `createPayout` check: dup→amount→min→OTP→(tx)balance; (j) e2e song song DB chung — dùng **PH**/`data-creator` duy nhất; (k) `next dev` compile-on-demand → `workers:3`+`timeout:60s`; (l) cast enum 2 vế `$queryRaw`; (s) **E2E cần Docker sống**: `/health` 503 → kiểm `docker info`, `compose up -d postgres`, API tự reconnect qua pool; (t) playwright webServer gate `/health` phải 2xx mới coi server sẵn sàng.
 
-**3. Nhiệm vụ đầu tiên phiên sau — commit N19 rồi N20 (mốc cuối):**
-- **Commit N19 trước** (chưa commit): `docs/HARD_PROBLEMS.md` + `Plan/LOG.md`.
-- **N20 — Buffer + regression + tổng duyệt (đóng dự án)**: chạy lại **toàn bộ `corepack pnpm verify`** (lint+typecheck+test+build) từ đầu trên DB sạch để chốt regression; tổng duyệt kịch bản demo trong `HARD_PROBLEMS.md` trên trình duyệt thật (11 bước); Anh Quang tự trả lời 7 bài toán không nhìn tài liệu (tiêu chí qua tuần D). Sửa nốt bug/lệch tài liệu nếu phát hiện. Cập nhật mục "Trạng thái ngay bây giờ" ở đầu LOG (hiện còn ghi 2026-07-18 Tuần C — đã cũ).
-- **Nợ kỹ thuật (lát mỏng, khi có giờ / sau N20)**: QĐ-7 phí, QĐ-8 escrow, QĐ-6 apply-flow; i18n index launcher + 3 nhãn data.ts; cập nhật `Report/` PPTX+Q&A cho N11–N19. Ưu tiên: spine trọn — KHÔNG thêm thư viện lõi.
+**3. Sau khi đóng dự án — việc còn lại (đều OPTIONAL, không chặn chấm điểm):**
+- **Commit N20** (chưa commit): `Plan/LOG.md`.
+- **Chuẩn bị bảo vệ (người làm, không phải code)**: Anh Quang tự chạy kịch bản demo 15 phút trong `docs/HARD_PROBLEMS.md` trên trình duyệt + tự trả lời 7 bài toán không nhìn tài liệu.
+- **Nợ kỹ thuật (nếu còn giờ, mở rộng chiều sâu)**: QĐ-7 phí (`platform_fee_bps` + builder), QĐ-8 escrow (`PENDING_FUNDING` + nút nạp quỹ), QĐ-6 apply-flow (`requires_approval` + APPLIED); i18n index launcher + 3 nhãn `data.ts`; đồng bộ `Report/MENTOR_QA.md` + PPTX với N11–N19 (dùng `HARD_PROBLEMS.md` làm nguồn). Nguyên tắc giữ nguyên: spine trọn, KHÔNG thêm thư viện lõi.
+- **Cách chạy nhanh lại**: `corepack pnpm bootstrap` → `dev:api` + `dev:web` → `/mockup`. Verify: `corepack pnpm verify` (lưu ý tắt `dev:web` trước vì có bước `next build` — gotcha #9).
