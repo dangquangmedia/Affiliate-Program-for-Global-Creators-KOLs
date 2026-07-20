@@ -1,107 +1,127 @@
 # Affiliate GLOBAL
 
-Multi-country affiliate marketing platform (VN + PH) — local MVP. Week 1 status: **walking
-skeleton** (`Web → API → PostgreSQL`), not business features. See `Plan/00_PROJECT_EXECUTION_LOG.md`
-and `docs/product/G5_WEEK1_GATE.md` for what is and isn't done.
+Nền tảng affiliate marketing **đa quốc gia** (Việt Nam + Philippines), MVP chạy local. Đây là bản
+dựng theo `Plan/KE_HOACH_V2.md` (4 tuần, N1–N20): một luồng tiền **chạy thật end-to-end** trên 2
+nước có tiền tệ / thuế / mức rút tối thiểu khác nhau, cộng bộ **13 màn prototype** để demo tư duy
+product.
 
-## Prerequisites
+## Nó làm được gì
 
-- Node.js `24.11.1` (see `.nvmrc`)
-- pnpm `10.15.1` via Corepack: `corepack enable && corepack prepare pnpm@10.15.1 --activate`
-- Docker Desktop (for local PostgreSQL only — the API and Web apps run natively, not in containers)
+- **Cách ly theo nước**: VN (VND, thuế 10%, rút tối thiểu 200.000) và PH (PHP, thuế 8%, rút tối
+  thiểu 50.000). Server không tin `country` từ client — mọi truy vấn scope theo nước của phiên.
+- **Luồng tiền trọn vẹn**: login SSO (mock) → chọn nước → KYC (duyệt theo từng field) → join
+  campaign (**snapshot điều khoản**) → nộp content → Ops duyệt (**earning exactly-once**) → sổ cái
+  **append-only** → Finance đối soát khoá batch → `AVAILABLE` → rút tiền (OTP + reserve) → provider
+  mock **3 kết cục**: `PAID` · `FAIL`→hoàn tiền 1 lần · `UNKNOWN`→giữ chờ đối soát tay.
+- **Audit trail (AD-02)**: mọi quyết định staff để lại vết append-only, ghi trong cùng transaction
+  với hành động (không có quyết định thiếu dấu, không có dấu cho quyết định đã rollback).
+- **RBAC 4 vai** + cách ly nước: cross-country → 404, sai vai → 403, transition sai → 409.
 
-## First-time setup
+Chi tiết "vì sao" xem `docs/PRODUCT.md`, `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`; 7 bài toán khó
+xem `docs/HARD_PROBLEMS.md`.
+
+## Yêu cầu
+
+- **Node.js `24.11.1`** (xem `.nvmrc`)
+- **pnpm `10.15.1`** qua Corepack: `corepack enable && corepack prepare pnpm@10.15.1 --activate`
+- **Docker Desktop** (chỉ để chạy PostgreSQL local — API và Web chạy native, không trong container)
+
+## Cài đặt từ máy sạch — 1 lệnh
 
 ```powershell
 git clone <repo-url>
 cd affiliate-global
 corepack pnpm install
 
-Copy-Item .env.example .env
-# Edit .env: set AFFILIATE_DB_PASSWORD to a local random value, and update
-# DATABASE_URL to use the same password.
-
-docker compose up -d postgres
-docker compose ps                          # wait for "healthy"
-
-corepack pnpm db:generate
-corepack pnpm db:migrate:deploy            # applies all migrations to an empty database
-corepack pnpm db:seed                      # deterministic VN/PH seed; safe to re-run
+corepack pnpm bootstrap
 ```
 
-## Run the walking skeleton
+`bootstrap` (script `scripts/setup.mjs`) làm tất cả và **an toàn chạy lại nhiều lần**:
 
-Two terminals. The API auto-loads `.env` from the repo root on startup, so you do **not**
-need to source it into the shell first for `dev:api`/`dev:web`/`test` (only the `db:*`
-Prisma CLI commands above still need it manually — see Troubleshooting):
+1. Tạo `.env` từ `.env.example` nếu chưa có (mật khẩu local/synthetic — đổi nếu cần bảo mật).
+2. `docker compose up -d postgres` rồi chờ Postgres nhận kết nối.
+3. `prisma generate` → `prisma migrate deploy` (áp mọi migration lên DB rỗng) → `prisma db seed`
+   (VN/PH + tài khoản 4 vai + campaign demo).
+
+> Docker Desktop phải đang chạy trước khi gọi `bootstrap`.
+
+## Chạy app
+
+Hai terminal (API tự nạp `.env` khi khởi động — không cần source env thủ công cho `dev:*`/`test`):
 
 ```powershell
-# Terminal 1 — API (NestJS), http://localhost:3001
-corepack pnpm dev:api
-
-# Terminal 2 — Web (Next.js), http://localhost:3000
-corepack pnpm dev:web
+corepack pnpm dev:api    # NestJS  → http://localhost:3001
+corepack pnpm dev:web    # Next.js → http://localhost:3000
 ```
 
-Then open a browser:
+Mở trình duyệt:
 
-- `http://localhost:3000/` — landing page, links to `/vn` and `/ph`
-- `http://localhost:3000/vn` — Vietnam context (VN / VND / vi-VN) loaded from PostgreSQL through the API
-- `http://localhost:3000/ph` — Philippines context (PH / PHP / fil-PH) loaded from PostgreSQL through the API
-- `http://localhost:3000/xx` — unknown market renders a controlled 404, not a fake market
-- `http://localhost:3001/health` — `{"status":"ok","db":"up"}` when PostgreSQL is reachable
+- `http://localhost:3000/mockup` — **13 màn prototype** (V01–V13) + 2 kịch bản click xuyên màn
+- `http://localhost:3000/vn` · `/ph` — ngữ cảnh nước (nạp từ Postgres qua API)
+- `http://localhost:3001/health` — `{"status":"ok","db":"up"}` khi Postgres sống
 
-## Verify
+Công tắc **VI/EN** và **$USD** ở góc phải mỗi màn prototype; đổi **VN/PH** để thấy cách ly dữ liệu +
+tiền tệ.
+
+## Tài khoản demo (mock SSO — đăng nhập bằng email)
+
+"SSO" là mock: mỗi màn có nút "đăng nhập vai …" gọi `POST /auth/mock-login` với email tương ứng →
+tạo user + session thật trong DB. Domain: `@demo.affiliate.gl`.
+
+| Vai | Email | Dùng cho |
+|---|---|---|
+| **Creator** | *email mới bất kỳ* | Tự tạo khi đăng nhập lần đầu (mỗi email = 1 creator) |
+| **Local Ops** | `ops.vn@` · `ops.ph@` | Duyệt KYC + content (V10) |
+| **Local Admin** | `admin.vn@` · `admin.ph@` | Tạo campaign / builder (V11) |
+| **Local Finance** | `finance.vn@` · `finance.ph@` | Đối soát + chi trả (V12) |
+| **Global Admin** | `global.admin@` | Xem nhật ký audit toàn cục (V13) — vai duy nhất vượt biên giới |
+
+Kịch bản demo gợi ý: đăng nhập creator mới → chọn VN → KYC → (Ops duyệt) → join campaign → nộp
+content → (Ops duyệt) → xem thu nhập → (Finance đối soát + khoá) → rút tiền OTP → (Finance settle) →
+(Global Admin xem audit).
+
+## Kiểm thử
 
 ```powershell
-corepack pnpm check      # docs/architecture/DB-scaffold/runtime-skeleton evidence gates
-corepack pnpm lint       # eslint (flat config, apps/api + apps/web)
-corepack pnpm typecheck  # tsc --noEmit for apps/api and apps/web
-corepack pnpm test       # apps/api: node:test DB-backed smoke tests
-                          # apps/web: Playwright Chromium E2E (auto-starts API + Web)
-corepack pnpm build      # tsc build (api) + next build (web)
+corepack pnpm lint        # eslint (apps/api + apps/web)
+corepack pnpm typecheck   # tsc --noEmit cho api + web
+corepack pnpm test        # API: node:test (105 test, DB-backed) · Web: Playwright E2E (17 test)
+corepack pnpm build       # tsc build (api) + next build (web)
 
-# or all of the above in one shot:
-corepack pnpm verify
+corepack pnpm verify      # cả 4 bước trên
 ```
 
-`pnpm test` (API and Web) requires PostgreSQL to be up and seeded (see setup above); the API
-auto-loads `.env` so no manual shell export is needed.
+`pnpm test` cần Postgres đang chạy + đã seed (xem phần cài đặt). Playwright tự khởi động API + Web
+nếu chưa chạy.
 
-## Clean restart (fresh database)
+## Reset DB sạch
 
 ```powershell
-docker compose down -v      # deletes the local Postgres volume — local/synthetic data only
-docker compose up -d postgres
-corepack pnpm db:migrate:deploy
-corepack pnpm db:seed
+docker compose down -v     # xoá volume Postgres local (dữ liệu synthetic)
+corepack pnpm bootstrap    # dựng lại từ đầu
 ```
 
-## Project layout
+## Cấu trúc
 
 ```text
-apps/web      Next.js App Router — Creator/Ops/Finance/Admin shells (only the market
-              context route is implemented as of Week 1 Day 5)
-apps/api      NestJS modular monolith — REST + OpenAPI (only /health and
-              /markets/:market/context are implemented as of Week 1 Day 5)
-apps/worker   background execution, not yet started
-packages/contracts   OpenAPI contracts (docs/design artifacts)
-packages/ui          shared UI components, not yet started
-docs/         product, architecture and QA design contracts (source of truth for scope)
-Plan/         week-by-week execution plan, decision log and execution history
+apps/api      NestJS modular monolith — auth/country/kyc/campaign/content/ledger/
+              reconciliation/payout/audit; Prisma 7 + PostgreSQL 17
+apps/web      Next.js App Router — 13 màn prototype (/mockup) + route ngữ cảnh nước (/vn /ph)
+apps/api/prisma  schema lean 18 bảng + migrations + seed.sql
+docs/         PRODUCT / DATA_MODEL / ARCHITECTURE / HARD_PROBLEMS (nguồn sự thật về phạm vi + vì sao)
+Plan/         KE_HOACH_V2.md (kế hoạch) + LOG.md (đọc trước để nắm trạng thái)
+apps/worker, packages/*   scaffolding dành sẵn — CHƯA dùng trong bản V2
 ```
 
-## Troubleshooting
+## Xử lý sự cố
 
-- **`P1000: Authentication failed`** on `db:migrate:deploy`/`db:seed`: the Postgres
-  container's data volume was created with a different password than the one in your
-  current `.env`. Either recover the original password, or reset the local volume with
-  `docker compose down -v` (local data is synthetic-only per project policy — see
-  `docs/engineering/INFRA_ENVIRONMENT.md`).
-- **Port already in use**: change `AFFILIATE_DB_PORT` (Postgres), or free port `3000`/`3001`
-  before starting Web/API.
-- **`DATABASE_URL` not resolved when running a `db:*` script** (`db:generate`,
-  `db:migrate:*`, `db:seed`): these invoke the `prisma` CLI directly, which does not
-  auto-load the repo-root `.env`. Load it into the shell first (PowerShell:
+- **`/health` trả 503 / E2E timeout "webServer"**: Docker Desktop tắt → Postgres mất. Kiểm
+  `docker info`, chạy `docker compose up -d postgres`, đợi healthy rồi thử lại (API tự reconnect).
+- **`P1000: Authentication failed`** khi migrate/seed: volume Postgres tạo bằng mật khẩu khác `.env`
+  hiện tại. Reset: `docker compose down -v` rồi `corepack pnpm bootstrap` (dữ liệu chỉ là synthetic).
+- **`DATABASE_URL` not resolved** khi chạy `db:*` trực tiếp: các lệnh `prisma` CLI không tự nạp
+  `.env`. `bootstrap` đã nạp giúp; nếu chạy tay, nạp env trước (PowerShell:
   `Get-Content .env | ForEach-Object { if ($_ -match '^(\w+)=(.*)$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }`).
-  `dev:api`/`dev:web`/`pnpm test` do not need this — the API loads `.env` itself on startup.
+- **Port bận**: đổi `AFFILIATE_DB_PORT` (Postgres), hoặc giải phóng `3000`/`3001` trước khi chạy.
+- **`corepack pnpm setup` chạy nhầm PATH-setup của pnpm**: dùng đúng tên script `bootstrap`
+  (`setup` là lệnh built-in của pnpm).

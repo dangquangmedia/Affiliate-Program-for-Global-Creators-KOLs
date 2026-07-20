@@ -8,6 +8,7 @@
     "pnpm": "10.15.1"
   },
   "scripts": {
+    "bootstrap": "node scripts/setup.mjs",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
