@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { MARKETS, type Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, KV, Empty, mk } from "../../../../mockup/ui";
+import { usePrefs } from "../../../../mockup/prefs";
 import { mockLogin, saveSession } from "../../../../lib/auth-client";
-import { formatMoney } from "../../../../lib/i18n";
+import { t, formatMoney } from "../../../../lib/i18n";
 import { listBatches, getBatch, createBatch, lockBatch, type ReconBatch } from "../../../../lib/reconciliation-client";
 import {
   payoutQueue,
@@ -28,6 +29,7 @@ export default function FinanceWorkbenchScreen() {
   const [holds, setHolds] = useState<PayoutQueueItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const { lang } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {
@@ -70,7 +72,7 @@ export default function FinanceWorkbenchScreen() {
         await load();
         setSelected(res.batch);
       } else {
-        setErr(res.code === "NOTHING_TO_RECONCILE" ? "Không có thu nhập PENDING nào để đối soát." : res.message);
+        setErr(res.code === "NOTHING_TO_RECONCILE" ? t(lang, "fin.errNothing") : res.message);
       }
     } finally {
       setBusy(false);
@@ -86,7 +88,7 @@ export default function FinanceWorkbenchScreen() {
         setSelected(res.batch);
         await load();
       } else if (res.code === "BATCH_ALREADY_LOCKED") {
-        setErr("Batch đã bị khoá bởi người khác (bất biến).");
+        setErr(t(lang, "fin.errLocked"));
         await openBatch(id);
       }
     } finally {
@@ -99,7 +101,7 @@ export default function FinanceWorkbenchScreen() {
     setErr(null);
     try {
       const res = await settlePayout(market, id, result);
-      if (!res.ok && res.code === "ALREADY_SETTLED") setErr("Lệnh này vừa được xử lý bởi người khác.");
+      if (!res.ok && res.code === "ALREADY_SETTLED") setErr(t(lang, "fin.errSettled"));
       await load();
     } finally {
       setBusy(false);
@@ -111,7 +113,7 @@ export default function FinanceWorkbenchScreen() {
     setErr(null);
     try {
       const res = await resolveHold(market, id, result);
-      if (!res.ok && res.code === "NOT_ON_HOLD") setErr("Lệnh này không còn ở trạng thái chờ đối soát.");
+      if (!res.ok && res.code === "NOT_ON_HOLD") setErr(t(lang, "fin.errNotHold"));
       await load();
     } finally {
       setBusy(false);
@@ -119,24 +121,19 @@ export default function FinanceWorkbenchScreen() {
   }
 
   return (
-    <Frame screen="V12 Finance workbench" title="Đối soát & chi trả (Local Finance)" market={market} setMarket={setMarket}>
+    <Frame screen="V12 Finance workbench" title={t(lang, "fin.title")} market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> Finance chốt số &amp; mở tiền rút thế nào? → Tạo batch
-        gom thu nhập <strong>PENDING</strong> → khoá (lock) để chuyển sang <strong>AVAILABLE</strong>
-        (rút được). <em>Bài toán #6: batch đã khoá là BẤT BIẾN; 1 earning vào đúng 1 batch
-        (UNIQUE). Payout 3 kết cục là N14.</em>
+        <strong>{t(lang, "fin.noteQ")}</strong> {t(lang, "fin.noteBody")} <em>{t(lang, "fin.noteHard")}</em>
       </Note>
 
-      {status === "loading" && <p style={{ color: "#8b96a3" }}>Đang tải…</p>}
+      {status === "loading" && <p style={{ color: "#8b96a3" }}>{t(lang, "fin.loading")}</p>}
 
       {status === "needStaff" && (
-        <Card title={`Cần quyền Finance ${market}`} sub="Phiên hiện tại không có vai Local Finance của nước này.">
-          <p style={{ color: "#a9b6c4", fontSize: 14, marginBottom: 10 }}>
-            Đăng nhập bằng tài khoản Finance demo (mock SSO) để đối soát nước {market}.
-          </p>
+        <Card title={t(lang, "fin.needStaffTitle", { market })} sub={t(lang, "fin.needStaffSub")}>
+          <p style={{ color: "#a9b6c4", fontSize: 14, marginBottom: 10 }}>{t(lang, "fin.needStaffBody", { market })}</p>
           <BtnRow>
             <Btn variant="primary" onClick={loginAsFinance}>
-              Đăng nhập vai Finance {market}
+              {t(lang, "fin.loginBtn", { market })}
             </Btn>
           </BtnRow>
         </Card>
@@ -150,20 +147,20 @@ export default function FinanceWorkbenchScreen() {
             </div>
           )}
 
-          <Card title="Kỳ đối soát" sub="Gom mọi thu nhập PENDING chưa đối soát của nước này vào 1 batch mới.">
+          <Card title={t(lang, "fin.batchTitle")} sub={t(lang, "fin.batchSub")}>
             <BtnRow>
               <Btn variant="primary" disabled={busy} onClick={doCreate}>
-                {busy ? "…" : "Tạo batch đối soát"}
+                {busy ? "…" : t(lang, "fin.createBatch")}
               </Btn>
             </BtnRow>
             {batches.length === 0 ? (
               <div style={{ marginTop: 12 }}>
-                <Empty icon="📊">Chưa có batch nào. Tạo batch khi có thu nhập PENDING.</Empty>
+                <Empty icon="📊">{t(lang, "fin.noBatch")}</Empty>
               </div>
             ) : (
               <table className={mk.table} style={{ marginTop: 12 }}>
                 <thead>
-                  <tr><th>Kỳ</th><th>Số dòng</th><th>Tổng net</th><th>Trạng thái</th><th></th></tr>
+                  <tr><th>{t(lang, "fin.colPeriod")}</th><th>{t(lang, "fin.colLines")}</th><th>{t(lang, "fin.colNet")}</th><th>{t(lang, "fin.colStatus")}</th><th></th></tr>
                 </thead>
                 <tbody>
                   {batches.map((b) => (
@@ -171,8 +168,8 @@ export default function FinanceWorkbenchScreen() {
                       <td>{b.period}</td>
                       <td>{b.lineCount}</td>
                       <td>{formatMoney(b.totalNetMinor, b.currency ?? MARKETS[market].currency, locale)}</td>
-                      <td>{b.status === "LOCKED" ? <Badge kind="info">🔒 Đã khoá</Badge> : <Badge kind="warn">Đang mở</Badge>}</td>
-                      <td><Btn onClick={() => openBatch(b.id)}>Xem</Btn></td>
+                      <td>{b.status === "LOCKED" ? <Badge kind="info">{t(lang, "fin.locked")}</Badge> : <Badge kind="warn">{t(lang, "fin.open")}</Badge>}</td>
+                      <td><Btn onClick={() => openBatch(b.id)}>{t(lang, "fin.view")}</Btn></td>
                     </tr>
                   ))}
                 </tbody>
@@ -182,12 +179,12 @@ export default function FinanceWorkbenchScreen() {
 
           {selected && (
             <Card
-              title={`Batch kỳ ${selected.period} · ${market}`}
-              sub={selected.status === "LOCKED" ? "Đã khoá — bất biến. Muốn sửa phải tạo điều chỉnh (bút toán đảo)." : "Kiểm tra từng dòng rồi khoá để mở tiền rút."}
+              title={t(lang, "fin.batchDetail", { period: selected.period, market })}
+              sub={selected.status === "LOCKED" ? t(lang, "fin.batchDetailLocked") : t(lang, "fin.batchDetailOpen")}
             >
               <table className={mk.table}>
                 <thead>
-                  <tr><th>Creator</th><th>Campaign</th><th>Net</th><th>Ghi chú</th></tr>
+                  <tr><th>{t(lang, "fin.colCreator")}</th><th>{t(lang, "fin.colCampaign")}</th><th>Net</th><th>{t(lang, "fin.colNote")}</th></tr>
                 </thead>
                 <tbody>
                   {(selected.lines ?? []).map((l) => (
@@ -195,56 +192,53 @@ export default function FinanceWorkbenchScreen() {
                       <td>{l.creatorName}</td>
                       <td>{l.campaignTitle ?? "—"}</td>
                       <td>{formatMoney(l.netMinor, l.currency, locale)}</td>
-                      <td>{l.anomaly ? <Badge kind="danger">{l.anomaly}</Badge> : <Badge kind="success">OK</Badge>}</td>
+                      <td>{l.anomaly ? <Badge kind="danger">{l.anomaly}</Badge> : <Badge kind="success">{t(lang, "fin.lineOk")}</Badge>}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <div style={{ marginTop: 12 }}>
-                <KV k="Tổng hợp lệ (loại dòng bất thường)" strong>
+                <KV k={t(lang, "fin.totalValid")} strong>
                   {formatMoney(selected.totalNetMinor, selected.currency ?? MARKETS[market].currency, locale)}
                 </KV>
               </div>
               {selected.status === "OPEN" ? (
                 <BtnRow>
                   <Btn variant="primary" disabled={busy} onClick={() => doLock(selected.id)}>
-                    {busy ? "…" : "Khoá batch (PENDING → Rút được)"}
+                    {busy ? "…" : t(lang, "fin.lockBatch")}
                   </Btn>
                 </BtnRow>
               ) : (
                 <>
-                  <div style={{ marginTop: 10 }}><Badge kind="info">🔒 LOCKED — không sửa trực tiếp</Badge></div>
+                  <div style={{ marginTop: 10 }}><Badge kind="info">{t(lang, "fin.lockedNote")}</Badge></div>
                   <p style={{ fontSize: 13, color: "#a9b6c4", marginTop: 8 }}>
-                    Các khoản hợp lệ đã chuyển sang <b>AVAILABLE</b> — creator thấy &quot;rút được&quot; ở{" "}
-                    <Link href="/mockup/creator/earnings" style={{ color: "#6aa6ff" }}>màn Thu nhập (V07)</Link>.
+                    {t(lang, "fin.lockedBody1")} <b>AVAILABLE</b> {t(lang, "fin.lockedBody2")}{" "}
+                    <Link href="/mockup/creator/earnings" style={{ color: "#6aa6ff" }}>{t(lang, "fin.earningsScreen")}</Link>.
                   </p>
                 </>
               )}
             </Card>
           )}
 
-          <Card
-            title={`Hàng đợi payout (${payouts.length})`}
-            sub="Lệnh đã reserve tiền · gọi provider (mock). 3 kết cục: SUCCESS → đã trả · FAIL → hoàn tiền (1 lần) · UNKNOWN → giữ chờ đối soát tay."
-          >
+          <Card title={t(lang, "fin.queueTitle", { n: payouts.length })} sub={t(lang, "fin.queueSub")}>
             {payouts.length === 0 ? (
-              <p style={{ color: "#8b96a3", fontSize: 13 }}>Không có lệnh rút nào chờ xử lý.</p>
+              <p style={{ color: "#8b96a3", fontSize: 13 }}>{t(lang, "fin.queueEmpty")}</p>
             ) : (
               <table className={mk.table}>
                 <thead>
-                  <tr><th>Creator</th><th>Số tiền</th><th>Trạng thái</th><th>Kết cục provider (mock)</th></tr>
+                  <tr><th>{t(lang, "fin.colCreator")}</th><th>{t(lang, "fin.colAmount")}</th><th>{t(lang, "fin.colStatus")}</th><th>{t(lang, "fin.colOutcome")}</th></tr>
                 </thead>
                 <tbody>
                   {payouts.map((p) => (
                     <tr key={p.id} data-creator={p.creatorName}>
                       <td>{p.creatorName}</td>
                       <td>{formatMoney(p.amountMinor, p.currency, locale)}</td>
-                      <td><Badge kind="info">Đã giữ chỗ</Badge></td>
+                      <td><Badge kind="info">{t(lang, "fin.held")}</Badge></td>
                       <td>
                         <BtnRow>
-                          <Btn variant="primary" disabled={busy} onClick={() => doSettle(p.id, "SUCCESS")}>Thành công</Btn>
-                          <Btn variant="danger" disabled={busy} onClick={() => doSettle(p.id, "FAIL")}>Thất bại (hoàn)</Btn>
-                          <Btn variant="ghost" disabled={busy} onClick={() => doSettle(p.id, "UNKNOWN")}>Không rõ</Btn>
+                          <Btn variant="primary" disabled={busy} onClick={() => doSettle(p.id, "SUCCESS")}>{t(lang, "fin.outSuccess")}</Btn>
+                          <Btn variant="danger" disabled={busy} onClick={() => doSettle(p.id, "FAIL")}>{t(lang, "fin.outFail")}</Btn>
+                          <Btn variant="ghost" disabled={busy} onClick={() => doSettle(p.id, "UNKNOWN")}>{t(lang, "fin.outUnknown")}</Btn>
                         </BtnRow>
                       </td>
                     </tr>
@@ -254,27 +248,24 @@ export default function FinanceWorkbenchScreen() {
             )}
           </Card>
 
-          <Card
-            title={`Chờ đối soát tay — UNKNOWN (${holds.length})`}
-            sub="Provider trả kết cục KHÔNG RÕ → tiền vẫn GIỮ (không hoàn vội, tránh double-pay). Finance đối chiếu sao kê provider rồi kết luận."
-          >
+          <Card title={t(lang, "fin.holdsTitle", { n: holds.length })} sub={t(lang, "fin.holdsSub")}>
             {holds.length === 0 ? (
-              <p style={{ color: "#8b96a3", fontSize: 13 }}>Không có lệnh nào đang chờ đối soát tay.</p>
+              <p style={{ color: "#8b96a3", fontSize: 13 }}>{t(lang, "fin.holdsEmpty")}</p>
             ) : (
               <table className={mk.table}>
                 <thead>
-                  <tr><th>Creator</th><th>Số tiền</th><th>Trạng thái</th><th>Kết luận sau đối soát</th></tr>
+                  <tr><th>{t(lang, "fin.colCreator")}</th><th>{t(lang, "fin.colAmount")}</th><th>{t(lang, "fin.colStatus")}</th><th>{t(lang, "fin.colResolve")}</th></tr>
                 </thead>
                 <tbody>
                   {holds.map((p) => (
                     <tr key={p.id} data-creator={p.creatorName}>
                       <td>{p.creatorName}</td>
                       <td>{formatMoney(p.amountMinor, p.currency, locale)}</td>
-                      <td><Badge kind="warn">Không rõ → đang giữ</Badge></td>
+                      <td><Badge kind="warn">{t(lang, "fin.unknownHold")}</Badge></td>
                       <td>
                         <BtnRow>
-                          <Btn variant="primary" disabled={busy} onClick={() => doResolve(p.id, "SUCCESS")}>Đã chuyển → trả</Btn>
-                          <Btn variant="danger" disabled={busy} onClick={() => doResolve(p.id, "FAIL")}>Không chuyển → hoàn</Btn>
+                          <Btn variant="primary" disabled={busy} onClick={() => doResolve(p.id, "SUCCESS")}>{t(lang, "fin.resolvePaid")}</Btn>
+                          <Btn variant="danger" disabled={busy} onClick={() => doResolve(p.id, "FAIL")}>{t(lang, "fin.resolveFail")}</Btn>
                         </BtnRow>
                       </td>
                     </tr>

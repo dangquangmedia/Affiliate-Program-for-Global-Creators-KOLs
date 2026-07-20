@@ -3,66 +3,65 @@
 import { useState } from "react";
 import { COUNTRY_CONFIG, MARKETS, formatMoney, type Market } from "../../../../mockup/data";
 import { Frame, Note, StateBar, Card, Btn, BtnRow, Badge, KV, Field } from "../../../../mockup/ui";
+import { usePrefs } from "../../../../mockup/prefs";
+import { t } from "../../../../lib/i18n";
 
 type View = "overview" | "edit";
 
 export default function AdminConfigScreen() {
   const [market, setMarket] = useState<Market>("VN");
   const [view, setView] = useState<View>("overview");
+  const { lang } = usePrefs();
   const cfg = COUNTRY_CONFIG[market];
+  const info = MARKETS[market];
 
   return (
-    <Frame screen="V09 Admin config" title="Cấu hình quốc gia (Global Admin)" market={market} setMarket={setMarket}>
+    <Frame screen="V09 Admin config" title={t(lang, "cfg.title")} market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> ai được cấu hình từng nước, và cấu hình gì? → Chỉ{" "}
-        <strong>Global Admin</strong> thấy &amp; sửa cấu hình mọi nước (thuế, mức rút tối thiểu,
-        bật/tắt tính năng). <em>Đây là vai DUY NHẤT vượt biên giới nước — nhân viên Local chỉ
-        thấy nước mình (bài toán khó #1). Mọi thay đổi cấu hình đều ghi audit.</em>
+        <strong>{t(lang, "cfg.noteQ")}</strong> {t(lang, "cfg.noteBody")} <em>{t(lang, "cfg.noteHard")}</em>
       </Note>
 
       <StateBar
         value={view}
         onChange={setView}
         options={[
-          { key: "overview", label: "Tổng quan" },
-          { key: "edit", label: "Sửa cấu hình" },
+          { key: "overview", label: t(lang, "cfg.overview") },
+          { key: "edit", label: t(lang, "cfg.edit") },
         ]}
       />
 
       <div style={{ fontSize: 12, color: "#8b96a3", marginBottom: 14 }}>
-        Đang xem: <b style={{ color: "#cfe0ff" }}>{MARKETS[market].flag} {MARKETS[market].name}</b>{" "}
-        · đổi VN/PH ở góc phải để thấy cấu hình khác nhau theo nước.
+        {t(lang, "cfg.viewing")} <b style={{ color: "#cfe0ff" }}>{info.flag} {info.name}</b>{" "}
+        {t(lang, "cfg.viewingTail")}
       </div>
 
       {view === "overview" ? (
-        <Card title={`Cấu hình ${MARKETS[market].name}`} sub={`Ngôn ngữ ${MARKETS[market].locale} · tiền tệ ${MARKETS[market].currency}`}>
-          <KV k="Thuế (synthetic demo)">{cfg.taxPercent}%</KV>
-          <KV k="Rút tối thiểu">{formatMoney(cfg.minPayoutMinor, MARKETS[market].currency)}</KV>
-          <div style={{ marginTop: 12, marginBottom: 6, fontSize: 13, color: "#9aa6b3" }}>Tính năng theo nước:</div>
+        <Card title={t(lang, "cfg.cardTitle", { name: info.name })} sub={t(lang, "cfg.cardSub", { locale: info.locale, currency: info.currency })}>
+          <KV k={t(lang, "cfg.tax")}>{cfg.taxPercent}%</KV>
+          <KV k={t(lang, "cfg.minPayout")}>{formatMoney(cfg.minPayoutMinor, info.currency)}</KV>
+          <div style={{ marginTop: 12, marginBottom: 6, fontSize: 13, color: "#9aa6b3" }}>{t(lang, "cfg.features")}</div>
           {cfg.features.map((f) => (
             <KV key={f.key} k={f.label}>
-              {f.on ? <Badge kind="success">Bật</Badge> : <Badge kind="neutral">Tắt</Badge>}
+              {f.on ? <Badge kind="success">{t(lang, "cfg.on")}</Badge> : <Badge kind="neutral">{t(lang, "cfg.off")}</Badge>}
             </KV>
           ))}
           <BtnRow>
-            <Btn variant="primary" onClick={() => setView("edit")}>Sửa cấu hình</Btn>
+            <Btn variant="primary" onClick={() => setView("edit")}>{t(lang, "cfg.edit")}</Btn>
           </BtnRow>
         </Card>
       ) : (
-        <Card title={`Sửa cấu hình ${MARKETS[market].name}`} sub="Lưu lại sẽ tạo version mới + ghi audit ai sửa, sửa gì, khi nào.">
-          <Field label="Thuế (%)" value={String(cfg.taxPercent)} />
-          <Field label={`Rút tối thiểu (${MARKETS[market].currency})`} value={String(cfg.minPayoutMinor)} />
-          <div style={{ fontSize: 13, color: "#9aa6b3", margin: "6px 0 10px" }}>
-            Bật/tắt tính năng (feature flag theo nước — bật/tắt không cần deploy lại):
-          </div>
+        <Card title={t(lang, "cfg.editTitle", { name: info.name })} sub={t(lang, "cfg.editSub")}>
+          <Field label={t(lang, "cfg.taxField")} value={String(cfg.taxPercent)} />
+          <Field label={t(lang, "cfg.minPayoutField", { currency: info.currency })} value={String(cfg.minPayoutMinor)} />
+          <div style={{ fontSize: 13, color: "#9aa6b3", margin: "6px 0 10px" }}>{t(lang, "cfg.featuresHint")}</div>
           {cfg.features.map((f) => (
             <KV key={f.key} k={f.label}>
-              <Badge kind={f.on ? "success" : "neutral"}>{f.on ? "Bật" : "Tắt"}</Badge>
+              <Badge kind={f.on ? "success" : "neutral"}>{f.on ? t(lang, "cfg.on") : t(lang, "cfg.off")}</Badge>
             </KV>
           ))}
           <BtnRow>
-            <Btn variant="primary" onClick={() => setView("overview")}>Lưu (tạo version + audit)</Btn>
-            <Btn variant="ghost" onClick={() => setView("overview")}>Huỷ</Btn>
+            <Btn variant="primary" onClick={() => setView("overview")}>{t(lang, "cfg.save")}</Btn>
+            <Btn variant="ghost" onClick={() => setView("overview")}>{t(lang, "cfg.cancel")}</Btn>
           </BtnRow>
         </Card>
       )}

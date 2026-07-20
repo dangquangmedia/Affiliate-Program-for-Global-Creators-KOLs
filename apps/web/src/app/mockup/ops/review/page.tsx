@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, mk } from "../../../../mockup/ui";
+import { usePrefs } from "../../../../mockup/prefs";
+import { t } from "../../../../lib/i18n";
 import { mockLogin, saveSession } from "../../../../lib/auth-client";
 import { getKycQueue, reviewKyc, type KycQueueItem, type FieldDecision } from "../../../../lib/kyc-client";
 import { contentQueue, reviewContent, type ContentQueueItem } from "../../../../lib/content-client";
@@ -19,6 +21,7 @@ export default function OpsReviewScreen() {
   const [decisions, setDecisions] = useState<DecisionMap>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const { lang } = usePrefs();
 
   const load = useCallback(async () => {
     const q = await getKycQueue(market);
@@ -62,14 +65,14 @@ export default function OpsReviewScreen() {
     setErr(null);
     const reason = (rejectReasons[id] ?? "").trim();
     if (decision === "REJECT" && !reason) {
-      setErr("Từ chối content phải nhập lý do.");
+      setErr(t(lang, "ops.errRejectContent"));
       return;
     }
     setBusy(id);
     try {
       const res = await reviewContent(market, id, decision, reason || undefined);
       if (!res.ok && res.code === "ALREADY_REVIEWED") {
-        setErr("Submission này vừa được reviewer khác xử lý (chống duyệt trùng).");
+        setErr(t(lang, "ops.errAlreadyReviewed"));
       }
       await load();
     } finally {
@@ -82,7 +85,7 @@ export default function OpsReviewScreen() {
     const picks = decisions[c.caseId] ?? {};
     const list: FieldDecision[] = Object.entries(picks).map(([key, v]) => ({ key, decision: v.decision, reason: v.reason }));
     if (list.some((d) => d.decision === "NEEDS_CHANGES" && !(d.reason ?? "").trim())) {
-      setErr("Từ chối field nào thì phải nhập lý do cho field đó.");
+      setErr(t(lang, "ops.errRejectField"));
       return;
     }
     setBusy(c.caseId);
@@ -95,28 +98,23 @@ export default function OpsReviewScreen() {
   }
 
   return (
-    <Frame screen="V10 Ops review" title="Hàng đợi duyệt (Local Ops)" market={market} setMarket={setMarket}>
+    <Frame screen="V10 Ops review" title={t(lang, "ops.title")} market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> Ops duyệt KYC + content thế nào, từ chối ra sao? →
-        Duyệt/từ chối <strong>theo từng field</strong> (KYC) và theo submission (content), từ chối
-        phải có lý do. <em>Cả 2 hàng đợi gọi API thật + RBAC cách ly nước (bài toán #1); duyệt
-        content tạo thu nhập ĐÚNG 1 LẦN kể cả double-click (bài toán #7 — N11).</em>
+        <strong>{t(lang, "ops.noteQ")}</strong> {t(lang, "ops.noteBody")} <em>{t(lang, "ops.noteHard")}</em>
       </Note>
 
       <div style={{ fontSize: 12, color: "#8b96a3", marginBottom: 14 }}>
-        Phạm vi: <b style={{ color: "#cfe0ff" }}>Ops {market}</b> — chỉ thấy hồ sơ của nước {market}.
+        {t(lang, "ops.scope")} <b style={{ color: "#cfe0ff" }}>{t(lang, "ops.scopeName", { market })}</b> {t(lang, "ops.scopeTail", { market })}
       </div>
 
-      {status === "loading" && <p style={{ color: "#8b96a3" }}>Đang tải hàng đợi…</p>}
+      {status === "loading" && <p style={{ color: "#8b96a3" }}>{t(lang, "ops.loading")}</p>}
 
       {status === "needStaff" && (
-        <Card title={`Cần quyền Ops ${market}`} sub="Phiên hiện tại không có vai Ops của nước này.">
-          <p style={{ color: "#a9b6c4", fontSize: 14, marginBottom: 10 }}>
-            Đăng nhập bằng tài khoản Ops demo (mock SSO) để xem & duyệt hàng đợi KYC nước {market}.
-          </p>
+        <Card title={t(lang, "ops.needStaffTitle", { market })} sub={t(lang, "ops.needStaffSub")}>
+          <p style={{ color: "#a9b6c4", fontSize: 14, marginBottom: 10 }}>{t(lang, "ops.needStaffBody", { market })}</p>
           <BtnRow>
             <Btn variant="primary" onClick={loginAsOps}>
-              Đăng nhập vai Ops {market}
+              {t(lang, "ops.loginBtn", { market })}
             </Btn>
           </BtnRow>
         </Card>
@@ -130,8 +128,8 @@ export default function OpsReviewScreen() {
             </div>
           )}
 
-          <Card title={`Hàng đợi KYC (${queue.length})`} sub="Duyệt/từ chối theo từng field rồi gửi quyết định.">
-            {queue.length === 0 && <p style={{ color: "#8b96a3" }}>Không có hồ sơ chờ duyệt.</p>}
+          <Card title={t(lang, "ops.kycQueue", { n: queue.length })} sub={t(lang, "ops.kycQueueSub")}>
+            {queue.length === 0 && <p style={{ color: "#8b96a3" }}>{t(lang, "ops.kycEmpty")}</p>}
             {queue.map((c) => (
               <div
                 key={c.caseId}
@@ -140,7 +138,7 @@ export default function OpsReviewScreen() {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <strong>{c.creatorName}</strong>
-                  {c.state === "RESUBMITTED" ? <Badge kind="info">Nộp lại</Badge> : <Badge kind="warn">Chờ duyệt</Badge>}
+                  {c.state === "RESUBMITTED" ? <Badge kind="info">{t(lang, "ops.resubmitted")}</Badge> : <Badge kind="warn">{t(lang, "ops.pending")}</Badge>}
                 </div>
                 {c.fields.map((f) => {
                   const locked = f.state === "ACCEPTED";
@@ -149,7 +147,7 @@ export default function OpsReviewScreen() {
                     <div key={f.key} style={{ padding: "8px 0", borderBottom: "1px solid #131a22" }}>
                       <div style={{ fontSize: 13 }}>
                         <b>{f.label}:</b> <span style={{ color: "#cfe0ff" }}>{f.value ?? "—"}</span>{" "}
-                        {locked && <Badge kind="success">✓ đã duyệt</Badge>}
+                        {locked && <Badge kind="success">✓ {t(lang, "ops.fieldApproved")}</Badge>}
                       </div>
                       {!locked && pick && (
                         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
@@ -157,19 +155,19 @@ export default function OpsReviewScreen() {
                             variant={pick.decision === "ACCEPT" ? "primary" : "ghost"}
                             onClick={() => setField(c.caseId, f.key, { decision: "ACCEPT" })}
                           >
-                            Duyệt
+                            {t(lang, "ops.approve")}
                           </Btn>
                           <Btn
                             variant={pick.decision === "NEEDS_CHANGES" ? "danger" : "ghost"}
                             onClick={() => setField(c.caseId, f.key, { decision: "NEEDS_CHANGES" })}
                           >
-                            Cần sửa
+                            {t(lang, "ops.needChanges")}
                           </Btn>
                           {pick.decision === "NEEDS_CHANGES" && (
                             <input
                               className={mk.input}
                               style={{ flex: 1, minWidth: 200 }}
-                              placeholder="Lý do từ chối (bắt buộc)"
+                              placeholder={t(lang, "ops.reasonPlaceholder")}
                               value={pick.reason}
                               onChange={(e) => setField(c.caseId, f.key, { reason: e.target.value })}
                             />
@@ -181,18 +179,15 @@ export default function OpsReviewScreen() {
                 })}
                 <BtnRow>
                   <Btn variant="primary" disabled={busy === c.caseId} onClick={() => submitReview(c)}>
-                    {busy === c.caseId ? "Đang gửi…" : "Gửi quyết định"}
+                    {busy === c.caseId ? t(lang, "ops.sending") : t(lang, "ops.submitDecision")}
                   </Btn>
                 </BtnRow>
               </div>
             ))}
           </Card>
 
-          <Card
-            title={`Hàng đợi content (${content.length})`}
-            sub="Approve tạo ĐÚNG 1 khoản thu nhập (exactly-once); reject bắt buộc lý do, creator có 24h sửa (QĐ-4)."
-          >
-            {content.length === 0 && <p style={{ color: "#8b96a3" }}>Không có content chờ duyệt.</p>}
+          <Card title={t(lang, "ops.contentQueue", { n: content.length })} sub={t(lang, "ops.contentQueueSub")}>
+            {content.length === 0 && <p style={{ color: "#8b96a3" }}>{t(lang, "ops.contentEmpty")}</p>}
             {content.map((s) => {
               const ok = s.hashtagOk && s.platformOk;
               return (
@@ -202,23 +197,23 @@ export default function OpsReviewScreen() {
                       <strong>{s.creatorName}</strong>
                       <span style={{ color: "#8b96a3", fontSize: 13 }}> · {s.campaignTitle} · attempt #{s.attemptNo}</span>
                     </div>
-                    {ok ? <Badge kind="success">Đạt sơ bộ</Badge> : <Badge kind="danger">Cần xem</Badge>}
+                    {ok ? <Badge kind="success">{t(lang, "ops.passPrelim")}</Badge> : <Badge kind="danger">{t(lang, "ops.needReview")}</Badge>}
                   </div>
                   <p style={{ fontSize: 12, color: "#6aa6ff", wordBreak: "break-all", margin: "6px 0" }}>
                     <a href={s.url} target="_blank" rel="noreferrer" style={{ color: "#6aa6ff" }}>{s.url}</a>
-                    {!s.hashtagOk && <span style={{ color: "#f0c674" }}> · caption thiếu hashtag</span>}
+                    {!s.hashtagOk && <span style={{ color: "#f0c674" }}>{t(lang, "ops.captionMissing")}</span>}
                   </p>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <Btn variant="primary" disabled={busy === s.submissionId} onClick={() => reviewSubmission(s.submissionId, "APPROVE")}>
-                      {busy === s.submissionId ? "…" : "Duyệt (+ thu nhập)"}
+                      {busy === s.submissionId ? "…" : t(lang, "ops.approveContent")}
                     </Btn>
                     <Btn variant="danger" disabled={busy === s.submissionId} onClick={() => reviewSubmission(s.submissionId, "REJECT")}>
-                      Từ chối
+                      {t(lang, "ops.reject")}
                     </Btn>
                     <input
                       className={mk.input}
                       style={{ flex: 1, minWidth: 200 }}
-                      placeholder="Lý do từ chối (bắt buộc khi từ chối)"
+                      placeholder={t(lang, "ops.rejectPlaceholder")}
                       value={rejectReasons[s.submissionId] ?? ""}
                       onChange={(e) => setRejectReasons((r) => ({ ...r, [s.submissionId]: e.target.value }))}
                     />

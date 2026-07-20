@@ -4,12 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { MARKETS, PRICING_OPTIONS, TRIGGER_OPTIONS, type Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, KV, mk } from "../../../../mockup/ui";
+import { usePrefs } from "../../../../mockup/prefs";
 import { mockLogin, saveSession } from "../../../../lib/auth-client";
 import { createCampaign, type CampaignDetail } from "../../../../lib/campaign-client";
-import { formatMoney } from "../../../../lib/i18n";
+import { t, formatMoney } from "../../../../lib/i18n";
 
 export default function CampaignBuilderScreen() {
   const [market, setMarket] = useState<Market>("VN");
+  const { lang } = usePrefs();
   const currency = MARKETS[market].currency;
   const locale = MARKETS[market].locale;
 
@@ -54,7 +56,7 @@ export default function CampaignBuilderScreen() {
       } else if (res.status === 401) {
         setErr("unauthorized");
       } else {
-        setErr("Dữ liệu chưa hợp lệ (đơn giá & số suất phải > 0).");
+        setErr(t(lang, "builder.invalid"));
       }
     } finally {
       setBusy(false);
@@ -69,38 +71,35 @@ export default function CampaignBuilderScreen() {
   );
 
   return (
-    <Frame screen="V11 Campaign builder" title="Tạo campaign (Local Admin)" market={market} setMarket={setMarket}>
+    <Frame screen="V11 Campaign builder" title={t(lang, "builder.title")} market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> admin dựng campaign & quy tắc thưởng thế nào? → Quy tắc
-        thưởng theo <strong>3 trục</strong> (① điều kiện · ② định giá · ③ trần ngân sách). <em>QĐ-1
-        sống trong UI: Phase 1 chỉ bật content-flat; view-gate & CPS hiển thị nhưng khoá. Nút gọi
-        API thật, cần vai Local Admin của nước — mở đúng bài toán RBAC + cách ly.</em>
+        <strong>{t(lang, "builder.noteQ")}</strong> {t(lang, "builder.noteBody")} <em>{t(lang, "builder.noteHard")}</em>
       </Note>
 
       <div style={{ marginBottom: 12 }}>
         <Btn variant="ghost" onClick={loginAsAdmin}>
-          Đăng nhập vai Admin {market}
+          {t(lang, "builder.loginBtn", { market })}
         </Btn>
       </div>
 
       {created ? (
-        <Card title="Đã tạo campaign">
+        <Card title={t(lang, "builder.createdTitle")}>
           <Badge kind="success">ACTIVE</Badge>
           <p style={{ fontSize: 14, color: "#a9b6c4", margin: "10px 0" }}>
-            <strong>{created.title}</strong> ({created.currency}) — trần ngân sách{" "}
+            <strong>{created.title}</strong> ({created.currency}) — {t(lang, "builder.createdBudget")}{" "}
             {created.reward?.budgetCapMinor != null
               ? formatMoney(created.reward.budgetCapMinor, created.currency, locale)
               : "—"}
-            . Creator nước {market} sẽ thấy ở màn Khám phá.
+            {t(lang, "builder.createdTail", { market })}
           </p>
           <BtnRow>
             <Btn variant="primary">
               <Link href="/mockup/creator/discover" style={{ color: "#fff", textDecoration: "none" }}>
-                Xem ở Khám phá (V04) →
+                {t(lang, "builder.viewInDiscover")}
               </Link>
             </Btn>
             <Btn variant="ghost" onClick={() => setCreated(null)}>
-              Tạo cái khác
+              {t(lang, "builder.createAnother")}
             </Btn>
           </BtnRow>
         </Card>
@@ -108,15 +107,13 @@ export default function CampaignBuilderScreen() {
         <>
           {err === "forbidden" && (
             <div style={{ marginBottom: 12 }}>
-              <Badge kind="danger">Cần vai Local Admin {market}</Badge>
-              <p style={{ color: "#ff9ba3", fontSize: 13, marginTop: 6 }}>
-                Phiên hiện tại không phải Admin nước này. Bấm &quot;Đăng nhập vai Admin {market}&quot; ở trên.
-              </p>
+              <Badge kind="danger">{t(lang, "builder.needAdminBadge", { market })}</Badge>
+              <p style={{ color: "#ff9ba3", fontSize: 13, marginTop: 6 }}>{t(lang, "builder.needAdminBody", { market })}</p>
             </div>
           )}
           {err === "unauthorized" && (
             <div style={{ marginBottom: 12 }}>
-              <Badge kind="danger">Chưa đăng nhập</Badge>
+              <Badge kind="danger">{t(lang, "builder.unauthorized")}</Badge>
             </div>
           )}
           {err && err !== "forbidden" && err !== "unauthorized" && (
@@ -125,31 +122,31 @@ export default function CampaignBuilderScreen() {
             </div>
           )}
 
-          <Card title="Thông tin campaign">
-            {field("Tên campaign", title, setTitle)}
-            {field("Nhãn hàng", brand, setBrand)}
-            {field("Nền tảng", platform, setPlatform)}
-            {field("Hashtag bắt buộc", hashtag, setHashtag)}
+          <Card title={t(lang, "builder.infoTitle")}>
+            {field(t(lang, "builder.name"), title, setTitle)}
+            {field(t(lang, "builder.brand"), brand, setBrand)}
+            {field(t(lang, "builder.platform"), platform, setPlatform)}
+            {field(t(lang, "builder.hashtag"), hashtag, setHashtag)}
           </Card>
 
-          <Card title="Quy tắc thưởng — 3 trục" sub="Phase 1: ① Content duyệt + ② Flat. Lựa chọn khác khoá (chừa đường).">
-            <div style={{ fontSize: 12, color: "#7d8896", marginBottom: 6 }}>① Điều kiện kích hoạt</div>
+          <Card title={t(lang, "builder.ruleTitle")} sub={t(lang, "builder.ruleSub")}>
+            <div style={{ fontSize: 12, color: "#7d8896", marginBottom: 6 }}>{t(lang, "builder.axis1")}</div>
             <div className={mk.optRow}>
               {TRIGGER_OPTIONS.map((o) => (
                 <div key={o.key} className={`${mk.opt} ${o.enabled ? mk.optOn : mk.optDisabled}`}>
                   <span className={mk.optLabel}>
-                    {o.label} {o.enabled ? <Badge kind="success">đang dùng</Badge> : <Badge kind="neutral">khoá</Badge>}
+                    {o.label} {o.enabled ? <Badge kind="success">{t(lang, "builder.optOn")}</Badge> : <Badge kind="neutral">{t(lang, "builder.optLocked")}</Badge>}
                   </span>
                   <span className={mk.optNote}>{o.note}</span>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 12, color: "#7d8896", margin: "12px 0 6px" }}>② Cách định giá</div>
+            <div style={{ fontSize: 12, color: "#7d8896", margin: "12px 0 6px" }}>{t(lang, "builder.axis2")}</div>
             <div className={mk.optRow}>
               {PRICING_OPTIONS.map((o) => (
                 <div key={o.key} className={`${mk.opt} ${o.enabled ? mk.optOn : mk.optDisabled}`}>
                   <span className={mk.optLabel}>
-                    {o.label} {o.enabled ? <Badge kind="success">đang dùng</Badge> : <Badge kind="neutral">khoá</Badge>}
+                    {o.label} {o.enabled ? <Badge kind="success">{t(lang, "builder.optOn")}</Badge> : <Badge kind="neutral">{t(lang, "builder.optLocked")}</Badge>}
                   </span>
                   <span className={mk.optNote}>{o.note}</span>
                 </div>
@@ -157,21 +154,20 @@ export default function CampaignBuilderScreen() {
             </div>
           </Card>
 
-          <Card title="③ Ngân sách = số suất × đơn giá" sub="Trần tự suy ra — không nhập tay tổng, tránh lệch.">
-            {field(`Đơn giá / content (${currency}, minor)`, price, setPrice, "number")}
-            {field("Số suất", slots, setSlots, "number")}
-            <KV k="Trần ngân sách (tự tính)" strong>
+          <Card title={t(lang, "builder.budgetTitle")} sub={t(lang, "builder.budgetSub")}>
+            {field(t(lang, "builder.priceLabel", { currency }), price, setPrice, "number")}
+            {field(t(lang, "builder.slots"), slots, setSlots, "number")}
+            <KV k={t(lang, "builder.budgetCap")} strong>
               {formatMoney(budgetCap, currency, locale)}
             </KV>
             <div style={{ fontSize: 12, color: "#6b7684", marginTop: 6 }}>
-              = {formatMoney(priceMinor, currency, locale)} × {slotsN} suất. Vì pricing FLAT nên trần
-              CỐ ĐỊNH — không thể vỡ (câu trả lời điểm &quot;cấn&quot; của mentor).
+              {t(lang, "builder.budgetFormula", { price: formatMoney(priceMinor, currency, locale), slots: slotsN })}
             </div>
           </Card>
 
           <BtnRow>
             <Btn variant="primary" disabled={busy} onClick={submit}>
-              {busy ? "Đang tạo…" : "Tạo campaign (Active)"}
+              {busy ? t(lang, "builder.creating") : t(lang, "builder.create")}
             </Btn>
           </BtnRow>
         </>
