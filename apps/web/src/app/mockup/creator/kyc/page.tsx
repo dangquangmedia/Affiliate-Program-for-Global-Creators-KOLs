@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { type Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, ContextBanner, mk } from "../../../../mockup/ui";
+import { usePrefs } from "../../../../mockup/prefs";
+import { t } from "../../../../lib/i18n";
 import { loadSession } from "../../../../lib/auth-client";
 import { getMyKyc, submitKyc, type KycCase, type KycField } from "../../../../lib/kyc-client";
 
@@ -15,6 +17,7 @@ export default function KycScreen() {
   const [kyc, setKyc] = useState<KycCase | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const { lang } = usePrefs();
 
   const load = useCallback(async () => {
     const c = await getMyKyc(market);
@@ -50,55 +53,49 @@ export default function KycScreen() {
   }
 
   return (
-    <Frame screen="V03 KYC" title="Xác minh danh tính (KYC)" market={market} setMarket={setMarket}>
+    <Frame screen="V03 KYC" title={t(lang, "kyc.title")} market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> creator đang ở bước nào của KYC, và nếu bị từ chối thì
-        sửa gì? → Ops duyệt/từ chối <strong>theo từng field</strong>; khi &quot;cần sửa&quot;,
-        chỉ field bị từ chối mới mở lại, field đã duyệt bị khoá. <em>Nút gọi API thật
-        (`/me/country/:market/kyc`); KYC phải Approved mới được Join (QĐ-2). Server chặn ghi đè
-        field đã duyệt kể cả khi client cố gửi.</em>
+        <strong>{t(lang, "kyc.noteQ")}</strong> {t(lang, "kyc.noteBody")} <em>{t(lang, "kyc.noteHard")}</em>
       </Note>
 
       {status === "needLogin" && (
-        <Card title="Bạn cần đăng nhập trước khi làm KYC">
+        <Card title={t(lang, "kyc.needLoginTitle")}>
           <p style={{ fontSize: 13 }}>
             →{" "}
             <Link href="/mockup/creator/login" style={{ color: "#6aa6ff" }}>
-              Đăng nhập
+              {t(lang, "nav.login")}
             </Link>
           </p>
         </Card>
       )}
 
-      {status === "loading" && <p style={{ color: "#8b96a3" }}>Đang tải hồ sơ KYC…</p>}
+      {status === "loading" && <p style={{ color: "#8b96a3" }}>{t(lang, "kyc.loading")}</p>}
 
       {status === "ready" && kyc && (
         <>
           <ContextBanner market={market} />
 
           <div style={{ margin: "6px 0 14px" }}>
-            Trạng thái hồ sơ:{" "}
+            {t(lang, "kyc.stateLabel")}{" "}
             {kyc.state === "APPROVED" ? (
-              <Badge kind="success">✓ Đã duyệt</Badge>
+              <Badge kind="success">✓ {t(lang, "kyc.approvedBadge")}</Badge>
             ) : kyc.state === "REJECTED" ? (
-              <Badge kind="warn">Cần sửa</Badge>
+              <Badge kind="warn">{t(lang, "kyc.needChanges")}</Badge>
             ) : kyc.state === "DRAFT" ? (
-              <Badge kind="neutral">Nháp</Badge>
+              <Badge kind="neutral">{t(lang, "kyc.draft")}</Badge>
             ) : (
-              <Badge kind="info">Chờ Ops duyệt ({kyc.state})</Badge>
+              <Badge kind="info">{t(lang, "kyc.pendingReview", { state: kyc.state })}</Badge>
             )}
           </div>
 
           {kyc.state === "APPROVED" && (
             <Card>
-              <Badge kind="success">✓ Đã duyệt</Badge>
-              <p style={{ color: "#a9b6c4", fontSize: 14, marginTop: 10 }}>
-                Danh tính đã xác minh. Bây giờ bạn có thể Join campaign.
-              </p>
+              <Badge kind="success">✓ {t(lang, "kyc.approvedBadge")}</Badge>
+              <p style={{ color: "#a9b6c4", fontSize: 14, marginTop: 10 }}>{t(lang, "kyc.approvedBody")}</p>
               <BtnRow>
                 <Btn variant="primary">
                   <Link href="/mockup/creator/discover" style={{ color: "#fff", textDecoration: "none" }}>
-                    Khám phá campaign →
+                    {t(lang, "kyc.discoverBtn")}
                   </Link>
                 </Btn>
               </BtnRow>
@@ -107,21 +104,15 @@ export default function KycScreen() {
 
           {(kyc.state === "SUBMITTED" || kyc.state === "RESUBMITTED") && (
             <Card>
-              <Badge kind="info">Đang chờ Ops duyệt</Badge>
-              <p style={{ color: "#a9b6c4", fontSize: 14, marginTop: 10 }}>
-                Hồ sơ đã gửi. Ops nước {market} sẽ duyệt sớm. Bạn không cần làm gì thêm lúc này.
-              </p>
+              <Badge kind="info">{t(lang, "kyc.awaitingBadge")}</Badge>
+              <p style={{ color: "#a9b6c4", fontSize: 14, marginTop: 10 }}>{t(lang, "kyc.awaitingBody", { market })}</p>
             </Card>
           )}
 
           {isFormState && (
             <Card
-              title="Thông tin định danh"
-              sub={
-                kyc.state === "REJECTED"
-                  ? "Có mục cần sửa. Mục đã duyệt đã bị khoá — không cần nhập lại."
-                  : "Điền các thông tin sau để nộp KYC."
-              }
+              title={t(lang, "kyc.formTitle")}
+              sub={kyc.state === "REJECTED" ? t(lang, "kyc.formSubReject") : t(lang, "kyc.formSubDraft")}
             >
               {kyc.fields.map((f) => {
                 const locked = !editable(f);
@@ -138,18 +129,18 @@ export default function KycScreen() {
                     />
                     {locked && f.state === "ACCEPTED" && (
                       <div style={{ marginTop: 4 }}>
-                        <Badge kind="success">✓ đã duyệt</Badge>
+                        <Badge kind="success">✓ {t(lang, "kyc.fieldApproved")}</Badge>
                       </div>
                     )}
                     {rejected && f.reason && (
-                      <div style={{ marginTop: 4, color: "#ff9ba3", fontSize: 13 }}>Lý do: {f.reason}</div>
+                      <div style={{ marginTop: 4, color: "#ff9ba3", fontSize: 13 }}>{t(lang, "kyc.reason")} {f.reason}</div>
                     )}
                   </div>
                 );
               })}
               <BtnRow>
                 <Btn variant="primary" disabled={busy} onClick={submit}>
-                  {busy ? "Đang gửi…" : kyc.state === "REJECTED" ? "Nộp lại mục đã sửa" : "Nộp KYC"}
+                  {busy ? t(lang, "kyc.sending") : kyc.state === "REJECTED" ? t(lang, "kyc.resubmit") : t(lang, "kyc.submit")}
                 </Btn>
               </BtnRow>
             </Card>

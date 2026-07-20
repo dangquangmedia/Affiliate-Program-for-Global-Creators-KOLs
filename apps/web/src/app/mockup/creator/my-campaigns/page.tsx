@@ -4,19 +4,21 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { MARKETS, type Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, Empty, ContextBanner } from "../../../../mockup/ui";
+import { usePrefs } from "../../../../mockup/prefs";
 import { loadSession } from "../../../../lib/auth-client";
 import { myParticipations, leaveCampaign, type Participation } from "../../../../lib/campaign-client";
-import { formatMoney } from "../../../../lib/i18n";
+import { t, formatMoney } from "../../../../lib/i18n";
 
 type Status = "loading" | "needLogin" | "ready";
 
-const STATE_BADGE: Record<string, { kind: "success" | "info" | "warn" | "danger" | "neutral"; label: string }> = {
-  JOINED: { kind: "success", label: "Đang giữ suất" },
-  CONTENT_SUBMITTED: { kind: "info", label: "Chờ Ops duyệt" },
-  APPROVED: { kind: "success", label: "Đã duyệt" },
-  REJECTED: { kind: "warn", label: "Cần sửa lại" },
-  WAITLISTED: { kind: "info", label: "Đang chờ suất" },
-  EXPIRED: { kind: "danger", label: "Bị thu hồi (quá hạn)" },
+// Chỉ giữ "kind" (màu); nhãn theo i18n key mycamp.st.*.
+const STATE_KIND: Record<string, "success" | "info" | "warn" | "danger" | "neutral"> = {
+  JOINED: "success",
+  CONTENT_SUBMITTED: "info",
+  APPROVED: "success",
+  REJECTED: "warn",
+  WAITLISTED: "info",
+  EXPIRED: "danger",
 };
 const HOLDING = new Set(["JOINED", "CONTENT_SUBMITTED", "REJECTED"]);
 
@@ -25,6 +27,7 @@ export default function MyCampaignsScreen() {
   const [status, setStatus] = useState<Status>("loading");
   const [rows, setRows] = useState<Participation[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const { lang } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {
@@ -52,24 +55,23 @@ export default function MyCampaignsScreen() {
   }
 
   return (
-    <Frame screen="My Campaigns" title="Chiến dịch của tôi" market={market} setMarket={setMarket}>
+    <Frame screen="My Campaigns" title={t(lang, "mycamp.title")} market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> tôi đang giữ những suất nào, hạn nộp bài đến bao giờ, và
-        trạng thái ra sao? <em>Suất giữ mà không nộp đúng hạn (48h) sẽ bị thu hồi để trả cho creator
-        khác (QĐ-4) — nên deadline hiển thị rõ để bạn triển khai nhanh.</em>
+        <strong>{t(lang, "mycamp.noteQ")}</strong> {t(lang, "mycamp.noteBody")}{" "}
+        <em>{t(lang, "mycamp.noteHard")}</em>
       </Note>
 
       {status === "needLogin" && (
-        <Card title="Bạn cần đăng nhập">
+        <Card title={t(lang, "mycamp.needLoginTitle")}>
           <p style={{ fontSize: 13 }}>
             →{" "}
             <Link href="/mockup/creator/login" style={{ color: "#6aa6ff" }}>
-              Đăng nhập
+              {t(lang, "nav.login")}
             </Link>
           </p>
         </Card>
       )}
-      {status === "loading" && <p style={{ color: "#8b96a3" }}>Đang tải…</p>}
+      {status === "loading" && <p style={{ color: "#8b96a3" }}>{t(lang, "mycamp.loading")}</p>}
 
       {status === "ready" && (
         <>
@@ -77,40 +79,38 @@ export default function MyCampaignsScreen() {
           {rows.length === 0 ? (
             <Card>
               <Empty icon="📭">
-                Bạn chưa tham gia campaign nào ở nước {market}.{" "}
+                {t(lang, "mycamp.empty", { market })}{" "}
                 <Link href="/mockup/creator/discover" style={{ color: "#6aa6ff" }}>
-                  Khám phá campaign →
+                  {t(lang, "mycamp.discover")}
                 </Link>
               </Empty>
             </Card>
           ) : (
             rows.map((p) => {
-              const badge = STATE_BADGE[p.state] ?? { kind: "neutral" as const, label: p.state };
+              const kind = STATE_KIND[p.state] ?? "neutral";
+              const label = STATE_KIND[p.state] ? t(lang, `mycamp.st.${p.state}`) : p.state;
               return (
                 <Card key={p.campaignId} title={p.campaignTitle ?? p.campaignId}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <Badge kind={badge.kind}>{badge.label}</Badge>
+                    <Badge kind={kind}>{label}</Badge>
                     {p.snapshotRewardMinor != null && p.currency && (
                       <span style={{ color: "#a9b6c4", fontSize: 14 }}>
-                        Thưởng (snapshot): {formatMoney(p.snapshotRewardMinor, p.currency, locale)}
+                        {t(lang, "mycamp.snapshot")} {formatMoney(p.snapshotRewardMinor, p.currency, locale)}
                       </span>
                     )}
                   </div>
                   {p.submitDeadlineAt && p.state === "JOINED" && (
                     <p style={{ color: "#f0c674", fontSize: 13, marginTop: 8 }}>
-                      ⏳ Hạn nộp bài: {new Date(p.submitDeadlineAt).toLocaleString(locale)}
+                      ⏳ {t(lang, "mycamp.deadline", { date: new Date(p.submitDeadlineAt).toLocaleString(locale) })}
                     </p>
                   )}
                   {p.state === "WAITLISTED" && (
                     <p style={{ color: "#7fb2ff", fontSize: 13, marginTop: 8 }}>
-                      ⏳ Hàng chờ{p.waitlistPosition != null ? ` · vị trí #${p.waitlistPosition}` : ""} — tự được đôn
-                      lên khi có suất trả lại (QĐ-5).
+                      ⏳ {t(lang, "mycamp.waitlistLine", { pos: p.waitlistPosition != null ? t(lang, "campaign.position", { pos: p.waitlistPosition }) : "" })}
                     </p>
                   )}
                   {p.state === "EXPIRED" && (
-                    <p style={{ color: "#e8a0a0", fontSize: 13, marginTop: 8 }}>
-                      Suất bị thu hồi do quá hạn nộp (QĐ-4). Bị thu hồi ≥ 2 lần sẽ không join lại được campaign này.
-                    </p>
+                    <p style={{ color: "#e8a0a0", fontSize: 13, marginTop: 8 }}>{t(lang, "mycamp.expiredLine")}</p>
                   )}
                   <BtnRow>
                     {(p.state === "JOINED" || p.state === "REJECTED") && (
@@ -119,7 +119,7 @@ export default function MyCampaignsScreen() {
                           href={`/mockup/creator/submit?id=${p.campaignId}&m=${market}`}
                           style={{ color: "#fff", textDecoration: "none" }}
                         >
-                          {p.state === "REJECTED" ? "Sửa & nộp lại →" : "Nộp nội dung →"}
+                          {p.state === "REJECTED" ? t(lang, "mycamp.resubmit") : t(lang, "mycamp.submitContent")}
                         </Link>
                       </Btn>
                     )}
@@ -129,18 +129,18 @@ export default function MyCampaignsScreen() {
                           href={`/mockup/creator/submit?id=${p.campaignId}&m=${market}`}
                           style={{ color: "inherit", textDecoration: "none" }}
                         >
-                          Xem bài đã nộp →
+                          {t(lang, "mycamp.viewSubmitted")}
                         </Link>
                       </Btn>
                     )}
                     {HOLDING.has(p.state) && (
                       <Btn variant="ghost" disabled={busy === p.campaignId} onClick={() => leave(p.campaignId)}>
-                        {busy === p.campaignId ? "…" : "Rời suất"}
+                        {busy === p.campaignId ? "…" : t(lang, "mycamp.leaveSlot")}
                       </Btn>
                     )}
                     {p.state === "WAITLISTED" && (
                       <Btn variant="ghost" disabled={busy === p.campaignId} onClick={() => leave(p.campaignId)}>
-                        {busy === p.campaignId ? "…" : "Rời hàng chờ"}
+                        {busy === p.campaignId ? "…" : t(lang, "mycamp.leaveWaitlist")}
                       </Btn>
                     )}
                   </BtnRow>

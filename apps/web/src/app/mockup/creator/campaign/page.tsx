@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { MARKETS, type Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, KV, ContextBanner } from "../../../../mockup/ui";
+import { usePrefs } from "../../../../mockup/prefs";
 import { loadSession } from "../../../../lib/auth-client";
 import {
   getCampaign,
@@ -16,15 +17,10 @@ import {
   type CampaignSummary,
   type Participation,
 } from "../../../../lib/campaign-client";
-import { formatMoney } from "../../../../lib/i18n";
+import { t, formatMoney } from "../../../../lib/i18n";
 
-// Thông báo rõ nguyên nhân theo mã lỗi có kiểu (QĐ-5).
-const JOIN_ERROR_MSG: Record<string, string> = {
-  SLOT_FULL: "Suất cuối vừa được creator khác giữ trước bạn.",
-  KYC_REQUIRED: "Bạn cần hoàn tất KYC (được duyệt) trước khi Join.",
-  CAMPAIGN_NOT_JOINABLE: "Campaign đang tạm dừng, đã kết thúc hoặc hết hạn.",
-  JOIN_BLOCKED_STRIKE: "Bạn đã bị thu hồi suất nhiều lần ở campaign này nên không thể join lại.",
-};
+// Mã lỗi join có kiểu (QĐ-5); thông báo lấy từ i18n campaign.err.*.
+const KNOWN_JOIN_ERR = new Set(["SLOT_FULL", "KYC_REQUIRED", "CAMPAIGN_NOT_JOINABLE", "JOIN_BLOCKED_STRIKE"]);
 const HOLDING = new Set(["JOINED", "CONTENT_SUBMITTED", "APPROVED", "REJECTED"]);
 
 function isMarket(v: string | null): v is Market {
@@ -43,7 +39,8 @@ function CampaignDetailInner() {
   const [waitlisted, setWaitlisted] = useState<Participation | null>(null);
   const [suggestions, setSuggestions] = useState<CampaignSummary[]>([]);
   const [joinBusy, setJoinBusy] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null); // lưu MÃ lỗi, render qua t()
+  const { lang } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {
@@ -77,7 +74,7 @@ function CampaignDetailInner() {
         else setJoined(res.participation);
         await load();
       } else {
-        setJoinError(JOIN_ERROR_MSG[res.code] ?? "Không join được, thử lại sau.");
+        setJoinError(res.code);
       }
     } finally {
       setJoinBusy(false);
@@ -107,43 +104,41 @@ function CampaignDetailInner() {
   }, [load]);
 
   return (
-    <Frame screen="V05 Campaign detail + Join" title={c?.title ?? "Chi tiết campaign"} market={market} setMarket={setMarket}>
+    <Frame screen="V05 Campaign detail + Join" title={c?.title ?? t(lang, "campaign.title")} market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> điều khoản là gì, tôi nhận bao nhiêu, có được Join
-        không? → Trước khi Join phải thấy rõ tiền thưởng, yêu cầu nội dung, số suất. Nút Join bị
-        chặn nếu chưa KYC (QĐ-2) hoặc hết suất (QĐ-3). <em>Bài toán #5: điều khoản được snapshot
-        lúc Join — nối ở N10.</em>
+        <strong>{t(lang, "campaign.noteQ")}</strong> {t(lang, "campaign.noteBody")}{" "}
+        <em>{t(lang, "campaign.noteHard")}</em>
       </Note>
 
       {status === "needLogin" && (
-        <Card title="Cần đăng nhập">
+        <Card title={t(lang, "campaign.needLoginTitle")}>
           <p style={{ fontSize: 13 }}>
             →{" "}
             <Link href="/mockup/creator/login" style={{ color: "#6aa6ff" }}>
-              Đăng nhập
+              {t(lang, "nav.login")}
             </Link>
           </p>
         </Card>
       )}
-      {status === "loading" && <p style={{ color: "#8b96a3" }}>Đang tải…</p>}
+      {status === "loading" && <p style={{ color: "#8b96a3" }}>{t(lang, "campaign.loading")}</p>}
       {status === "missing" && (
-        <Card title="Thiếu campaign">
+        <Card title={t(lang, "campaign.missingTitle")}>
           <p style={{ fontSize: 13 }}>
-            Vào từ{" "}
+            {t(lang, "campaign.missingBody")}{" "}
             <Link href="/mockup/creator/discover" style={{ color: "#6aa6ff" }}>
-              màn Khám phá
+              {t(lang, "campaign.discoverScreen")}
             </Link>{" "}
-            để chọn 1 campaign.
+            {t(lang, "campaign.missingTail")}
           </p>
         </Card>
       )}
       {status === "notFound" && (
         <Card>
-          <Badge kind="danger">Không tìm thấy campaign ở nước {market}</Badge>
+          <Badge kind="danger">{t(lang, "campaign.notFoundBadge", { market })}</Badge>
           <p style={{ color: "#a9b6c4", fontSize: 14, marginTop: 10 }}>
-            Campaign này không thuộc nước {market} (cách ly dữ liệu). Quay lại{" "}
+            {t(lang, "campaign.notFoundBody", { market })}{" "}
             <Link href="/mockup/creator/discover" style={{ color: "#6aa6ff" }}>
-              Khám phá
+              {t(lang, "campaign.discoverLink")}
             </Link>
             .
           </p>
@@ -154,42 +149,42 @@ function CampaignDetailInner() {
         <>
           <ContextBanner market={market} />
           <Card title={`${c.brand} · ${c.platform}`} sub={c.brief}>
-            <KV k="Tiền thưởng / content được duyệt" strong>
+            <KV k={t(lang, "campaign.reward")} strong>
               {formatMoney(c.rewardMinor, c.currency, locale)}
             </KV>
             <div style={{ height: 8 }} />
-            <KV k="Hashtag bắt buộc">{c.requiredHashtag}</KV>
-            <KV k="Số suất">
-              {c.slotsLeft}/{c.slotsTotal} suất còn lại
+            <KV k={t(lang, "campaign.hashtag")}>{c.requiredHashtag}</KV>
+            <KV k={t(lang, "campaign.slots")}>
+              {t(lang, "campaign.slotsLeft", { left: c.slotsLeft, total: c.slotsTotal })}
             </KV>
             {c.reward && (
-              <KV k="Quy tắc thưởng (3 trục)">
-                {c.reward.triggerType} · {c.reward.pricingType} · trần{" "}
+              <KV k={t(lang, "campaign.rewardRule")}>
+                {c.reward.triggerType} · {c.reward.pricingType} · {t(lang, "campaign.cap")}{" "}
                 {c.reward.budgetCapMinor != null ? formatMoney(c.reward.budgetCapMinor, c.currency, locale) : "—"}
               </KV>
             )}
-            <KV k="Trạng thái">
+            <KV k={t(lang, "campaign.statusLabel")}>
               {c.status === "ACTIVE" && !c.full ? (
-                <Badge kind="success">Đang nhận</Badge>
+                <Badge kind="success">{t(lang, "campaign.open")}</Badge>
               ) : c.full ? (
-                <Badge kind="danger">Đã đầy</Badge>
+                <Badge kind="danger">{t(lang, "campaign.full")}</Badge>
               ) : (
-                <Badge kind="warn">Tạm dừng</Badge>
+                <Badge kind="warn">{t(lang, "campaign.paused")}</Badge>
               )}
             </KV>
           </Card>
 
           {joined ? (
-            <Card title="Đã tham gia" sub="Bạn đã giữ 1 suất — điều khoản đã được snapshot lúc Join.">
-              <Badge kind="success">✓ Đang giữ suất ({joined.state})</Badge>
+            <Card title={t(lang, "campaign.joinedTitle")} sub={t(lang, "campaign.joinedSub")}>
+              <Badge kind="success">✓ {t(lang, "campaign.holdingBadge", { state: joined.state })}</Badge>
               <p style={{ color: "#a9b6c4", fontSize: 14, margin: "10px 0" }}>
-                Snapshot khi Join: {joined.snapshotRewardMinor != null && joined.currency
+                {t(lang, "campaign.snapshotOnJoin")} {joined.snapshotRewardMinor != null && joined.currency
                   ? formatMoney(joined.snapshotRewardMinor, joined.currency, locale)
                   : "—"}
                 {joined.submitDeadlineAt && (
-                  <> · hạn nộp bài: {new Date(joined.submitDeadlineAt).toLocaleString(locale)}</>
+                  <> · {t(lang, "campaign.deadlineInline", { date: new Date(joined.submitDeadlineAt).toLocaleString(locale) })}</>
                 )}
-                . Bấm Join lại nhiều lần cũng chỉ 1 suất (idempotent).
+                . {t(lang, "campaign.idempotentNote")}
               </p>
               <BtnRow>
                 <Btn variant="primary">
@@ -197,59 +192,55 @@ function CampaignDetailInner() {
                     href={`/mockup/creator/submit?id=${id}&m=${market}`}
                     style={{ color: "#fff", textDecoration: "none" }}
                   >
-                    Nộp nội dung →
+                    {t(lang, "campaign.submitContent")}
                   </Link>
                 </Btn>
                 <Btn variant="ghost" disabled={joinBusy} onClick={doLeave}>
-                  {joinBusy ? "…" : "Rời suất"}
+                  {joinBusy ? "…" : t(lang, "campaign.leaveSlot")}
                 </Btn>
               </BtnRow>
             </Card>
           ) : waitlisted ? (
-            <Card title="Bạn đang trong hàng chờ" sub="Suất đầy — bạn được xếp hàng FCFS (QĐ-5).">
+            <Card title={t(lang, "campaign.waitlistTitle")} sub={t(lang, "campaign.waitlistSub")}>
               <Badge kind="info">
-                ⏳ Hàng chờ{waitlisted.waitlistPosition != null ? ` · vị trí #${waitlisted.waitlistPosition}` : ""}
+                ⏳ {t(lang, "campaign.waitlistQueue")}{waitlisted.waitlistPosition != null ? t(lang, "campaign.position", { pos: waitlisted.waitlistPosition }) : ""}
               </Badge>
               <p style={{ color: "#a9b6c4", fontSize: 14, margin: "10px 0" }}>
-                Khi có creator rời hoặc bị thu hồi suất, người đứng đầu hàng chờ được TỰ ĐỘNG đôn lên
-                (JOINED + snapshot điều khoản lúc đó + hạn nộp mới). Bạn sẽ thấy thay đổi ở{" "}
+                {t(lang, "campaign.waitlistBody1")}{" "}
                 <Link href="/mockup/creator/my-campaigns" style={{ color: "#6aa6ff" }}>
-                  Chiến dịch của tôi
+                  {t(lang, "campaign.myCampaigns")}
                 </Link>
-                . Vào hàng chờ KHÔNG bị tính strike.
+                {t(lang, "campaign.waitlistBody2")}
               </p>
               <BtnRow>
                 <Btn variant="ghost" disabled={joinBusy} onClick={doLeave}>
-                  {joinBusy ? "…" : "Rời hàng chờ"}
+                  {joinBusy ? "…" : t(lang, "campaign.leaveWaitlist")}
                 </Btn>
               </BtnRow>
             </Card>
           ) : (
-            <Card title="Tham gia" sub="Join = giữ 1 suất + snapshot điều khoản (QĐ-2/3/5).">
+            <Card title={t(lang, "campaign.joinTitle")} sub={t(lang, "campaign.joinSub")}>
               {joinError && (
                 <div style={{ marginBottom: 10 }}>
-                  <Badge kind="danger">{joinError}</Badge>
-                  {joinError === JOIN_ERROR_MSG.KYC_REQUIRED && (
+                  <Badge kind="danger">{t(lang, KNOWN_JOIN_ERR.has(joinError) ? `campaign.err.${joinError}` : "campaign.err.UNKNOWN")}</Badge>
+                  {joinError === "KYC_REQUIRED" && (
                     <p style={{ fontSize: 13, marginTop: 6 }}>
                       →{" "}
                       <Link href="/mockup/creator/kyc" style={{ color: "#6aa6ff" }}>
-                        Hoàn tất KYC
+                        {t(lang, "campaign.completeKyc")}
                       </Link>
                     </p>
                   )}
                 </div>
               )}
-              <p style={{ color: "#a9b6c4", fontSize: 14, marginBottom: 10 }}>
-                Trước khi Join cần KYC Approved (QĐ-2). Còn suất → giữ ngay; HẾT suất → vào hàng chờ
-                FCFS và tự được đôn khi có suất trả lại (QĐ-5).
-              </p>
+              <p style={{ color: "#a9b6c4", fontSize: 14, marginBottom: 10 }}>{t(lang, "campaign.joinBody")}</p>
               <BtnRow>
                 <Btn variant="primary" disabled={joinBusy || c.status !== "ACTIVE"} onClick={doJoin}>
-                  {joinBusy ? "Đang xử lý…" : c.full ? "Vào hàng chờ" : "Tham gia campaign"}
+                  {joinBusy ? t(lang, "campaign.processing") : c.full ? t(lang, "campaign.joinWaitlist") : t(lang, "campaign.join")}
                 </Btn>
                 <Btn variant="ghost">
                   <Link href="/mockup/creator/kyc" style={{ color: "inherit", textDecoration: "none" }}>
-                    Kiểm tra KYC
+                    {t(lang, "campaign.checkKyc")}
                   </Link>
                 </Btn>
               </BtnRow>
@@ -257,7 +248,7 @@ function CampaignDetailInner() {
           )}
 
           {suggestions.length > 0 && (
-            <Card title="Campaign tương tự còn suất" sub="Cùng nước, còn nhận — ưu tiên cùng nền tảng / mức thưởng gần (QĐ-5).">
+            <Card title={t(lang, "campaign.suggestTitle")} sub={t(lang, "campaign.suggestSub")}>
               <div style={{ display: "grid", gap: 10 }}>
                 {suggestions.map((s) => (
                   <div
@@ -275,7 +266,7 @@ function CampaignDetailInner() {
                       href={`/mockup/creator/campaign?id=${s.id}&m=${market}`}
                       style={{ color: "#6aa6ff", fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}
                     >
-                      Xem →
+                      {t(lang, "campaign.view")}
                     </Link>
                   </div>
                 ))}
