@@ -7,6 +7,7 @@ import { Frame, Note, Card, Btn, BtnRow, Badge, KV, Empty, mk } from "../../../.
 import { mockLogin, saveSession } from "../../../../lib/auth-client";
 import { formatMoney } from "../../../../lib/i18n";
 import { listBatches, getBatch, createBatch, lockBatch, type ReconBatch } from "../../../../lib/reconciliation-client";
+import { payoutQueue, settlePayout, type PayoutQueueItem } from "../../../../lib/payout-client";
 
 type Status = "loading" | "needStaff" | "ready";
 
@@ -15,6 +16,7 @@ export default function FinanceWorkbenchScreen() {
   const [status, setStatus] = useState<Status>("loading");
   const [batches, setBatches] = useState<ReconBatch[]>([]);
   const [selected, setSelected] = useState<ReconBatch | null>(null);
+  const [payouts, setPayouts] = useState<PayoutQueueItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const locale = MARKETS[market].locale;
@@ -27,6 +29,8 @@ export default function FinanceWorkbenchScreen() {
       return;
     }
     setBatches(res);
+    const pq = await payoutQueue(market);
+    setPayouts("forbidden" in pq ? [] : pq);
     setStatus("ready");
   }, [market]);
 
@@ -74,6 +78,18 @@ export default function FinanceWorkbenchScreen() {
         setErr("Batch đã bị khoá bởi người khác (bất biến).");
         await openBatch(id);
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function doSettle(id: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await settlePayout(market, id);
+      if (!res.ok && res.code === "ALREADY_SETTLED") setErr("Lệnh này vừa được xử lý bởi người khác.");
+      await load();
     } finally {
       setBusy(false);
     }
@@ -184,11 +200,33 @@ export default function FinanceWorkbenchScreen() {
             </Card>
           )}
 
-          <Card title="Hàng đợi payout — N14 (mock)" sub="Rút tiền + OTP + provider 3 kết cục (paid/fail-hoàn/unknown-giữ) sẽ nối ở N14-15.">
-            <p style={{ color: "#8b96a3", fontSize: 13 }}>
-              Sau khi batch khoá → tiền AVAILABLE → creator tạo lệnh rút (reserve) → Finance xử lý
-              kết cục provider. Phần này chưa nối dữ liệu thật.
-            </p>
+          <Card
+            title={`Hàng đợi payout (${payouts.length})`}
+            sub="Lệnh đã reserve tiền · gọi provider (mock). Xử lý = SUCCESS → PAID (fail/unknown ở N15)."
+          >
+            {payouts.length === 0 ? (
+              <p style={{ color: "#8b96a3", fontSize: 13 }}>Không có lệnh rút nào chờ xử lý.</p>
+            ) : (
+              <table className={mk.table}>
+                <thead>
+                  <tr><th>Creator</th><th>Số tiền</th><th>Trạng thái</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {payouts.map((p) => (
+                    <tr key={p.id} data-creator={p.creatorName}>
+                      <td>{p.creatorName}</td>
+                      <td>{formatMoney(p.amountMinor, p.currency, locale)}</td>
+                      <td><Badge kind="info">Đã giữ chỗ</Badge></td>
+                      <td>
+                        <Btn variant="primary" disabled={busy} onClick={() => doSettle(p.id)}>
+                          {busy ? "…" : "Xử lý → thành công"}
+                        </Btn>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </Card>
         </>
       )}

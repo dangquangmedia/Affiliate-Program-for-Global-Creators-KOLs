@@ -1,126 +1,186 @@
 "use client";
 
-import { useState } from "react";
-import { MARKETS, availableBalanceMinor, formatMoney, PAYOUT_MIN_MINOR, type Market } from "../../../../mockup/data";
-import { Frame, Note, StateBar, Card, Btn, BtnRow, Badge, KV, Field, ContextBanner } from "../../../../mockup/ui";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { MARKETS, type Market } from "../../../../mockup/data";
+import { Frame, Note, Card, Btn, BtnRow, Badge, KV, Field, ContextBanner } from "../../../../mockup/ui";
+import { loadSession } from "../../../../lib/auth-client";
+import { getWallet, requestOtp, createPayout, type Wallet, type Otp, type Payout } from "../../../../lib/payout-client";
+import { formatMoney } from "../../../../lib/i18n";
 
-type View = "balance" | "minGuard" | "otp" | "processing" | "paid" | "failedReleased" | "unknownHold";
+type Status = "loading" | "needLogin" | "ready";
+type Step = "idle" | "otp";
+
+const PAYOUT_BADGE: Record<Payout["state"], { kind: "info" | "success" | "danger" | "warn"; label: string }> = {
+  PROCESSING: { kind: "info", label: "Đang xử lý (đã giữ chỗ)" },
+  PAID: { kind: "success", label: "Đã trả" },
+  FAILED_RELEASED: { kind: "danger", label: "Lỗi → đã hoàn" },
+  UNKNOWN_HOLD: { kind: "warn", label: "Không rõ → đang giữ" },
+};
 
 export default function WalletScreen() {
   const [market, setMarket] = useState<Market>("VN");
-  const [view, setView] = useState<View>("balance");
-  const currency = MARKETS[market].currency;
-  const balance = availableBalanceMinor(currency);
-  const min = PAYOUT_MIN_MINOR[currency];
+  const [status, setStatus] = useState<Status>("loading");
+  const [w, setW] = useState<Wallet | null>(null);
+  const [step, setStep] = useState<Step>("idle");
+  const [otp, setOtp] = useState<Otp | null>(null);
+  const [code, setCode] = useState("");
+  const [amount, setAmount] = useState("");
+  const [idemKey, setIdemKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const locale = MARKETS[market].locale;
+
+  const load = useCallback(async () => {
+    const res = await getWallet(market);
+    if ("unauthorized" in res) {
+      setStatus("needLogin");
+      return;
+    }
+    setW(res);
+    setStatus("ready");
+  }, [market]);
+
+  useEffect(() => {
+    if (!loadSession()) {
+      setStatus("needLogin");
+      return;
+    }
+    setStatus("loading");
+    setStep("idle");
+    load();
+  }, [load]);
+
+  async function startPayout() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const o = await requestOtp(market);
+      if (!o) {
+        setErr("Không phát được OTP.");
+        return;
+      }
+      setOtp(o);
+      setCode("");
+      setAmount(w ? String(w.withdrawableMinor) : "");
+      setIdemKey(crypto.randomUUID()); // 1 key/lệnh -> bấm xác nhận 2 lần vẫn 1 lệnh (idempotent)
+      setStep("otp");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmPayout() {
+    if (!otp) return;
+    const amt = Number(amount);
+    if (!Number.isInteger(amt) || amt <= 0) {
+      setErr("Số tiền không hợp lệ.");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await createPayout(market, { amountMinor: amt, otpId: otp.otpId, code, idempotencyKey: idemKey });
+      if (res.ok) {
+        setStep("idle");
+        setOtp(null);
+        await load();
+      } else {
+        setErr(res.message);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const cur = w?.currency ?? MARKETS[market].currency;
 
   return (
     <Frame screen="V08 Wallet + Payout" title="Ví & rút tiền" market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> tôi rút tiền thế nào và nếu lỗi thì tiền có mất không?
-        → Rút cần OTP; số tiền được <strong>giữ chỗ (reserve)</strong> khi gửi lệnh. <em>Bài toán
-        khó #4 — 3 kết cục của cổng thanh toán: Thành công → PAID; Lỗi xác nhận → hoàn về ví đúng
-        1 lần; KHÔNG RÕ (timeout) → GIỮ tiền, không hoàn vội (vì có thể provider thật đã chuyển →
-        hoàn = trả 2 lần).</em>
+        <strong>Màn này trả lời:</strong> tôi rút tiền thế nào? → Rút cần OTP; số tiền được{" "}
+        <strong>giữ chỗ (reserve)</strong> khi gửi lệnh (ghi sổ −amount). <em>Bấm 2 lần vẫn 1 lệnh
+        (idempotency key UNIQUE). Bài toán #4 (fail-hoàn / unknown-giữ) hoàn thiện ở N15.</em>
       </Note>
 
-      <StateBar
-        value={view}
-        onChange={setView}
-        options={[
-          { key: "balance", label: "Số dư" },
-          { key: "minGuard", label: "Dưới mức tối thiểu" },
-          { key: "otp", label: "Nhập OTP" },
-          { key: "processing", label: "Đang xử lý" },
-          { key: "paid", label: "Đã trả" },
-          { key: "failedReleased", label: "Lỗi → hoàn" },
-          { key: "unknownHold", label: "Không rõ → giữ" },
-        ]}
-      />
-
-      <ContextBanner market={market} />
-
-      <Card title="Số dư khả dụng">
-        <KV k={`Rút được (${currency})`} strong>
-          {formatMoney(balance, currency)}
-        </KV>
-        <KV k="Tối thiểu mỗi lần rút">{formatMoney(min, currency)}</KV>
-      </Card>
-
-      {view === "balance" && (
-        <BtnRow>
-          <Btn variant="primary" onClick={() => setView("otp")} disabled={balance < min}>
-            Yêu cầu rút tiền
-          </Btn>
-        </BtnRow>
-      )}
-
-      {view === "minGuard" && (
-        <Card>
-          <Badge kind="warn">Chưa đủ mức tối thiểu</Badge>
-          <p style={{ color: "#f0c674", fontSize: 14, marginTop: 10 }}>
-            Số dư khả dụng phải ≥ {formatMoney(min, currency)} mới rút được. Tiếp tục làm content
-            để tích luỹ thêm.
+      {status === "needLogin" && (
+        <Card title="Bạn cần đăng nhập">
+          <p style={{ fontSize: 13 }}>
+            →{" "}
+            <Link href="/mockup/creator/login" style={{ color: "#6aa6ff" }}>
+              Đăng nhập
+            </Link>
           </p>
         </Card>
       )}
+      {status === "loading" && <p style={{ color: "#8b96a3" }}>Đang tải…</p>}
 
-      {view === "otp" && (
-        <Card title="Xác thực rút tiền" sub="Nhập mã OTP để xác nhận. Ngay khi xác nhận, số tiền được giữ chỗ khỏi số dư.">
-          <Field label="Mã OTP (mock hiển thị: 123456)" placeholder="6 chữ số" />
-          <BtnRow>
-            <Btn variant="primary" onClick={() => setView("processing")}>
-              Xác nhận rút
-            </Btn>
-            <Btn variant="ghost" onClick={() => setView("balance")}>
-              Huỷ
-            </Btn>
-          </BtnRow>
-        </Card>
-      )}
+      {status === "ready" && w && (
+        <>
+          <ContextBanner market={market} />
 
-      {view === "processing" && (
-        <Card title="Đang xử lý chi trả">
-          <Badge kind="info">Đã giữ chỗ số tiền · chờ cổng thanh toán</Badge>
-          <p style={{ color: "#a9b6c4", fontSize: 14, marginTop: 10 }}>
-            Số tiền đã bị trừ khỏi &quot;khả dụng&quot; và đang chờ provider (mock). Bấm rút nhiều
-            lần cũng chỉ tạo 1 lệnh (idempotent). Chọn 1 kết cục bên trên để xem hệ thống xử lý.
-          </p>
-        </Card>
-      )}
+          <Card title="Số dư khả dụng">
+            <KV k={`Rút được (${cur})`} strong>
+              {formatMoney(w.withdrawableMinor, cur, locale)}
+            </KV>
+            <KV k="Tối thiểu mỗi lần rút">{formatMoney(w.minPayoutMinor, cur, locale)}</KV>
+            <p style={{ fontSize: 12, color: "#6b7684", marginTop: 8 }}>
+              Số dư = net đã đối soát (AVAILABLE) − các lệnh đang giữ tiền. Chưa đủ? Tiền còn{" "}
+              <Link href="/mockup/creator/earnings" style={{ color: "#6aa6ff" }}>PENDING chờ đối soát</Link>.
+            </p>
 
-      {view === "paid" && (
-        <Card title="Chi trả thành công">
-          <Badge kind="success">✓ PAID</Badge>
-          <p style={{ color: "#a9b6c4", fontSize: 14, marginTop: 10 }}>
-            Provider xác nhận đã chuyển. Lệnh chuyển sang PAID và ghi vào lịch sử — không thể sửa
-            đè. Nếu sau này có hoàn tiền, hệ thống tạo <strong>bút toán đảo</strong> liên kết,
-            không xoá lịch sử cũ (bài toán khó #6).
-          </p>
-        </Card>
-      )}
+            {step === "idle" ? (
+              <BtnRow>
+                <Btn
+                  variant="primary"
+                  disabled={busy || w.withdrawableMinor < w.minPayoutMinor || w.withdrawableMinor <= 0}
+                  onClick={startPayout}
+                >
+                  {busy ? "…" : w.withdrawableMinor < w.minPayoutMinor ? "Chưa đủ mức tối thiểu" : "Yêu cầu rút tiền"}
+                </Btn>
+              </BtnRow>
+            ) : (
+              <div style={{ marginTop: 12, borderTop: "1px solid #1b2430", paddingTop: 12 }}>
+                {err && (
+                  <div style={{ marginBottom: 10 }}>
+                    <Badge kind="danger">{err}</Badge>
+                  </div>
+                )}
+                {otp && (
+                  <p style={{ fontSize: 13, color: "#f0c674", marginBottom: 8 }}>
+                    OTP (mock, dev hiển thị): <b style={{ color: "#fff" }}>{otp.code}</b> — nhập vào bên dưới.
+                  </p>
+                )}
+                <Field label={`Số tiền rút (${cur}, minor units)`} placeholder="VD 450000" value={amount} onChange={setAmount} />
+                <Field label="Mã OTP (6 chữ số)" placeholder="6 chữ số" value={code} onChange={setCode} />
+                <BtnRow>
+                  <Btn variant="primary" disabled={busy || !code.trim()} onClick={confirmPayout}>
+                    {busy ? "Đang gửi…" : "Xác nhận rút (giữ chỗ)"}
+                  </Btn>
+                  <Btn variant="ghost" disabled={busy} onClick={() => { setStep("idle"); setErr(null); }}>
+                    Huỷ
+                  </Btn>
+                </BtnRow>
+              </div>
+            )}
+          </Card>
 
-      {view === "failedReleased" && (
-        <Card title="Chi trả thất bại">
-          <Badge kind="danger">Thất bại → đã hoàn về ví</Badge>
-          <p style={{ color: "#ff9ba3", fontSize: 14, marginTop: 10 }}>
-            Provider xác nhận <strong>chắc chắn</strong> thất bại (sai số tài khoản). Số tiền giữ
-            chỗ được <strong>hoàn về &quot;khả dụng&quot; đúng 1 lần</strong>. Bạn có thể sửa
-            thông tin và rút lại — lần rút mới là một lệnh riêng, không ghi đè lệnh cũ.
-          </p>
-        </Card>
-      )}
-
-      {view === "unknownHold" && (
-        <Card title="Chưa rõ kết quả">
-          <Badge kind="warn">KHÔNG RÕ → đang giữ tiền, chờ đối soát</Badge>
-          <p style={{ color: "#f0c674", fontSize: 14, marginTop: 10 }}>
-            Provider timeout / không phản hồi rõ ràng. Hệ thống <strong>KHÔNG hoàn tiền vội</strong>
-            — vì rất có thể tiền đã được chuyển thật. Số tiền tiếp tục bị giữ chỗ cho tới khi
-            Finance đối soát với provider rồi mới quyết định PAID hay hoàn. Đây là điểm khác biệt
-            quan trọng nhất với trạng thái &quot;Thất bại&quot; ở trên: hoàn vội = nguy cơ trả 2
-            lần.
-          </p>
-        </Card>
+          <Card title="Lịch sử lệnh rút" sub="Mỗi lệnh là bản ghi riêng — không ghi đè. Provider mock được Finance xử lý (V12).">
+            {w.payouts.length === 0 ? (
+              <p style={{ color: "#8b96a3", fontSize: 13 }}>Chưa có lệnh rút nào.</p>
+            ) : (
+              w.payouts.map((p) => (
+                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid #1b2430", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <span style={{ fontWeight: 600 }}>{formatMoney(p.amountMinor, p.currency, locale)}</span>
+                    <span style={{ fontSize: 12, color: "#6b7684" }}> · {new Date(p.requestedAt).toLocaleString(locale)}</span>
+                  </div>
+                  <Badge kind={PAYOUT_BADGE[p.state].kind}>{PAYOUT_BADGE[p.state].label}</Badge>
+                </div>
+              ))
+            )}
+          </Card>
+        </>
       )}
     </Frame>
   );

@@ -9,11 +9,12 @@
   Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
 - Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
   V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
-- **Xong Tuần A (N1-N5) + Tuần B (N6-N10b) + N11-N13**: schema lean + auth/session + country +
+- **Xong Tuần A (N1-N5) + Tuần B (N6-N10b) + N11-N14**: schema lean + auth/session + country +
   i18n + KYC + Campaign + Join (QĐ-4/5) + content→Earning exactly-once (N11) + ledger append-only
-  + V07 (N12) + **đối soát Finance batch→lock→AVAILABLE (N13)**. Spine tới trình duyệt:
-  login→…→nộp content→Ops duyệt→thu nhập PENDING+sổ cái→**Finance đối soát→AVAILABLE (rút được)**.
-  Đã chốt QĐ-6/7/8. **API 69/69, E2E 15/15**. Đang **Tuần C**. Kế: **N14** payout (reserve+OTP+provider).
+  + V07 (N12) + đối soát Finance→AVAILABLE (N13) + **payout OTP+reserve+provider SUCCESS→PAID (N14)**.
+  Spine tới trình duyệt: login→…→nộp content→Ops duyệt→thu nhập→Finance đối soát→AVAILABLE→**rút
+  tiền (OTP+reserve)→Finance settle→PAID**. Đã chốt QĐ-6/7/8. **API 78/78, E2E 16/16**. Đang **Tuần
+  C**. Kế: **N15** payout FAIL/UNKNOWN + bút toán đảo + E2E cả spine tiền.
 - Code hiện có: walking skeleton chạy trên **schema mới 18 bảng** (Next.js `/vn` `/ph` →
   NestJS → Postgres). Schema 45 bảng cũ **ĐÃ XÓA & thay** bằng lean N5 (migration
   `20260718095722_init_lean_18_tables`, DB có 20 base table gồm _prisma_migrations).
@@ -241,6 +242,29 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   docs cả 3 ngay (đã xong) + code LÁT MỎNG sau N11 (QĐ-6 apply-flow; QĐ-7 `platform_fee_bps`+builder
   ghép N12/N13; QĐ-8 `PENDING_FUNDING`+nút nạp quỹ mock ghép N13/N14) — money spine không bị chậm.
 
+- **N14 — Payout: rút tiền + OTP + reserve + provider mock SUCCESS (2026-07-20)**: KHÔNG cần
+  migration (bảng `payout_request/attempt` + `otp_code` đã có). Module `payout/`: creator
+  `GET /me/country/:m/wallet` (số dư rút được = Σ net earning AVAILABLE − Σ lệnh đang giữ
+  PROCESSING/PAID/UNKNOWN_HOLD; min từ `country_config.min_payout_minor`; lịch sử),
+  `POST .../payouts/otp` (phát OTP mock 6 số, trả `code` chỉ dev để hiện màn),
+  `POST .../payouts` {amount, otpId, code, idempotencyKey}. **Chống bấm 2 lần**: `idempotency_key`
+  UNIQUE — key đã có → trả lệnh cũ (short-circuit + catch P2002 khi đua). **OTP**: đúng mã + chưa
+  dùng + chưa hết hạn, **consume nguyên tử** `UPDATE otp_code ... WHERE consumed_at IS NULL`. Kiểm
+  min (409 `BELOW_MIN_PAYOUT`) trước OTP; **số dư kiểm + reserve TRONG cùng transaction** (không rút
+  vượt kể cả 2 lệnh song song) → `PROCESSING` + ghi sổ `PAYOUT_RESERVE −amount` (tái dùng
+  `LedgerService.post`). Finance `GET /ops/:m/payouts` (hàng đợi PROCESSING) +
+  `POST /ops/:m/payouts/:id/settle` {result:"SUCCESS"} → claim `WHERE state='PROCESSING'`
+  (double-settle 409 `ALREADY_SETTLED`) + `payout_attempt` (`provider_ref` UNIQUE) → `PAID`; reserve
+  đã trừ tiền nên PAID không đổi số dư. RBAC `LOCAL_FINANCE` + cách ly (PH settle VN → 404). Web:
+  `lib/payout-client.ts`, V08 wallet rewire (số dư + OTP flow + lịch sử, idempotency key 1/lệnh),
+  V12 thêm hàng đợi payout thật (settle → PAID). **Fail/UNKNOWN để N15.** Kết quả: **API 78/78**
+  (thêm 9: wallet số dư, request→PROCESSING+reserve, below-min, insufficient, OTP invalid/used,
+  idempotency 1 lệnh, settle→PAID + double-settle 409, RBAC+cách ly), **E2E 16/16** (thêm
+  payout-flow V08). **Đổi test script → `--test-concurrency=1`** (suite integration dùng chung DB,
+  chạy song song làm test "NOTHING_TO_RECONCILE" gom nhầm earning từ file khác). Vòng đời tiền GẦN
+  TRỌN: content→earning→đối soát→AVAILABLE→**rút→PAID**. Kế: **N15** payout FAIL→hoàn 1 lần /
+  UNKNOWN→giữ + bút toán đảo + E2E cả spine tiền VN+PH.
+
 - **N13 — Đối soát Finance (batch → lock → AVAILABLE) (2026-07-20)**: KHÔNG cần migration (bảng
   `reconciliation_batch/line` đã có). Seed thêm 2 tài khoản `finance.vn@`/`finance.ph@` +
   role_assignment `LOCAL_FINANCE` (đăng nhập vai như Ops/Admin) — đã re-seed DB. Module
@@ -304,20 +328,20 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   token + tài nguyên VN → 404); gọi route VN bằng token PH là 403 — ngữ nghĩa khác. Kế: **N12**
   ledger append-only + dashboard earnings (V07) Gross–Thuế–Net.
 
-## Current State & Hand-off (cập nhật 2026-07-20 — sau N13, Tuần C đang chạy)
+## Current State & Hand-off (cập nhật 2026-07-20 — sau N14, Tuần C đang chạy)
 
 **1. Vừa xong / trạng thái:**
-- Xong **Tuần A + Tuần B + N11 + N12 + N13**. **Đã commit HẾT** tới N12 (`95bdf41`); **N13 chưa commit** (commit đầu phiên sau). Chỉ còn `.claude/settings.local.json` (settings máy — không commit).
-- **N13**: đối soát Finance chạy thật — tạo batch gom earning PENDING → khoá → PENDING→**AVAILABLE** (rút được). LOCKED bất biến; 1 earning đúng 1 batch (`UNIQUE(earning_id)`); không ghi sổ cái khi flip (chỉ cổng quy trình). Seed thêm `finance.vn@`/`finance.ph@` (LOCAL_FINANCE) — **đã re-seed DB**.
-- Toàn xanh: **API 69/69, E2E 15/15**, lint + 2×typecheck sạch. Postgres Docker 54329 (bật Docker Desktop sau khi khởi động máy). Báo cáo mentor ở `Report/`.
+- Xong **Tuần A + Tuần B + N11–N14**. **Đã commit HẾT** tới N13 (`6af92fc`); **N14 chưa commit** (commit đầu phiên sau). Chỉ còn `.claude/settings.local.json` (settings máy — không commit).
+- **N14**: rút tiền chạy thật — số dư rút được (net AVAILABLE − đang giữ) → OTP mock → reserve (`PAYOUT_RESERVE −amount`) → PROCESSING → Finance settle SUCCESS → PAID. Chống bấm 2 lần (`idempotency_key` UNIQUE), OTP consume nguyên tử, số dư kiểm trong khóa (không rút vượt). Fail/UNKNOWN chưa làm.
+- Toàn xanh: **API 78/78, E2E 16/16**, lint + 2×typecheck sạch. Postgres Docker 54329 (bật Docker Desktop sau khi khởi động máy). Báo cáo mentor ở `Report/`.
 
-**2. File/biến quan trọng (N13):**
-- `apps/api/src/reconciliation/{reconciliation.service.ts,reconciliation.controller.ts}`: `createBatch` (gom PENDING chưa đối soát: `where reconLine: { is: null }`; rỗng → 409 `NOTHING_TO_RECONCILE`), `lockBatch` (claim `UPDATE ... WHERE status='OPEN'` → double-lock 409 `BATCH_ALREADY_LOCKED`; flip earning hợp lệ PENDING→AVAILABLE trong cùng tx; KHÔNG ghi sổ cái), `getBatch`/`listBatches`. RBAC `LOCAL_FINANCE`; cách ly nước → 404. Routes `/ops/:market/reconciliation` (+`/:id`, `/:id/lock`).
-- Facade thêm `reconciliationBatch`/`reconciliationLine` + `earning.update`. Seed `apps/api/prisma/seed.sql` +2 finance account (id `34/35...`). Web: `lib/reconciliation-client.ts`, V12 `finance/workbench/page.tsx` (màn thật, payout còn mock N14). Test `reconciliation.smoke.test.ts` (7) + e2e `reconciliation-flow.spec.ts`.
-- **LedgerService** (N12, tái dùng cho N14): `post(tx, input)` append-only; loại bút toán `EARNING_ACCRUE|TAX|PAYOUT_RESERVE|PAYOUT_PAID|PAYOUT_RELEASE|REVERSAL`; `view()` trả số dư luỹ kế. `content.service.review()` approve đã ghi +gross/−tax.
-- **Gotcha (giữ nguyên)**: (a) `.env` thủ công cho prisma CLI (+ `db:seed` sau khi sửa seed.sql); (b) đừng build/xóa `.next` khi dev:web chạy; (c) test email/tên unique; (d) `listMine` ẩn LEFT; (e) `corepack pnpm`; (f) cách ly staff: gọi route nước MÌNH (VN res qua PH route → 404; route VN + token PH → 403); (g) test đối soát: `createBatch` gom TOÀN BỘ PENDING của nước (dữ liệu tích luỹ giữa test) → assert theo earning cụ thể, không theo tổng batch.
+**2. File/biến quan trọng (N14):**
+- `apps/api/src/payout/{payout.service.ts,payout.controller.ts}`: `wallet()` (số dư = Σ net AVAILABLE − Σ payout PROCESSING/PAID/UNKNOWN_HOLD), `requestOtp()` (mã 6 số, trả `code` chỉ dev), `createPayout()` (idempotency short-circuit + catch P2002; OTP consume `UPDATE ... WHERE consumed_at IS NULL`; min → 409 BELOW_MIN_PAYOUT; số dư+reserve TRONG tx → INSUFFICIENT_BALANCE; ghi `PAYOUT_RESERVE −amount`), `queue()` + `settle()` (claim `WHERE state='PROCESSING'` → PAID; double-settle 409 ALREADY_SETTLED; `payout_attempt.provider_ref` UNIQUE). Routes creator `/me/country/:m/{wallet,payouts,payouts/otp}`, finance `/ops/:m/payouts` (+`/:id/settle`).
+- Facade thêm `payoutRequest`/`payoutAttempt`/`otpCode`. Web: `lib/payout-client.ts`, V08 `creator/wallet/page.tsx` (số dư + OTP flow + lịch sử), V12 thêm hàng đợi payout thật. Test `payout.smoke.test.ts` (9) + e2e `payout-flow.spec.ts`.
+- **LedgerService** (tái dùng): `post(tx, input)` append-only. Ghi khi rút: `PAYOUT_RESERVE −amount`. N15 sẽ dùng `PAYOUT_RELEASE +amount` (fail) + `REVERSAL`.
+- **Gotcha**: (a) `.env` thủ công cho prisma CLI (+ `db:seed` sau khi sửa seed.sql); (b) đừng build/xóa `.next` khi dev:web chạy; (c) test email/tên unique; (d) `listMine` ẩn LEFT; (e) `corepack pnpm`; (f) cách ly staff: route nước MÌNH (VN res qua PH route → 404; route VN + token PH → 403); (g) `createBatch`/payout queue gom TOÀN BỘ của nước → assert theo bản ghi cụ thể; (h) **test script `--test-concurrency=1`** (bắt buộc: suite integration dùng chung 1 DB, chạy song song gây nhiễu chéo); (i) thứ tự check trong `createPayout`: dup → amount → **min → OTP → (trong tx) balance** (test dưới-min phải để amount≥min mới chạm nhánh OTP).
 
-**3. Nhiệm vụ đầu tiên phiên sau — N14:**
-- **Commit N13** (nếu chưa): reconciliation module + seed finance + web V12 + tests + LOG.
-- **N14 — Payout (rút tiền)**: creator có số dư AVAILABLE → tạo lệnh rút (`payout_request`, `idempotency_key` UNIQUE chống bấm 2 lần) + **OTP mock** (`otp_code`, mã cố định hiện màn dev) → **reserve** (ghi sổ `PAYOUT_RESERVE` −amount, giảm số dư khả dụng) → gọi **provider mock** (nút chọn success). Success → `PAYOUT_PAID` + earning/PayoutState PAID. Dùng lại **LedgerService.post()**. Kiểm `min_payout_minor` (country_config). Bảng `payout_request/attempt` + `otp_code` đã có. V08 wallet rewire. (Fail/UNKNOWN để **N15**.)
-- **Lát mỏng QĐ-7 (phí) + QĐ-8 (escrow)**: ghép khi làm payout/funding N14/N15 — `platform_fee_bps` (migration nhỏ) + `PLATFORM_FEE` ledger; `PENDING_FUNDING`+`funded_at`. **QĐ-6 apply-flow**: dồn buffer N20.
+**3. Nhiệm vụ đầu tiên phiên sau — N15:**
+- **Commit N14** (nếu chưa): payout module + web V08/V12 + tests + package.json + LOG.
+- **N15 — Payout FAIL/UNKNOWN + bút toán đảo + E2E cả spine tiền**: mở `settle` nhận `result` FAIL/UNKNOWN. **FAIL** → `FAILED_RELEASED` + ghi sổ `PAYOUT_RELEASE +amount` **đúng 1 lần** (hoàn tiền về số dư) — dùng `UNIQUE(ref_type,ref_id,entry_type)` hoặc claim để không hoàn 2 lần; creator rút lại = lệnh MỚI (không ghi đè). **UNKNOWN** → `UNKNOWN_HOLD` + **KHÔNG** ghi release (giữ reserve — release vội = double-pay nếu provider thật đã chuyển); chờ Finance đối soát tay rồi mới quyết PAID/hoàn. Retry provider: `provider_ref` khác nhau mỗi lần (VD `mock-${id}-${attemptNo}`). V08/V12 nút chọn kết cục. Chạy **E2E cả spine tiền trên VN + PH**.
+- **Lát mỏng QĐ-7 (phí) + QĐ-8 (escrow)**: `platform_fee_bps` (migration nhỏ) + `PLATFORM_FEE` ledger; `PENDING_FUNDING`+`funded_at`. **QĐ-6 apply-flow**: dồn buffer N20. Cắt bớt nếu thiếu thời gian (ưu tiên spine tiền trọn vẹn).

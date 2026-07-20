@@ -23,6 +23,8 @@ import { EarningsController } from "./earnings/earnings.controller";
 import { EarningsService } from "./earnings/earnings.service";
 import { ReconciliationController } from "./reconciliation/reconciliation.controller";
 import { ReconciliationService } from "./reconciliation/reconciliation.service";
+import { CreatorPayoutController, FinancePayoutController } from "./payout/payout.controller";
+import { PayoutService } from "./payout/payout.service";
 
 @Module({
   controllers: [
@@ -39,6 +41,8 @@ import { ReconciliationService } from "./reconciliation/reconciliation.service";
     OpsContentController,
     EarningsController,
     ReconciliationController,
+    CreatorPayoutController,
+    FinancePayoutController,
   ],
   providers: [
     PrismaService,
@@ -54,6 +58,7 @@ import { ReconciliationService } from "./reconciliation/reconciliation.service";
     LedgerService,
     EarningsService,
     ReconciliationService,
+    PayoutService,
   ],
 })
 export class AppModule {}
