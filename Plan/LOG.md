@@ -331,7 +331,7 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
 ## Current State & Hand-off (cập nhật 2026-07-20 — sau N14, Tuần C đang chạy)
 
 **1. Vừa xong / trạng thái:**
-- Xong **Tuần A + Tuần B + N11–N14**. **Đã commit HẾT** tới N13 (`6af92fc`); **N14 chưa commit** (commit đầu phiên sau). Chỉ còn `.claude/settings.local.json` (settings máy — không commit).
+- Xong **Tuần A + Tuần B + N11–N14**. **Đã commit HẾT, cây sạch** — mốc mới nhất N14 = `23aed26`. Chỉ còn `.claude/settings.local.json` modified (settings máy — KHÔNG commit).
 - **N14**: rút tiền chạy thật — số dư rút được (net AVAILABLE − đang giữ) → OTP mock → reserve (`PAYOUT_RESERVE −amount`) → PROCESSING → Finance settle SUCCESS → PAID. Chống bấm 2 lần (`idempotency_key` UNIQUE), OTP consume nguyên tử, số dư kiểm trong khóa (không rút vượt). Fail/UNKNOWN chưa làm.
 - Toàn xanh: **API 78/78, E2E 16/16**, lint + 2×typecheck sạch. Postgres Docker 54329 (bật Docker Desktop sau khi khởi động máy). Báo cáo mentor ở `Report/`.
 
@@ -341,7 +341,7 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
 - **LedgerService** (tái dùng): `post(tx, input)` append-only. Ghi khi rút: `PAYOUT_RESERVE −amount`. N15 sẽ dùng `PAYOUT_RELEASE +amount` (fail) + `REVERSAL`.
 - **Gotcha**: (a) `.env` thủ công cho prisma CLI (+ `db:seed` sau khi sửa seed.sql); (b) đừng build/xóa `.next` khi dev:web chạy; (c) test email/tên unique; (d) `listMine` ẩn LEFT; (e) `corepack pnpm`; (f) cách ly staff: route nước MÌNH (VN res qua PH route → 404; route VN + token PH → 403); (g) `createBatch`/payout queue gom TOÀN BỘ của nước → assert theo bản ghi cụ thể; (h) **test script `--test-concurrency=1`** (bắt buộc: suite integration dùng chung 1 DB, chạy song song gây nhiễu chéo); (i) thứ tự check trong `createPayout`: dup → amount → **min → OTP → (trong tx) balance** (test dưới-min phải để amount≥min mới chạm nhánh OTP).
 
-**3. Nhiệm vụ đầu tiên phiên sau — N15:**
-- **Commit N14** (nếu chưa): payout module + web V08/V12 + tests + package.json + LOG.
-- **N15 — Payout FAIL/UNKNOWN + bút toán đảo + E2E cả spine tiền**: mở `settle` nhận `result` FAIL/UNKNOWN. **FAIL** → `FAILED_RELEASED` + ghi sổ `PAYOUT_RELEASE +amount` **đúng 1 lần** (hoàn tiền về số dư) — dùng `UNIQUE(ref_type,ref_id,entry_type)` hoặc claim để không hoàn 2 lần; creator rút lại = lệnh MỚI (không ghi đè). **UNKNOWN** → `UNKNOWN_HOLD` + **KHÔNG** ghi release (giữ reserve — release vội = double-pay nếu provider thật đã chuyển); chờ Finance đối soát tay rồi mới quyết PAID/hoàn. Retry provider: `provider_ref` khác nhau mỗi lần (VD `mock-${id}-${attemptNo}`). V08/V12 nút chọn kết cục. Chạy **E2E cả spine tiền trên VN + PH**.
+**3. Nhiệm vụ đầu tiên phiên sau — N15 (đóng Tuần C):**
+- **Trước khi code**: bật Docker Desktop (Postgres 54329) rồi `corepack pnpm test` (apps/api) xác nhận 78/78 xanh — mốc khởi động sạch.
+- **N15 — Payout FAIL/UNKNOWN + bút toán đảo + E2E cả spine tiền**: mở `settle` (payout.service.ts) nhận `result` FAIL/UNKNOWN. **FAIL** → `FAILED_RELEASED` + ghi sổ `PAYOUT_RELEASE +amount` **đúng 1 lần** (hoàn tiền về số dư) — dùng `UNIQUE(ref_type,ref_id,entry_type)` hoặc claim để không hoàn 2 lần; creator rút lại = lệnh MỚI (không ghi đè). **UNKNOWN** → `UNKNOWN_HOLD` + **KHÔNG** ghi release (giữ reserve — release vội = double-pay nếu provider thật đã chuyển); chờ Finance đối soát tay rồi mới quyết PAID/hoàn. Retry provider: `provider_ref` khác nhau mỗi lần (VD `mock-${id}-${attemptNo}`). V08/V12 nút chọn kết cục. Chạy **E2E cả spine tiền trên VN + PH**.
 - **Lát mỏng QĐ-7 (phí) + QĐ-8 (escrow)**: `platform_fee_bps` (migration nhỏ) + `PLATFORM_FEE` ledger; `PENDING_FUNDING`+`funded_at`. **QĐ-6 apply-flow**: dồn buffer N20. Cắt bớt nếu thiếu thời gian (ưu tiên spine tiền trọn vẹn).
