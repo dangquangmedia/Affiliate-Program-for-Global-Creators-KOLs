@@ -3,19 +3,21 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { MARKETS, type Market } from "../../../../mockup/data";
-import { Frame, Note, Card, Btn, BtnRow, Badge, KV, Field, ContextBanner } from "../../../../mockup/ui";
+import { Frame, Note, Card, Btn, BtnRow, Badge, KV, Field, ContextBanner, UsdRef } from "../../../../mockup/ui";
+import { usePrefs } from "../../../../mockup/prefs";
 import { loadSession } from "../../../../lib/auth-client";
 import { getWallet, requestOtp, createPayout, type Wallet, type Otp, type Payout } from "../../../../lib/payout-client";
-import { formatMoney } from "../../../../lib/i18n";
+import { t, formatMoney, usdReference } from "../../../../lib/i18n";
 
 type Status = "loading" | "needLogin" | "ready";
 type Step = "idle" | "otp";
 
-const PAYOUT_BADGE: Record<Payout["state"], { kind: "info" | "success" | "danger" | "warn"; label: string }> = {
-  PROCESSING: { kind: "info", label: "Đang xử lý (đã giữ chỗ)" },
-  PAID: { kind: "success", label: "Đã trả" },
-  FAILED_RELEASED: { kind: "danger", label: "Lỗi → đã hoàn" },
-  UNKNOWN_HOLD: { kind: "warn", label: "Không rõ → đang giữ" },
+// Chỉ giữ "kind" (màu) ở code; nhãn trạng thái lấy từ i18n theo key wallet.st.*.
+const PAYOUT_KIND: Record<Payout["state"], "info" | "success" | "danger" | "warn"> = {
+  PROCESSING: "info",
+  PAID: "success",
+  FAILED_RELEASED: "danger",
+  UNKNOWN_HOLD: "warn",
 };
 
 export default function WalletScreen() {
@@ -29,6 +31,7 @@ export default function WalletScreen() {
   const [idemKey, setIdemKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const { lang, showUsd } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {
@@ -57,7 +60,7 @@ export default function WalletScreen() {
     try {
       const o = await requestOtp(market);
       if (!o) {
-        setErr("Không phát được OTP.");
+        setErr(t(lang, "wallet.noOtp"));
         return;
       }
       setOtp(o);
@@ -74,7 +77,7 @@ export default function WalletScreen() {
     if (!otp) return;
     const amt = Number(amount);
     if (!Number.isInteger(amt) || amt <= 0) {
-      setErr("Số tiền không hợp lệ.");
+      setErr(t(lang, "wallet.badAmount"));
       return;
     }
     setBusy(true);
@@ -96,37 +99,37 @@ export default function WalletScreen() {
   const cur = w?.currency ?? MARKETS[market].currency;
 
   return (
-    <Frame screen="V08 Wallet + Payout" title="Ví & rút tiền" market={market} setMarket={setMarket}>
+    <Frame screen="V08 Wallet + Payout" title={t(lang, "wallet.title")} market={market} setMarket={setMarket}>
       <Note>
-        <strong>Màn này trả lời:</strong> tôi rút tiền thế nào? → Rút cần OTP; số tiền được{" "}
-        <strong>giữ chỗ (reserve)</strong> khi gửi lệnh (ghi sổ −amount). <em>Bấm 2 lần vẫn 1 lệnh
-        (idempotency key UNIQUE). Bài toán #4 (fail-hoàn / unknown-giữ) hoàn thiện ở N15.</em>
+        <strong>{t(lang, "wallet.noteQ")}</strong> {t(lang, "wallet.noteBody")}{" "}
+        <em>{t(lang, "wallet.noteHard")}</em>
       </Note>
 
       {status === "needLogin" && (
-        <Card title="Bạn cần đăng nhập">
+        <Card title={t(lang, "common.needLoginTitle")}>
           <p style={{ fontSize: 13 }}>
             →{" "}
             <Link href="/mockup/creator/login" style={{ color: "#6aa6ff" }}>
-              Đăng nhập
+              {t(lang, "nav.login")}
             </Link>
           </p>
         </Card>
       )}
-      {status === "loading" && <p style={{ color: "#8b96a3" }}>Đang tải…</p>}
+      {status === "loading" && <p style={{ color: "#8b96a3" }}>{t(lang, "common.loading")}</p>}
 
       {status === "ready" && w && (
         <>
           <ContextBanner market={market} />
 
-          <Card title="Số dư khả dụng">
-            <KV k={`Rút được (${cur})`} strong>
+          <Card title={t(lang, "wallet.balanceTitle")}>
+            <KV k={t(lang, "wallet.withdrawable", { cur })} strong>
               {formatMoney(w.withdrawableMinor, cur, locale)}
             </KV>
-            <KV k="Tối thiểu mỗi lần rút">{formatMoney(w.minPayoutMinor, cur, locale)}</KV>
+            {showUsd && <UsdRef>{usdReference(w.withdrawableMinor, cur)}</UsdRef>}
+            <KV k={t(lang, "wallet.min")}>{formatMoney(w.minPayoutMinor, cur, locale)}</KV>
             <p style={{ fontSize: 12, color: "#6b7684", marginTop: 8 }}>
-              Số dư = net đã đối soát (AVAILABLE) − các lệnh đang giữ tiền. Chưa đủ? Tiền còn{" "}
-              <Link href="/mockup/creator/earnings" style={{ color: "#6aa6ff" }}>PENDING chờ đối soát</Link>.
+              {t(lang, "wallet.balanceHint")}{" "}
+              <Link href="/mockup/creator/earnings" style={{ color: "#6aa6ff" }}>{t(lang, "wallet.balanceHintLink")}</Link>.
             </p>
 
             {step === "idle" ? (
@@ -136,7 +139,7 @@ export default function WalletScreen() {
                   disabled={busy || w.withdrawableMinor < w.minPayoutMinor || w.withdrawableMinor <= 0}
                   onClick={startPayout}
                 >
-                  {busy ? "…" : w.withdrawableMinor < w.minPayoutMinor ? "Chưa đủ mức tối thiểu" : "Yêu cầu rút tiền"}
+                  {busy ? "…" : w.withdrawableMinor < w.minPayoutMinor ? t(lang, "wallet.belowMin") : t(lang, "wallet.request")}
                 </Btn>
               </BtnRow>
             ) : (
@@ -148,26 +151,26 @@ export default function WalletScreen() {
                 )}
                 {otp && (
                   <p style={{ fontSize: 13, color: "#f0c674", marginBottom: 8 }}>
-                    OTP (mock, dev hiển thị): <b style={{ color: "#fff" }}>{otp.code}</b> — nhập vào bên dưới.
+                    {t(lang, "wallet.otpLine")} <b style={{ color: "#fff" }}>{otp.code}</b> {t(lang, "wallet.otpLineTail")}
                   </p>
                 )}
-                <Field label={`Số tiền rút (${cur}, minor units)`} placeholder="VD 450000" value={amount} onChange={setAmount} />
-                <Field label="Mã OTP (6 chữ số)" placeholder="6 chữ số" value={code} onChange={setCode} />
+                <Field label={t(lang, "wallet.amountLabel", { cur })} placeholder="VD 450000" value={amount} onChange={setAmount} />
+                <Field label={t(lang, "wallet.otpLabel")} placeholder={t(lang, "wallet.otpPlaceholder")} value={code} onChange={setCode} />
                 <BtnRow>
                   <Btn variant="primary" disabled={busy || !code.trim()} onClick={confirmPayout}>
-                    {busy ? "Đang gửi…" : "Xác nhận rút (giữ chỗ)"}
+                    {busy ? t(lang, "wallet.sending") : t(lang, "wallet.confirm")}
                   </Btn>
                   <Btn variant="ghost" disabled={busy} onClick={() => { setStep("idle"); setErr(null); }}>
-                    Huỷ
+                    {t(lang, "wallet.cancel")}
                   </Btn>
                 </BtnRow>
               </div>
             )}
           </Card>
 
-          <Card title="Lịch sử lệnh rút" sub="Mỗi lệnh là bản ghi riêng — không ghi đè. Provider mock được Finance xử lý (V12).">
+          <Card title={t(lang, "wallet.historyTitle")} sub={t(lang, "wallet.historySub")}>
             {w.payouts.length === 0 ? (
-              <p style={{ color: "#8b96a3", fontSize: 13 }}>Chưa có lệnh rút nào.</p>
+              <p style={{ color: "#8b96a3", fontSize: 13 }}>{t(lang, "wallet.noPayouts")}</p>
             ) : (
               w.payouts.map((p) => (
                 <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid #1b2430", gap: 10, flexWrap: "wrap" }}>
@@ -175,7 +178,7 @@ export default function WalletScreen() {
                     <span style={{ fontWeight: 600 }}>{formatMoney(p.amountMinor, p.currency, locale)}</span>
                     <span style={{ fontSize: 12, color: "#6b7684" }}> · {new Date(p.requestedAt).toLocaleString(locale)}</span>
                   </div>
-                  <Badge kind={PAYOUT_BADGE[p.state].kind}>{PAYOUT_BADGE[p.state].label}</Badge>
+                  <Badge kind={PAYOUT_KIND[p.state]}>{t(lang, `wallet.st.${p.state}`)}</Badge>
                 </div>
               ))
             )}

@@ -4,8 +4,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import styles from "./mockup.module.css";
 import { MARKETS, type Market } from "./data";
+import { usePrefs } from "./prefs";
+import { t, type Lang } from "../lib/i18n";
 
-/** Khung chung mọi màn Creator: brand + market switcher + breadcrumb + tiêu đề. */
+const LANGS: Lang[] = ["vi", "en"];
+
+/** Khung chung mọi màn: brand + công tắc ngôn ngữ/USD + market switcher + breadcrumb + tiêu đề. */
 export function Frame({
   screen,
   title,
@@ -19,6 +23,7 @@ export function Frame({
   setMarket: (m: Market) => void;
   children: ReactNode;
 }) {
+  const { lang, setLang, showUsd, toggleUsd } = usePrefs();
   return (
     <div className={styles.page}>
       <div className={styles.topbar}>
@@ -26,6 +31,24 @@ export function Frame({
           Affiliate GLOBAL <span className={styles.brandDim}>· prototype</span>
         </Link>
         <div className={styles.marketPills}>
+          {/* Công tắc ngôn ngữ UI (độc lập với nước) — chứng minh i18n đổi ngôn ngữ chạy thật. */}
+          {LANGS.map((l) => (
+            <button
+              key={l}
+              className={`${styles.pill} ${l === lang ? styles.pillActive : ""}`}
+              onClick={() => setLang(l)}
+            >
+              {l.toUpperCase()}
+            </button>
+          ))}
+          {/* Toggle hiện USD tham chiếu bên cạnh tiền local (CP-06). */}
+          <button
+            className={`${styles.pill} ${showUsd ? styles.pillActive : ""}`}
+            onClick={toggleUsd}
+            title={t(lang, "usd.show")}
+          >
+            $ USD
+          </button>
           {(Object.keys(MARKETS) as Market[]).map((m) => (
             <button
               key={m}
@@ -39,7 +62,7 @@ export function Frame({
       </div>
 
       <div className={styles.crumb}>
-        <Link href="/mockup">← Tất cả màn</Link>
+        <Link href="/mockup">{t(lang, "nav.allScreens")}</Link>
       </div>
       <h1 className={styles.title}>
         {title} <span className={styles.screenCode}>· {screen}</span>
@@ -49,13 +72,15 @@ export function Frame({
   );
 }
 
-/** Banner luôn hiển thị đang ở nước nào — trả lời "câu hỏi 1" mỗi màn phải trả lời. */
+/** Banner luôn hiển thị đang ở nước nào — trả lời "câu hỏi 1" mỗi màn phải trả lời.
+ *  Locale hiển thị là SỰ THẬT của nước (data); nhãn xung quanh theo ngôn ngữ UI người dùng chọn. */
 export function ContextBanner({ market }: { market: Market }) {
+  const { lang } = usePrefs();
   const info = MARKETS[market];
   return (
     <div className={styles.ctxBanner}>
-      Ngữ cảnh: <b>{info.flag} {info.name}</b> · ngôn ngữ <b>{info.locale}</b> · tiền tệ{" "}
-      <b>{info.currency}</b>
+      {t(lang, "ctx.label")}: <b>{info.flag} {info.name}</b> · {t(lang, "ctx.language")} <b>{info.locale}</b> ·{" "}
+      {t(lang, "ctx.currency")} <b>{info.currency}</b>
     </div>
   );
 }
@@ -182,7 +207,8 @@ export function KV({ k, children, strong }: { k: string; children: ReactNode; st
 }
 
 export function UsdRef({ children }: { children: ReactNode }) {
-  return <div className={styles.usdRef}>≈ {children} (tỷ giá tham chiếu, demo)</div>;
+  const { lang } = usePrefs();
+  return <div className={styles.usdRef}>≈ {children} ({t(lang, "usd.refNote")})</div>;
 }
 
 export function Skeleton({ rows = 3 }: { rows?: number }) {

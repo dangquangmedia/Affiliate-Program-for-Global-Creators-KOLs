@@ -242,6 +242,25 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   docs cả 3 ngay (đã xong) + code LÁT MỎNG sau N11 (QĐ-6 apply-flow; QĐ-7 `platform_fee_bps`+builder
   ghép N12/N13; QĐ-8 `PENDING_FUNDING`+nút nạp quỹ mock ghép N13/N14) — money spine không bị chậm.
 
+- **N16 phần 1 — i18n cơ chế thật + USD toggle + phủ 4 màn demo (2026-07-20, mở Tuần D)**: sau
+  khi Quang tự research + lập 4 report audit (`Report/PROJECT_AUDIT_DAY15_TO_DAY20.md` +
+  `MVP_GAP_ANALYSIS.md` + `REQUIREMENT_TRACEABILITY_MATRIX.md` + `DAY15_DAY20_PLAN.md`) → chốt gap
+  P0 = i18n/USD/audit/responsive; vào N16. **Quyết định thiết kế (mentor có thể hỏi):** ngôn ngữ
+  UI = **công tắc tường minh vi/en, mặc định vi, ĐỘC LẬP với market** — không suy từ nước (nếu suy
+  từ nước thì mở PH → tiếng Anh → vỡ `payout-fail-flow` chạy PH assert chuỗi Việt). Tách bạch
+  "locale dữ liệu" (sự thật của nước, hiện ở ContextBanner) vs "ngôn ngữ UI" (lựa chọn người dùng).
+  Dựng `mockup/prefs.tsx` (`PrefsProvider`+`usePrefs`: lang+showUsd, localStorage) + `app/mockup/
+  layout.tsx` bọc toàn khu. Mở rộng `lib/i18n.ts`: `t(lang,key,params?)` thêm **interpolation
+  `{param}`** + `usdReference(minor,currency)` (tỷ giá tĩnh mock) + từ điển vi/en cho chrome +
+  login/country/earnings/wallet. `Frame` thêm **công tắc VI/EN + toggle "$ USD"** (dùng chung mọi
+  màn) + crumb qua `t()`; `ContextBanner`/`UsdRef` theo lang. Convert **V01 login, V02 country,
+  V07 earnings, V08 wallet** sang `t()` + nối USD ref (hiện USD tham chiếu cạnh tiền local khi bật
+  toggle). **Giữ chuỗi `vi` y hệt UI cũ** (default vi) nên **E2E 17/17 không đổi** — đã liệt kê
+  mọi chuỗi e2e khoá trước khi sửa (grep getByText/getByRole/getByPlaceholder). Kết quả: typecheck
+  +lint sạch, **E2E 17/17** (chạy 2 lần: 50.8s/41.6s). **Còn lại (N16 phần 2):** kyc/discover/
+  campaign/my-campaigns/submit + index + staff V09–V12 (kyc có chuỗi e2e "Thông tin định danh" cần
+  giữ). Kế: xong phủ i18n → N17 audit AD-02 (Must ❌ duy nhất) + RBAC negative tests + responsive.
+
 - **N15 — Payout FAIL/UNKNOWN + hoàn tiền 1 lần + E2E cả spine tiền VN+PH (2026-07-20, đóng
   Tuần C)**: KHÔNG cần migration (enum `PayoutState` đã có `FAILED_RELEASED`/`UNKNOWN_HOLD`;
   `PayoutAttemptResult` đã có `FAIL`/`UNKNOWN`). Mở `settle` (payout.service.ts) cho **3 kết cục**
@@ -355,21 +374,20 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   token + tài nguyên VN → 404); gọi route VN bằng token PH là 403 — ngữ nghĩa khác. Kế: **N12**
   ledger append-only + dashboard earnings (V07) Gross–Thuế–Net.
 
-## Current State & Hand-off (cập nhật 2026-07-20 — sau N15, **HẾT Tuần C — money spine TRỌN VẸN**)
+## Current State & Hand-off (cập nhật 2026-07-20 — sau N16 phần 1, **đang mở Tuần D**)
 
 **1. Vừa xong / trạng thái:**
-- Xong **Tuần A + B + toàn bộ Tuần C (N11–N15)**. Vòng đời tiền **TRỌN VẸN**: content→earning (exactly-once)→ledger append-only→đối soát/khoá→AVAILABLE→rút (OTP+reserve)→**3 kết cục** {PAID · FAIL→hoàn 1 lần · UNKNOWN→giữ→đối soát tay}.
-- **N15**: `settle` nhận SUCCESS/FAIL/UNKNOWN + `resolveHold` cho UNKNOWN_HOLD (helper `applyProviderOutcome`: claim `WHERE state=fromState` → 409 nếu trượt; `provider_ref` khác nhau mỗi lần thử; FAIL ghi `PAYOUT_RELEASE +amount` hoàn đúng 1 lần; UNKNOWN không hoàn). 7 bài toán khó **đã có code chứng minh đủ**.
-- Toàn xanh: **API 88/88, E2E 17/17** (ổn định qua 2 lần chạy), lint + 2×typecheck sạch. **Đã commit HẾT, cây sạch** — mốc N15 = `2df0d9d`; chỉ còn `.claude/settings.local.json` modified (settings máy — KHÔNG commit). Postgres Docker 54329 (bật Docker Desktop sau khi khởi động máy). Báo cáo mentor ở `Report/` (dựng ở Tuần A+B, chưa cập nhật N11–N15).
+- Xong **Tuần A + B + C (N11–N15)** + **N16 phần 1** (i18n cơ chế + USD toggle + phủ 4 màn). Vòng đời tiền TRỌN VẸN (content→earning→ledger→đối soát→AVAILABLE→rút→3 kết cục).
+- **N16 phần 1**: công tắc ngôn ngữ **vi/en tường minh** (mặc định vi, độc lập market) + toggle **USD tham chiếu** ở `Frame` (mọi màn); `PrefsProvider`(localStorage)+`layout.tsx`; `t()` thêm interpolation + `usdReference()`. Convert **V01/V02/V07/V08** + chrome (ContextBanner/UsdRef). Giữ chuỗi vi y hệt → E2E không đổi.
+- Toàn xanh: **API 88/88, E2E 17/17** (2 lần: 50.8s/41.6s), lint + 2×typecheck sạch. **N16 phần 1 sẽ commit ghép chung 4 report + `requirements/`** (xem việc #0 mục 3). Mốc trước đó N15 = `2df0d9d`. Postgres Docker 54329. `Report/` có 4 audit MỚI (chưa cập nhật PPTX/Q&A cho N11–N16).
 
-**2. File/biến quan trọng (N15):**
-- `apps/api/src/payout/payout.service.ts`: `settle(auth, market, id, result: SettleResult)` + `resolveHold(...result: ResolveResult)` + private `applyProviderOutcome(tx, payout, fromState, result, conflictCode, conflictMsg)` (claim UPDATE bằng `$queryRaw` với `${toState}::"PayoutState"` và `${fromState}::"PayoutState"` — **cast enum tường minh cho param**; đếm `payoutAttempt.findMany` → `attemptNo` → `provider_ref = mock-{id}-{attemptNo}`; FAIL → `ledger.post(PAYOUT_RELEASE +amount)`). `queue()` = PROCESSING, `holds()` = UNKNOWN_HOLD. `OUTSTANDING_STATES = {PROCESSING, PAID, UNKNOWN_HOLD}` (FAILED_RELEASED KHÔNG giữ → số dư phục hồi).
-- `payout.controller.ts`: `POST :id/settle` (validate ∈ {SUCCESS,FAIL,UNKNOWN}), `POST :id/resolve` (∈ {SUCCESS,FAIL}), `GET payouts/holds`. Facade `payoutAttempt` thêm `findMany`.
-- Web `lib/payout-client.ts`: `settlePayout(market,id,result?)`, `resolveHold(market,id,result)`, `payoutHolds(market)`. V12 `finance/workbench/page.tsx`: nút 3 kết cục ở hàng đợi + card "Chờ đối soát tay — UNKNOWN" (nút "Đã chuyển→trả"/"Không chuyển→hoàn"). V08 đã có sẵn 4 badge (PROCESSING/PAID/FAILED_RELEASED/UNKNOWN_HOLD).
-- Test: `payout.smoke.test.ts` (+6 N15), `money-spine.test.ts` (NEW, 4 test — spine VN+PH ×{SUCCESS,FAIL}, chạy `for FIXTURES` tham số hoá theo nước). E2e `payout-fail-flow.spec.ts` (NEW, **PH** để cách ly). `playwright.config.ts`: `workers:3`, `timeout:60_000`.
-- **Gotcha** (giữ nguyên N14, đọc journal N14 nếu cần): (a) `.env` thủ công cho prisma CLI; (b) đừng xoá `.next` khi dev:web chạy; (c) test email/tên unique; (e) `corepack pnpm`; (f) cách ly staff route nước MÌNH; (g) queue/holds/createBatch gom TOÀN BỘ của nước → assert theo bản ghi cụ thể; (h) **`--test-concurrency=1`** cho test API (DB chung); (i) `createPayout` thứ tự check: dup→amount→min→OTP→(tx)balance. **MỚI N15**: (j) **e2e chạy song song trên DB chung — `payout-flow.spec` settle MỌI lệnh PROCESSING của VN** → spec payout khác phải dùng **PH** hoặc match theo `data-creator` duy nhất; (k) `next dev` compile route theo yêu cầu → dưới tải nhiều worker gây **timeout giả** → giữ `workers:3`+`timeout:60s`; (l) claim state bằng `$queryRaw` phải cast **cả 2 vế** enum (`= ${x}::"PayoutState"`), param text so enum column sẽ lỗi nếu thiếu cast.
+**2. File/biến quan trọng:**
+- **N16**: `mockup/prefs.tsx` (`usePrefs`: lang+showUsd), `app/mockup/layout.tsx` (bọc PrefsProvider), `lib/i18n.ts` (`t(lang,key,params?)` interpolation `{param}` + `usdReference` + DICT vi/en), `mockup/ui.tsx` `Frame` (VI/EN + "$ USD" pills) / `ContextBanner` / `UsdRef` theo lang. Convert: `creator/{login,country,earnings,wallet}/page.tsx` (dùng `usePrefs().lang`, `t()`, `showUsd`→`<UsdRef>`). **Gotcha i18n**: (m) từ điển `vi` PHẢI khớp chuỗi UI cũ vì E2E assert văn bản Việt — trước khi convert 1 màn, grep e2e `getByText/getByRole/getByPlaceholder` để biết chuỗi khoá (VD kyc: "Thông tin định danh", "Nộp KYC"); (n) badge/label chuyển map `...KIND` (chỉ màu) + `t(lang,\`prefix.${key}\`)`; (o) chuỗi có markup `<strong>/<em>` tách thành 2–3 key (`.noteQ/.noteBody/.noteHard`).
+- **N15** (giữ nguyên): `payout.service.ts` (`settle` 3 kết cục + `resolveHold` + `applyProviderOutcome` claim `WHERE state=fromState`, cast enum **cả 2 vế** `= ${x}::"PayoutState"`; `provider_ref=mock-{id}-{attemptNo}` đếm `payoutAttempt.findMany`; FAIL→`PAYOUT_RELEASE +amount`; `OUTSTANDING={PROCESSING,PAID,UNKNOWN_HOLD}`), controller `settle/resolve/holds`, `payout-client.ts`, V12 nút 3 kết cục + card đối soát tay. Test `payout.smoke`(+6), `money-spine.test.ts`(VN+PH×{SUCCESS,FAIL}), e2e `payout-fail-flow`(PH).
+- **Gotcha (mang theo)**: (a) `.env` thủ công cho prisma CLI; (b) đừng xoá `.next` khi dev:web chạy; (c) test email/tên unique; (e) `corepack pnpm`; (f) cách ly staff route nước MÌNH; (g) queue/holds/createBatch gom TOÀN BỘ nước → assert bản ghi cụ thể; (h) **`--test-concurrency=1`** test API; (i) `createPayout` check: dup→amount→min→OTP→(tx)balance; (j) e2e song song DB chung — `payout-flow` settle MỌI lệnh PROCESSING của VN → spec payout khác dùng **PH**/`data-creator` duy nhất; (k) `next dev` compile-on-demand → giữ `workers:3`+`timeout:60s` chống timeout giả; (l) cast enum 2 vế trong `$queryRaw`.
 
-**3. Nhiệm vụ đầu tiên phiên sau — mở Tuần D (N16, Bước 5 Triển khai):**
-- **Trước khi code**: bật Docker Desktop (Postgres 54329) → `corepack pnpm test` (apps/api) xác nhận **88/88** xanh — mốc khởi động sạch.
-- **N16 — i18n hoàn thiện + USD tham chiếu + responsive**: rà mọi chuỗi vi/en (fallback), format tiền/ngày theo locale nước, thêm USD quy đổi tham chiếu (bảng tỷ giá tĩnh — mock có công bố), kiểm responsive các màn V01–V12. Rồi N17 audit+RBAC negative tests, N18 seed+README máy sạch+docker, N19 `docs/HARD_PROBLEMS.md` thành bộ Q&A (mỗi bài toán: câu hỏi + trả lời + file code chứng minh) + kịch bản demo, N20 buffer+regression.
-- **Nợ kỹ thuật (lát mỏng, nhét khi có giờ)**: QĐ-7 phí (`platform_fee_bps` + `PLATFORM_FEE` ledger + tổng brand ở builder), QĐ-8 escrow (`PENDING_FUNDING`+`funded_at`+nút nạp quỹ mock), QĐ-6 apply-flow. Cập nhật `Report/` (PPTX+Q&A) cho N11–N15 trước buổi mentor. Ưu tiên: spine đã trọn — Tuần D là polish/defense, không thêm thư viện lõi.
+**3. Nhiệm vụ đầu tiên phiên sau:**
+- **Việc #0 — COMMIT N16 phần 1** (cây đang bẩn): bật Docker → `corepack pnpm test`(api, 88/88) → lint + 2×typecheck → e2e (17/17) → `git add` payout? KHÔNG, chỉ N16: `mockup/prefs.tsx`, `app/mockup/layout.tsx`, `lib/i18n.ts`, `mockup/ui.tsx`, `creator/{login,country,earnings,wallet}/page.tsx`, `Plan/LOG.md`, **4 file `Report/*.md` + `requirements/`** (ghép chung). Commit "N16: i18n công tắc vi/en + USD toggle + phủ V01/02/07/08 + audit report". `.claude/settings.local.json` KHÔNG commit. *(Nếu đọc dòng này nghĩa là commit ĐÃ xong ở phiên trước — bỏ qua, sang N16 phần 2.)*
+- **N16 phần 2 — phủ i18n nốt**: `creator/{kyc,discover,campaign,my-campaigns,submit}` + `mockup/page.tsx` (index, đang là server component → thêm `"use client"`+`usePrefs` hoặc để nguyên) + staff `admin/{config,campaign-builder}`, `ops/review`, `finance/workbench`. **Quy trình mỗi màn**: grep e2e chuỗi khoá trước → map `...KIND`+`t()` cho badge → tách note markup → giữ vi y hệt → e2e xanh. Rồi **responsive** (mở viewport mobile kiểm 12 màn) đóng N16.
+- **Sau N16**: N17 **audit AD-02** (Must ❌ duy nhất — ghi `AuditEvent` ở mọi approve/reject/settle/lock) + RBAC negative tests; N18 seed+README máy sạch+docker; N19 `docs/HARD_PROBLEMS.md` Q&A + kịch bản demo; N20 buffer+regression.
+- **Nợ kỹ thuật (lát mỏng)**: QĐ-7 phí, QĐ-8 escrow, QĐ-6 apply-flow; cập nhật `Report/` PPTX+Q&A cho N11–N16. Ưu tiên: spine trọn — Tuần D là polish/defense, không thêm thư viện lõi.
