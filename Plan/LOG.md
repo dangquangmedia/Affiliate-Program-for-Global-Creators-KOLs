@@ -9,11 +9,11 @@
   Toàn bộ plan cũ (7 file) + docs cũ (~25 file) đã xóa có chủ đích; lịch sử trong git.
 - Lý do làm lại: bộ cũ do AI sinh quá nhiều, không giải thích nổi khi mentor hỏi đáp.
   V2 = gọn + hiểu sâu: 5 docs mỏng, schema lean ~16 bảng, brainstorm trước code sau.
-- **Xong Tuần A (N1-N5) + Tuần B (N6-N10b) + N11**: schema lean + auth/session + country + i18n
-  + KYC + Campaign + Join race-safe/waitlist/thu hồi (QĐ-4/5) + **content→review→Earning
-  exactly-once (N11)**. Spine tới trình duyệt: login→chọn nước→KYC→join→**nộp content→Ops duyệt→
-  thu nhập PENDING (đúng 1 lần)**. Đã chốt QĐ-6/7/8 (điều kiện tham gia / thu phí / escrow) trong
-  PRODUCT.md. **API 56/56, E2E 13/13**. Đang **Tuần C**. Kế: **N12** ledger append-only + V07 earnings.
+- **Xong Tuần A (N1-N5) + Tuần B (N6-N10b) + N11-N12**: schema lean + auth/session + country +
+  i18n + KYC + Campaign + Join race-safe/waitlist/thu hồi (QĐ-4/5) + content→review→Earning
+  exactly-once (N11) + **ledger append-only + dashboard earnings V07 (N12)**. Spine tới trình
+  duyệt: login→chọn nước→KYC→join→nộp content→Ops duyệt→**thu nhập PENDING + ghi sổ cái +net**.
+  Đã chốt QĐ-6/7/8 trong PRODUCT.md. **API 62/62, E2E 14/14**. Đang **Tuần C**. Kế: **N13** đối soát.
 - Code hiện có: walking skeleton chạy trên **schema mới 18 bảng** (Next.js `/vn` `/ph` →
   NestJS → Postgres). Schema 45 bảng cũ **ĐÃ XÓA & thay** bằng lean N5 (migration
   `20260718095722_init_lean_18_tables`, DB có 20 base table gồm _prisma_migrations).
@@ -241,6 +241,25 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   docs cả 3 ngay (đã xong) + code LÁT MỎNG sau N11 (QĐ-6 apply-flow; QĐ-7 `platform_fee_bps`+builder
   ghép N12/N13; QĐ-8 `PENDING_FUNDING`+nút nạp quỹ mock ghép N13/N14) — money spine không bị chậm.
 
+- **N12 — Ledger append-only + dashboard earnings V07 (2026-07-20)**: KHÔNG cần migration (bảng
+  `ledger_entry` đã có từ N5). Tạo **`LedgerService`** (`ledger/ledger.service.ts`) — tập trung
+  logic ghi sổ APPEND-ONLY (bài toán #6), tái dùng cho payout N14-15: `post(tx, entry)` (chỉ
+  CREATE trong transaction có sẵn), `postEarningAccrual(tx, earning)` ghi cặp bút toán
+  `EARNING_ACCRUE (+gross)` / `TAX (−tax)` (cùng `ref_type='earning'`+`ref_id=earning.id`, khác
+  `entry_type` nên không đụng `UNIQUE(ref_type,ref_id,entry_type)`), `view(profileId,countryId)`
+  (bút toán mới-nhất-trước + số dư luỹ kế `balanceAfterMinor` tính lại từ sổ + `balanceMinor` tổng).
+  Nối vào `content.service.review()`: sau khi tạo earning (bắt `earning.id`), gọi
+  `ledger.postEarningAccrual(tx, …)` **TRONG CÙNG transaction approve** → earning + sổ cái luôn
+  nhất quán; exactly-once của earning kéo theo sổ không nhân đôi. Tạo **`EarningsService`** +
+  `GET /me/country/:market/earnings` (dashboard: danh sách earning + summary Gross/Thuế/Net + net
+  theo trạng thái PENDING/AVAILABLE/PAID + `ledger` view). Web: `lib/earnings-client.ts`; V07
+  rewire màn thật (tổng quan Gross–Thuế–Net + số dư sổ, danh sách earning, **thẻ Sổ cái
+  append-only** hiện từng bút toán +/− và số dư luỹ kế). Facade thêm delegate `ledgerEntry`. Kết
+  quả: **API 62/62** (thêm 6: post +gross/−tax, dashboard tổng đúng net=gross−tax, sổ số dư luỹ
+  kế, double-approve không nhân đôi sổ, cách ly VN/PH), **E2E 14/14** (thêm earnings-flow V07).
+  Vòng đời tiền hiện: content APPROVED → earning PENDING + sổ +net (chưa AVAILABLE tới khi đối
+  soát N13). Kế: **N13** đối soát (Finance tạo batch → lock → PENDING→AVAILABLE) + lát mỏng QĐ-7 phí.
+
 - **N11 — content → review → Earning exactly-once (2026-07-19, mở màn Tuần C)**: API module
   `content/` — creator: `GET/POST /me/country/:market/campaigns/:campaignId/content` (nộp link +
   caption; kiểm sơ bộ: SAI NỀN TẢNG chặn sớm 400, thiếu hashtag trong caption = cờ advisory "Cần
@@ -266,21 +285,21 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   token + tài nguyên VN → 404); gọi route VN bằng token PH là 403 — ngữ nghĩa khác. Kế: **N12**
   ledger append-only + dashboard earnings (V07) Gross–Thuế–Net.
 
-## Current State & Hand-off (cập nhật 2026-07-19 — sau N11, Tuần C đang chạy)
+## Current State & Hand-off (cập nhật 2026-07-20 — sau N12, Tuần C đang chạy)
 
 **1. Vừa xong / trạng thái:**
-- Xong **Tuần A + Tuần B + N11** (mở màn Tuần C money spine). **Đã commit HẾT, cây sạch**: `8381122` (N10b) → `2001f3f` (Report) → `484dd4d` (docs QĐ-6/7/8) → `85fba6a` (N11). Chỉ còn `.claude/settings.local.json` modified (settings máy — không commit).
-- **N11**: content spine chạy thật — V06 nộp link (kiểm nền tảng chặn sớm, hashtag advisory) → V10 hàng đợi content thật → Ops approve tạo **Earning exactly-once** (claim `UPDATE WHERE state='SUBMITTED'` + `UNIQUE(submission_id)`; RACE 2 approve song song → đúng 1 earning) / reject có lý do → `fix_deadline_at=now+24h` nối worker QĐ-4 (test chứng minh quá hạn → EXPIRED).
-- Đã chốt + ghi docs **QĐ-6 (Apply→duyệt), QĐ-7 (take-rate brand), QĐ-8 (prepaid escrow)** — `docs/PRODUCT.md` §3; lát mỏng code xếp sau (xem mục 3).
-- Toàn xanh: **API 56/56, E2E 13/13**, lint + 2×typecheck sạch. Postgres Docker 54329 (nhớ bật Docker Desktop sau khi khởi động máy). Bộ báo cáo mentor ở `Report/` (PPTX 18 slide + MENTOR_QA.md).
+- Xong **Tuần A + Tuần B + N11 + N12**. **Đã commit HẾT** tới N11 (`85fba6a`) + LOG (`4a03555`); **N12 chưa commit** (commit đầu phiên sau). Chỉ còn `.claude/settings.local.json` (settings máy — không commit).
+- **N12**: money truth chạy thật — approve content → earning PENDING **và** ghi cặp bút toán sổ cái `EARNING_ACCRUE (+gross)` / `TAX (−tax)` trong CÙNG transaction; V07 dashboard thật hiện Gross–Thuế–Net + **sổ cái append-only** (mỗi bút toán +/− + số dư luỹ kế). Số dư sổ = net (gross−tax); tất cả PENDING tới khi đối soát N13.
+- Toàn xanh: **API 62/62, E2E 14/14**, lint + 2×typecheck sạch. Postgres Docker 54329 (bật Docker Desktop sau khi khởi động máy). Báo cáo mentor ở `Report/`.
 
-**2. File/biến quan trọng (N11):**
-- `apps/api/src/content/content.service.ts`: `submit()` (chỉ JOINED/REJECTED; sai nền tảng → 400; `SUBMISSION_PENDING`/`ALREADY_DELIVERED`/`NOT_HOLDING_SLOT`; attempt_no + supersedes; → CONTENT_SUBMITTED dừng đồng hồ QĐ-4), `review()` (claim có điều kiện trong transaction → 409 `ALREADY_REVIEWED`; approve → earning PENDING gross=snapshot, tax theo `country_config.tax_percent`, BigInt; reject → REJECTED + fix deadline), `getQueue()` (cách ly nước như KYC). Controller: `content.controller.ts` (`/me/country/:m/campaigns/:cid/content`, `/ops/:m/content/*`).
-- Facade `prisma.service.ts` thêm delegate `submission`/`earning`/`countryConfig`. `ui.tsx Field` có `onChange` (controlled). Web: `lib/content-client.ts`, V06 `creator/submit/page.tsx` (màn thật, Suspense `?id=&m=`), V10 content queue thật, my-campaigns nút nộp/nộp lại theo state.
-- Test: `test/content.smoke.test.ts` (12 case) + e2e `content-flow.spec.ts`.
-- **Gotcha**: (a) prisma CLI `db:*` nạp `.env` thủ công; (b) đừng build/xóa `.next` khi dev:web chạy; (c) test dùng email/tên unique; (d) `listMine` ẩn LEFT; (e) `corepack pnpm`; (f) **test cách ly gọi route nước MÌNH của staff** (PH route + PH token + tài nguyên VN → 404; route VN + token PH là 403 — ngữ nghĩa khác).
+**2. File/biến quan trọng (N12):**
+- `apps/api/src/ledger/ledger.service.ts` — **LedgerService** (tập trung ghi sổ append-only, tái dùng N14-15): `post(tx, input)` chỉ CREATE trong tx có sẵn; `postEarningAccrual(tx, earning)` ghi +gross/−tax; `view(profileId, countryId)` trả bút toán mới-nhất-trước + `balanceAfterMinor` (luỹ kế) + `balanceMinor` (tổng). Loại bút toán: `EARNING_ACCRUE|TAX|PAYOUT_RESERVE|PAYOUT_PAID|PAYOUT_RELEASE|REVERSAL`.
+- `content.service.review()` approve: bắt `earning.id` từ `tx.earning.create` rồi gọi `ledger.postEarningAccrual(tx,…)` trong cùng transaction (inject LedgerService).
+- `apps/api/src/earnings/{earnings.service.ts,earnings.controller.ts}`: `GET /me/country/:market/earnings` → `{ earnings[], summary(Gross/Thuế/Net + net theo status), ledger(view) }`.
+- Facade `prisma.service.ts` thêm delegate `ledgerEntry`. Web: `lib/earnings-client.ts`, V07 `creator/earnings/page.tsx` (màn thật + thẻ Sổ cái). Test `earnings.smoke.test.ts` (6) + e2e `earnings-flow.spec.ts`.
+- **Gotcha (giữ nguyên)**: (a) `.env` thủ công cho prisma CLI; (b) đừng build/xóa `.next` khi dev:web chạy; (c) test email/tên unique; (d) `listMine` ẩn LEFT; (e) `corepack pnpm`; (f) test cách ly staff gọi route nước MÌNH (VN res qua PH route → 404; VN route + PH token → 403); (g) ledger là single signed ledger/(profile,nước): `balanceMinor = Σ amount_minor`; "AVAILABLE để rút" ≠ balance sổ (chờ đối soát N13 flip status).
 
-**3. Nhiệm vụ đầu tiên phiên sau — N12:**
-- **Trước khi code**: bật Docker Desktop (Postgres 54329) — hôm nay quên bật làm test 500 hàng loạt.
-- **N12 — Ledger append-only + dashboard earnings (V07)**: mỗi earning sinh bút toán `EARNING_ACCRUE` (+gross) và `TAX` (−tax) vào `ledger_entry` (append-only, `UNIQUE(ref_type,ref_id,entry_type)` chống ghi trùng); ghi bút toán NGAY TRONG transaction approve của `content.service.review()` (cùng chỗ tạo earning). V07 rewire màn thật: danh sách earning + tổng Gross–Thuế–Net theo nước, ghi chú thuế synthetic. Cân nhắc: backfill ledger cho earning đã tạo ở N11 (script nhỏ hoặc bỏ qua — dữ liệu test không quan trọng, chọn lúc code).
-- **Lát mỏng QĐ-7 ghép N12/N13**: `platform_fee_bps` + enum `PLATFORM_FEE` + tổng chi brand ở builder. **QĐ-8 ghép N13/N14**: `PENDING_FUNDING` + `funded_at` + nút "Nạp quỹ" mock. **QĐ-6 apply-flow**: lát riêng sau N12 hoặc dồn buffer N20 (xem PRODUCT.md §3).
+**3. Nhiệm vụ đầu tiên phiên sau — N13:**
+- **Commit N12** (nếu chưa): ledger + earnings module + web V07 + tests + LOG.
+- **N13 — Đối soát đơn giản hoá (Finance)**: `GET/POST /ops/:market/reconciliation` — Finance tạo batch (gom earning PENDING của nước) → duyệt/lock (`ReconciliationBatch` OPEN→LOCKED, `ReconciliationLine` 1 earning vào ĐÚNG 1 batch nhờ `UNIQUE(earning_id)`) → earning PENDING→**AVAILABLE** (mở tiền rút). LOCKED = bất biến. Bảng `reconciliation_batch/line` đã có. V12 finance workbench rewire. RBAC vai `LOCAL_FINANCE` (chưa có seed account → thêm seed `finance.vn@`/`finance.ph@` + role_assignment như Ops/Admin).
+- **Lát mỏng QĐ-7 ghép N13**: `country_config.platform_fee_bps` (cần migration nhỏ) + enum ledger `PLATFORM_FEE` + tổng chi brand ở builder. **QĐ-8 ghép N13/N14**: `PENDING_FUNDING` + `funded_at`. **QĐ-6 apply-flow**: dồn buffer N20 nếu thiếu thời gian.

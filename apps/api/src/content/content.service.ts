@@ -3,6 +3,7 @@ import { PrismaService, PrismaClientLike } from "../prisma.service";
 import { AuthContext } from "../auth/auth.service";
 import { assertStaffForCountry } from "../auth/rbac";
 import { FIX_SLA_HOURS } from "../campaign/join.service";
+import { LedgerService } from "../ledger/ledger.service";
 
 const OPS_ROLES = ["LOCAL_OPS", "LOCAL_ADMIN"];
 
@@ -70,7 +71,10 @@ type SubmissionRow = {
 
 @Injectable()
 export class ContentService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(LedgerService) private readonly ledger: LedgerService,
+  ) {}
 
   private conflict(code: string, message: string): never {
     throw new ConflictException({ code, message });
@@ -289,7 +293,8 @@ export class ContentService {
           | { taxPercent: number }
           | null;
         const tax = (gross * BigInt(config?.taxPercent ?? 0)) / 100n;
-        await tx.earning.create({
+        const currency = p.snapshotCurrency ?? "VND";
+        const earning = (await tx.earning.create({
           data: {
             participationId: p.id,
             submissionId, // UNIQUE -> exactly-once, chốt chặn cuối trong DB
@@ -297,9 +302,18 @@ export class ContentService {
             profileId: p.profileId,
             grossMinor: gross,
             taxMinor: tax,
-            currency: p.snapshotCurrency ?? "VND",
+            currency,
             status: "PENDING",
           },
+        })) as { id: string };
+        // Ghi sổ cái NGAY trong transaction (N12): +gross / −tax. Earning và sổ cái luôn nhất quán.
+        await this.ledger.postEarningAccrual(tx, {
+          id: earning.id,
+          countryId: country.id,
+          profileId: p.profileId,
+          grossMinor: gross,
+          taxMinor: tax,
+          currency,
         });
         await tx.participation.update({
           where: { id: p.id },

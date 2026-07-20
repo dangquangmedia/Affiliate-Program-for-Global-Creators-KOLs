@@ -18,6 +18,9 @@ import { JoinService } from "./campaign/join.service";
 import { ReclaimScheduler } from "./campaign/reclaim.scheduler";
 import { CreatorContentController, OpsContentController } from "./content/content.controller";
 import { ContentService } from "./content/content.service";
+import { LedgerService } from "./ledger/ledger.service";
+import { EarningsController } from "./earnings/earnings.controller";
+import { EarningsService } from "./earnings/earnings.service";
 
 @Module({
   controllers: [
@@ -32,6 +35,7 @@ import { ContentService } from "./content/content.service";
     JoinController,
     CreatorContentController,
     OpsContentController,
+    EarningsController,
   ],
   providers: [
     PrismaService,
@@ -44,6 +48,8 @@ import { ContentService } from "./content/content.service";
     JoinService,
     ReclaimScheduler,
     ContentService,
+    LedgerService,
+    EarningsService,
   ],
 })
 export class AppModule {}
