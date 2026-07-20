@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Inject, Param, Post, UseGuards } from "@nestjs/common";
-import { PayoutService, WalletDto, OtpDto, PayoutDto, PayoutQueueItem } from "./payout.service";
+import { PayoutService, WalletDto, OtpDto, PayoutDto, PayoutQueueItem, SettleResult, ResolveResult } from "./payout.service";
 import { SessionAuthGuard } from "../auth/session-auth.guard";
 import { CurrentAuth } from "../auth/current-auth.decorator";
 import { AuthContext } from "../auth/auth.service";
@@ -42,6 +42,9 @@ export class CreatorPayoutController {
   }
 }
 
+const SETTLE_RESULTS = new Set(["SUCCESS", "FAIL", "UNKNOWN"]);
+const RESOLVE_RESULTS = new Set(["SUCCESS", "FAIL"]);
+
 // Finance: hàng đợi payout + xử lý kết cục provider (V12).
 @Controller("ops/:market/payouts")
 @UseGuards(SessionAuthGuard)
@@ -53,6 +56,13 @@ export class FinancePayoutController {
     return this.payout.queue(auth, market);
   }
 
+  // Lệnh đang UNKNOWN_HOLD chờ đối soát tay (N15).
+  @Get("holds")
+  holds(@CurrentAuth() auth: AuthContext, @Param("market") market: string): Promise<PayoutQueueItem[]> {
+    return this.payout.holds(auth, market);
+  }
+
+  // Gọi provider mock lần đầu: SUCCESS → PAID, FAIL → hoàn tiền, UNKNOWN → giữ chờ đối soát.
   @Post(":id/settle")
   settle(
     @CurrentAuth() auth: AuthContext,
@@ -60,9 +70,23 @@ export class FinancePayoutController {
     @Param("id") id: string,
     @Body() body: SettleBody,
   ): Promise<PayoutDto> {
-    if (body.result !== "SUCCESS") {
-      throw new BadRequestException({ code: "VALIDATION_ERROR", message: 'result must be "SUCCESS" (N14).' });
+    if (typeof body.result !== "string" || !SETTLE_RESULTS.has(body.result)) {
+      throw new BadRequestException({ code: "VALIDATION_ERROR", message: 'result must be "SUCCESS" | "FAIL" | "UNKNOWN".' });
     }
-    return this.payout.settle(auth, market, id, body.result);
+    return this.payout.settle(auth, market, id, body.result as SettleResult);
+  }
+
+  // Kết luận dứt điểm 1 lệnh UNKNOWN_HOLD sau khi đối soát tay với provider (N15).
+  @Post(":id/resolve")
+  resolve(
+    @CurrentAuth() auth: AuthContext,
+    @Param("market") market: string,
+    @Param("id") id: string,
+    @Body() body: SettleBody,
+  ): Promise<PayoutDto> {
+    if (typeof body.result !== "string" || !RESOLVE_RESULTS.has(body.result)) {
+      throw new BadRequestException({ code: "VALIDATION_ERROR", message: 'result must be "SUCCESS" | "FAIL".' });
+    }
+    return this.payout.resolveHold(auth, market, id, body.result as ResolveResult);
   }
 }

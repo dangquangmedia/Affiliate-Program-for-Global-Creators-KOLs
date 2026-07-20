@@ -3,6 +3,11 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  // Server web chạy `next dev` (compile route theo yêu cầu): dưới tải, lần điều hướng đầu vào 1
+  // route có thể chậm nhiều giây. Thao tác vẫn ĐÚNG, chỉ chậm — nên nới timeout 60s và giới hạn
+  // 3 worker để tránh timeout giả khi máy đang tải nặng.
+  workers: 3,
+  timeout: 60_000,
   retries: 0,
   reporter: [["list"]],
   use: {

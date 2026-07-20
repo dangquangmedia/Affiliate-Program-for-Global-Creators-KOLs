@@ -7,7 +7,15 @@ import { Frame, Note, Card, Btn, BtnRow, Badge, KV, Empty, mk } from "../../../.
 import { mockLogin, saveSession } from "../../../../lib/auth-client";
 import { formatMoney } from "../../../../lib/i18n";
 import { listBatches, getBatch, createBatch, lockBatch, type ReconBatch } from "../../../../lib/reconciliation-client";
-import { payoutQueue, settlePayout, type PayoutQueueItem } from "../../../../lib/payout-client";
+import {
+  payoutQueue,
+  payoutHolds,
+  settlePayout,
+  resolveHold,
+  type PayoutQueueItem,
+  type SettleResult,
+  type ResolveResult,
+} from "../../../../lib/payout-client";
 
 type Status = "loading" | "needStaff" | "ready";
 
@@ -17,6 +25,7 @@ export default function FinanceWorkbenchScreen() {
   const [batches, setBatches] = useState<ReconBatch[]>([]);
   const [selected, setSelected] = useState<ReconBatch | null>(null);
   const [payouts, setPayouts] = useState<PayoutQueueItem[]>([]);
+  const [holds, setHolds] = useState<PayoutQueueItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const locale = MARKETS[market].locale;
@@ -31,6 +40,8 @@ export default function FinanceWorkbenchScreen() {
     setBatches(res);
     const pq = await payoutQueue(market);
     setPayouts("forbidden" in pq ? [] : pq);
+    const hq = await payoutHolds(market);
+    setHolds("forbidden" in hq ? [] : hq);
     setStatus("ready");
   }, [market]);
 
@@ -83,12 +94,24 @@ export default function FinanceWorkbenchScreen() {
     }
   }
 
-  async function doSettle(id: string) {
+  async function doSettle(id: string, result: SettleResult) {
     setBusy(true);
     setErr(null);
     try {
-      const res = await settlePayout(market, id);
+      const res = await settlePayout(market, id, result);
       if (!res.ok && res.code === "ALREADY_SETTLED") setErr("Lệnh này vừa được xử lý bởi người khác.");
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function doResolve(id: string, result: ResolveResult) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await resolveHold(market, id, result);
+      if (!res.ok && res.code === "NOT_ON_HOLD") setErr("Lệnh này không còn ở trạng thái chờ đối soát.");
       await load();
     } finally {
       setBusy(false);
@@ -202,14 +225,14 @@ export default function FinanceWorkbenchScreen() {
 
           <Card
             title={`Hàng đợi payout (${payouts.length})`}
-            sub="Lệnh đã reserve tiền · gọi provider (mock). Xử lý = SUCCESS → PAID (fail/unknown ở N15)."
+            sub="Lệnh đã reserve tiền · gọi provider (mock). 3 kết cục: SUCCESS → đã trả · FAIL → hoàn tiền (1 lần) · UNKNOWN → giữ chờ đối soát tay."
           >
             {payouts.length === 0 ? (
               <p style={{ color: "#8b96a3", fontSize: 13 }}>Không có lệnh rút nào chờ xử lý.</p>
             ) : (
               <table className={mk.table}>
                 <thead>
-                  <tr><th>Creator</th><th>Số tiền</th><th>Trạng thái</th><th></th></tr>
+                  <tr><th>Creator</th><th>Số tiền</th><th>Trạng thái</th><th>Kết cục provider (mock)</th></tr>
                 </thead>
                 <tbody>
                   {payouts.map((p) => (
@@ -218,9 +241,41 @@ export default function FinanceWorkbenchScreen() {
                       <td>{formatMoney(p.amountMinor, p.currency, locale)}</td>
                       <td><Badge kind="info">Đã giữ chỗ</Badge></td>
                       <td>
-                        <Btn variant="primary" disabled={busy} onClick={() => doSettle(p.id)}>
-                          {busy ? "…" : "Xử lý → thành công"}
-                        </Btn>
+                        <BtnRow>
+                          <Btn variant="primary" disabled={busy} onClick={() => doSettle(p.id, "SUCCESS")}>Thành công</Btn>
+                          <Btn variant="danger" disabled={busy} onClick={() => doSettle(p.id, "FAIL")}>Thất bại (hoàn)</Btn>
+                          <Btn variant="ghost" disabled={busy} onClick={() => doSettle(p.id, "UNKNOWN")}>Không rõ</Btn>
+                        </BtnRow>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Card>
+
+          <Card
+            title={`Chờ đối soát tay — UNKNOWN (${holds.length})`}
+            sub="Provider trả kết cục KHÔNG RÕ → tiền vẫn GIỮ (không hoàn vội, tránh double-pay). Finance đối chiếu sao kê provider rồi kết luận."
+          >
+            {holds.length === 0 ? (
+              <p style={{ color: "#8b96a3", fontSize: 13 }}>Không có lệnh nào đang chờ đối soát tay.</p>
+            ) : (
+              <table className={mk.table}>
+                <thead>
+                  <tr><th>Creator</th><th>Số tiền</th><th>Trạng thái</th><th>Kết luận sau đối soát</th></tr>
+                </thead>
+                <tbody>
+                  {holds.map((p) => (
+                    <tr key={p.id} data-creator={p.creatorName}>
+                      <td>{p.creatorName}</td>
+                      <td>{formatMoney(p.amountMinor, p.currency, locale)}</td>
+                      <td><Badge kind="warn">Không rõ → đang giữ</Badge></td>
+                      <td>
+                        <BtnRow>
+                          <Btn variant="primary" disabled={busy} onClick={() => doResolve(p.id, "SUCCESS")}>Đã chuyển → trả</Btn>
+                          <Btn variant="danger" disabled={busy} onClick={() => doResolve(p.id, "FAIL")}>Không chuyển → hoàn</Btn>
+                        </BtnRow>
                       </td>
                     </tr>
                   ))}

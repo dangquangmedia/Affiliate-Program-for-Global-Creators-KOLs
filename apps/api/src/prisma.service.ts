@@ -119,6 +119,7 @@ export type PrismaClientLike = {
   };
   payoutAttempt: {
     create(args: { data: unknown }): Promise<unknown>;
+    findMany(args?: { where?: unknown }): Promise<unknown[]>;
   };
   otpCode: {
     findFirst(args: { where?: unknown; orderBy?: unknown }): Promise<unknown>;

@@ -191,3 +191,101 @@ test("RBAC + isolation: creator cannot settle/queue; Finance PH cannot settle VN
   const phSettle = await fetch(`${baseUrl}/ops/ph/payouts/${payout.id}/settle`, { method: "POST", headers: jsonH(financePh), body: JSON.stringify({ result: "SUCCESS" }) });
   assert.equal(phSettle.status, 404);
 });
+
+// ===== N15: FAIL → hoàn 1 lần / UNKNOWN → giữ + đối soát tay =====
+
+const settle = (id: string, result: string) =>
+  fetch(`${baseUrl}/ops/vn/payouts/${id}/settle`, { method: "POST", headers: jsonH(financeVn), body: JSON.stringify({ result }) });
+const resolve = (id: string, result: string) =>
+  fetch(`${baseUrl}/ops/vn/payouts/${id}/resolve`, { method: "POST", headers: jsonH(financeVn), body: JSON.stringify({ result }) });
+
+async function processingPayout(tag: string): Promise<{ token: string; id: string }> {
+  const token = await availableCreator(tag);
+  const otp = await getOtp(token);
+  const p = await (await createPayout(token, { amountMinor: 450000, otpId: otp.otpId, code: otp.code, idempotencyKey: randomUUID() })).json();
+  return { token, id: p.id };
+}
+
+test("settle FAIL -> FAILED_RELEASED + PAYOUT_RELEASE +amount once, withdrawable restored", async () => {
+  const { token, id } = await processingPayout("fail");
+  assert.equal((await wallet(token)).withdrawableMinor, 0); // đang giữ chỗ
+
+  const res = await settle(id, "FAIL");
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).state, "FAILED_RELEASED");
+
+  const prisma = app.get(PrismaService);
+  const releases = (await prisma.db.ledgerEntry.findMany({ where: { refType: "payout", refId: id, entryType: "PAYOUT_RELEASE" } })) as Array<{ amountMinor: bigint }>;
+  assert.equal(releases.length, 1); // hoàn đúng 1 lần
+  assert.equal(releases[0].amountMinor, 450000n); // +amount
+
+  assert.equal((await wallet(token)).withdrawableMinor, 450000); // số dư phục hồi
+
+  // Xử lý lại lệnh đã kết thúc -> 409 (claim WHERE state='PROCESSING' trượt).
+  const again = await settle(id, "FAIL");
+  assert.equal(again.status, 409);
+  assert.equal((await again.json()).error.code, "ALREADY_SETTLED");
+});
+
+test("settle UNKNOWN -> UNKNOWN_HOLD, money stays held, NO release entry, shows in holds", async () => {
+  const { token, id } = await processingPayout("unk");
+  const res = await settle(id, "UNKNOWN");
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).state, "UNKNOWN_HOLD");
+
+  assert.equal((await wallet(token)).withdrawableMinor, 0); // vẫn giữ (không hoàn vội)
+  const prisma = app.get(PrismaService);
+  const releases = (await prisma.db.ledgerEntry.findMany({ where: { refType: "payout", refId: id, entryType: "PAYOUT_RELEASE" } })) as unknown[];
+  assert.equal(releases.length, 0); // KHÔNG hoàn khi chưa rõ
+
+  const holds = (await (await fetch(`${baseUrl}/ops/vn/payouts/holds`, { headers: bearer(financeVn) })).json()) as Array<{ id: string }>;
+  assert.ok(holds.some((h) => h.id === id));
+});
+
+test("resolveHold FAIL on an UNKNOWN_HOLD -> FAILED_RELEASED + release, withdrawable restored", async () => {
+  const { token, id } = await processingPayout("hold-fail");
+  await settle(id, "UNKNOWN");
+
+  const res = await resolve(id, "FAIL");
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).state, "FAILED_RELEASED");
+  assert.equal((await wallet(token)).withdrawableMinor, 450000);
+
+  // provider_ref khác nhau mỗi lần thử (UNKNOWN rồi FAIL) -> 2 attempt.
+  const prisma = app.get(PrismaService);
+  const attempts = (await prisma.db.payoutAttempt.findMany({ where: { payoutRequestId: id } })) as Array<{ providerRef: string }>;
+  assert.equal(attempts.length, 2);
+  assert.equal(new Set(attempts.map((a) => a.providerRef)).size, 2);
+});
+
+test("resolveHold SUCCESS on an UNKNOWN_HOLD -> PAID, money stays spent (no release)", async () => {
+  const { token, id } = await processingPayout("hold-ok");
+  await settle(id, "UNKNOWN");
+
+  const res = await resolve(id, "SUCCESS");
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).state, "PAID");
+  assert.equal((await wallet(token)).withdrawableMinor, 0); // provider thật đã chuyển -> giữ
+
+  const prisma = app.get(PrismaService);
+  const releases = (await prisma.db.ledgerEntry.findMany({ where: { refType: "payout", refId: id, entryType: "PAYOUT_RELEASE" } })) as unknown[];
+  assert.equal(releases.length, 0);
+
+  // Đối soát lại lệnh đã kết luận -> 409 NOT_ON_HOLD.
+  const again = await resolve(id, "FAIL");
+  assert.equal(again.status, 409);
+  assert.equal((await again.json()).error.code, "NOT_ON_HOLD");
+});
+
+test("resolve rejects on a PROCESSING payout (not on hold) -> 409 NOT_ON_HOLD", async () => {
+  const { id } = await processingPayout("hold-guard");
+  const res = await resolve(id, "SUCCESS");
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error.code, "NOT_ON_HOLD");
+});
+
+test("settle rejects an unknown result value -> 400", async () => {
+  const { id } = await processingPayout("bad-result");
+  const res = await settle(id, "MAYBE");
+  assert.equal(res.status, 400);
+});

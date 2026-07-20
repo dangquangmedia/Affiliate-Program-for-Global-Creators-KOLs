@@ -242,6 +242,33 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   docs cả 3 ngay (đã xong) + code LÁT MỎNG sau N11 (QĐ-6 apply-flow; QĐ-7 `platform_fee_bps`+builder
   ghép N12/N13; QĐ-8 `PENDING_FUNDING`+nút nạp quỹ mock ghép N13/N14) — money spine không bị chậm.
 
+- **N15 — Payout FAIL/UNKNOWN + hoàn tiền 1 lần + E2E cả spine tiền VN+PH (2026-07-20, đóng
+  Tuần C)**: KHÔNG cần migration (enum `PayoutState` đã có `FAILED_RELEASED`/`UNKNOWN_HOLD`;
+  `PayoutAttemptResult` đã có `FAIL`/`UNKNOWN`). Mở `settle` (payout.service.ts) cho **3 kết cục**
+  (bài toán #4): **SUCCESS** → PAID (reserve đã trừ, số dư không đổi); **FAIL** (provider xác nhận
+  KHÔNG chuyển) → `FAILED_RELEASED` + ghi sổ `PAYOUT_RELEASE +amount` **hoàn đúng 1 lần** — rời
+  khỏi tập "đang giữ" nên số dư rút được TỰ phục hồi (rút lại = lệnh MỚI, không ghi đè);
+  **UNKNOWN** (timeout/không rõ) → `UNKNOWN_HOLD` + **KHÔNG hoàn** (hoàn vội = double-pay nếu
+  provider thật đã chuyển) — giữ reserve chờ đối soát tay. Thêm `resolveHold` (Finance đối chiếu
+  sao kê provider): SUCCESS → PAID (giữ), FAIL → FAILED_RELEASED + hoàn. Gom logic vào 1 helper
+  **`applyProviderOutcome`**: **claim `UPDATE ... WHERE state=fromState`** (kẻ đến sau match 0 →
+  409 `ALREADY_SETTLED`/`NOT_ON_HOLD`) + mỗi lần gọi provider = 1 `payout_attempt` với
+  `provider_ref` KHÁC NHAU (`mock-{id}-{lần}`, đếm attempt) → callback/retry idempotent; hoàn đúng
+  1 lần được đảm bảo bởi claim + `UNIQUE(ref_type,ref_id,entry_type)`. Endpoint mới `GET
+  /ops/:m/payouts/holds` (hàng đợi UNKNOWN_HOLD) + `POST /ops/:m/payouts/:id/resolve`. Facade thêm
+  `payoutAttempt.findMany`. Web: `payout-client.ts` (`settlePayout(result)`, `resolveHold`,
+  `payoutHolds`); V12 nút 3 kết cục (Thành công / Thất bại-hoàn / Không rõ) + card "Chờ đối soát
+  tay — UNKNOWN" với nút kết luận; V08 vốn đã render đủ 4 badge trạng thái. Kết quả: **API 88/88**
+  (thêm 10: 6 payout — FAIL hoàn-1-lần + số dư phục hồi + double 409, UNKNOWN giữ + không release +
+  hiện ở holds, resolve FAIL/SUCCESS, guard NOT_ON_HOLD, 400 result lạ; **4 money-spine E2E API
+  chạy trọn luồng tiền trên VN+PH cả SUCCESS lẫn FAIL**), **E2E 17/17** (thêm `payout-fail-flow`
+  chạy trên **PH** để cách ly khỏi `payout-flow` VN — spec đó settle mọi lệnh PROCESSING của VN).
+  **Chỉnh playwright.config**: `workers: 3` + `timeout: 60_000` — `next dev` compile route theo
+  yêu cầu, dưới tải nhiều worker gây timeout GIẢ (thao tác đúng, chỉ chậm); nới timeout trị đúng
+  gốc, ổn định qua 2 lần chạy liên tiếp. Vòng đời tiền **TRỌN VẸN**: content→earning→đối soát→
+  AVAILABLE→rút→{PAID · FAIL-hoàn · UNKNOWN-giữ→đối soát tay}. Kế: **Tuần D (N16+)** — i18n/polish,
+  audit+RBAC negative tests, seed+README máy sạch, HARD_PROBLEMS.md Q&A; lát mỏng QĐ-7/8 nếu còn giờ.
+
 - **N14 — Payout: rút tiền + OTP + reserve + provider mock SUCCESS (2026-07-20)**: KHÔNG cần
   migration (bảng `payout_request/attempt` + `otp_code` đã có). Module `payout/`: creator
   `GET /me/country/:m/wallet` (số dư rút được = Σ net earning AVAILABLE − Σ lệnh đang giữ
@@ -328,20 +355,21 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   token + tài nguyên VN → 404); gọi route VN bằng token PH là 403 — ngữ nghĩa khác. Kế: **N12**
   ledger append-only + dashboard earnings (V07) Gross–Thuế–Net.
 
-## Current State & Hand-off (cập nhật 2026-07-20 — sau N14, Tuần C đang chạy)
+## Current State & Hand-off (cập nhật 2026-07-20 — sau N15, **HẾT Tuần C — money spine TRỌN VẸN**)
 
 **1. Vừa xong / trạng thái:**
-- Xong **Tuần A + Tuần B + N11–N14**. **Đã commit HẾT, cây sạch** — mốc mới nhất N14 = `23aed26`. Chỉ còn `.claude/settings.local.json` modified (settings máy — KHÔNG commit).
-- **N14**: rút tiền chạy thật — số dư rút được (net AVAILABLE − đang giữ) → OTP mock → reserve (`PAYOUT_RESERVE −amount`) → PROCESSING → Finance settle SUCCESS → PAID. Chống bấm 2 lần (`idempotency_key` UNIQUE), OTP consume nguyên tử, số dư kiểm trong khóa (không rút vượt). Fail/UNKNOWN chưa làm.
-- Toàn xanh: **API 78/78, E2E 16/16**, lint + 2×typecheck sạch. Postgres Docker 54329 (bật Docker Desktop sau khi khởi động máy). Báo cáo mentor ở `Report/`.
+- Xong **Tuần A + B + toàn bộ Tuần C (N11–N15)**. Vòng đời tiền **TRỌN VẸN**: content→earning (exactly-once)→ledger append-only→đối soát/khoá→AVAILABLE→rút (OTP+reserve)→**3 kết cục** {PAID · FAIL→hoàn 1 lần · UNKNOWN→giữ→đối soát tay}.
+- **N15**: `settle` nhận SUCCESS/FAIL/UNKNOWN + `resolveHold` cho UNKNOWN_HOLD (helper `applyProviderOutcome`: claim `WHERE state=fromState` → 409 nếu trượt; `provider_ref` khác nhau mỗi lần thử; FAIL ghi `PAYOUT_RELEASE +amount` hoàn đúng 1 lần; UNKNOWN không hoàn). 7 bài toán khó **đã có code chứng minh đủ**.
+- Toàn xanh: **API 88/88, E2E 17/17** (ổn định qua 2 lần chạy), lint + 2×typecheck sạch. **CHƯA COMMIT** (xem mục 3). Postgres Docker 54329 (bật Docker Desktop sau khi khởi động máy). Báo cáo mentor ở `Report/` (dựng ở Tuần A+B, chưa cập nhật N11–N15).
 
-**2. File/biến quan trọng (N14):**
-- `apps/api/src/payout/{payout.service.ts,payout.controller.ts}`: `wallet()` (số dư = Σ net AVAILABLE − Σ payout PROCESSING/PAID/UNKNOWN_HOLD), `requestOtp()` (mã 6 số, trả `code` chỉ dev), `createPayout()` (idempotency short-circuit + catch P2002; OTP consume `UPDATE ... WHERE consumed_at IS NULL`; min → 409 BELOW_MIN_PAYOUT; số dư+reserve TRONG tx → INSUFFICIENT_BALANCE; ghi `PAYOUT_RESERVE −amount`), `queue()` + `settle()` (claim `WHERE state='PROCESSING'` → PAID; double-settle 409 ALREADY_SETTLED; `payout_attempt.provider_ref` UNIQUE). Routes creator `/me/country/:m/{wallet,payouts,payouts/otp}`, finance `/ops/:m/payouts` (+`/:id/settle`).
-- Facade thêm `payoutRequest`/`payoutAttempt`/`otpCode`. Web: `lib/payout-client.ts`, V08 `creator/wallet/page.tsx` (số dư + OTP flow + lịch sử), V12 thêm hàng đợi payout thật. Test `payout.smoke.test.ts` (9) + e2e `payout-flow.spec.ts`.
-- **LedgerService** (tái dùng): `post(tx, input)` append-only. Ghi khi rút: `PAYOUT_RESERVE −amount`. N15 sẽ dùng `PAYOUT_RELEASE +amount` (fail) + `REVERSAL`.
-- **Gotcha**: (a) `.env` thủ công cho prisma CLI (+ `db:seed` sau khi sửa seed.sql); (b) đừng build/xóa `.next` khi dev:web chạy; (c) test email/tên unique; (d) `listMine` ẩn LEFT; (e) `corepack pnpm`; (f) cách ly staff: route nước MÌNH (VN res qua PH route → 404; route VN + token PH → 403); (g) `createBatch`/payout queue gom TOÀN BỘ của nước → assert theo bản ghi cụ thể; (h) **test script `--test-concurrency=1`** (bắt buộc: suite integration dùng chung 1 DB, chạy song song gây nhiễu chéo); (i) thứ tự check trong `createPayout`: dup → amount → **min → OTP → (trong tx) balance** (test dưới-min phải để amount≥min mới chạm nhánh OTP).
+**2. File/biến quan trọng (N15):**
+- `apps/api/src/payout/payout.service.ts`: `settle(auth, market, id, result: SettleResult)` + `resolveHold(...result: ResolveResult)` + private `applyProviderOutcome(tx, payout, fromState, result, conflictCode, conflictMsg)` (claim UPDATE bằng `$queryRaw` với `${toState}::"PayoutState"` và `${fromState}::"PayoutState"` — **cast enum tường minh cho param**; đếm `payoutAttempt.findMany` → `attemptNo` → `provider_ref = mock-{id}-{attemptNo}`; FAIL → `ledger.post(PAYOUT_RELEASE +amount)`). `queue()` = PROCESSING, `holds()` = UNKNOWN_HOLD. `OUTSTANDING_STATES = {PROCESSING, PAID, UNKNOWN_HOLD}` (FAILED_RELEASED KHÔNG giữ → số dư phục hồi).
+- `payout.controller.ts`: `POST :id/settle` (validate ∈ {SUCCESS,FAIL,UNKNOWN}), `POST :id/resolve` (∈ {SUCCESS,FAIL}), `GET payouts/holds`. Facade `payoutAttempt` thêm `findMany`.
+- Web `lib/payout-client.ts`: `settlePayout(market,id,result?)`, `resolveHold(market,id,result)`, `payoutHolds(market)`. V12 `finance/workbench/page.tsx`: nút 3 kết cục ở hàng đợi + card "Chờ đối soát tay — UNKNOWN" (nút "Đã chuyển→trả"/"Không chuyển→hoàn"). V08 đã có sẵn 4 badge (PROCESSING/PAID/FAILED_RELEASED/UNKNOWN_HOLD).
+- Test: `payout.smoke.test.ts` (+6 N15), `money-spine.test.ts` (NEW, 4 test — spine VN+PH ×{SUCCESS,FAIL}, chạy `for FIXTURES` tham số hoá theo nước). E2e `payout-fail-flow.spec.ts` (NEW, **PH** để cách ly). `playwright.config.ts`: `workers:3`, `timeout:60_000`.
+- **Gotcha** (giữ nguyên N14, đọc journal N14 nếu cần): (a) `.env` thủ công cho prisma CLI; (b) đừng xoá `.next` khi dev:web chạy; (c) test email/tên unique; (e) `corepack pnpm`; (f) cách ly staff route nước MÌNH; (g) queue/holds/createBatch gom TOÀN BỘ của nước → assert theo bản ghi cụ thể; (h) **`--test-concurrency=1`** cho test API (DB chung); (i) `createPayout` thứ tự check: dup→amount→min→OTP→(tx)balance. **MỚI N15**: (j) **e2e chạy song song trên DB chung — `payout-flow.spec` settle MỌI lệnh PROCESSING của VN** → spec payout khác phải dùng **PH** hoặc match theo `data-creator` duy nhất; (k) `next dev` compile route theo yêu cầu → dưới tải nhiều worker gây **timeout giả** → giữ `workers:3`+`timeout:60s`; (l) claim state bằng `$queryRaw` phải cast **cả 2 vế** enum (`= ${x}::"PayoutState"`), param text so enum column sẽ lỗi nếu thiếu cast.
 
-**3. Nhiệm vụ đầu tiên phiên sau — N15 (đóng Tuần C):**
-- **Trước khi code**: bật Docker Desktop (Postgres 54329) rồi `corepack pnpm test` (apps/api) xác nhận 78/78 xanh — mốc khởi động sạch.
-- **N15 — Payout FAIL/UNKNOWN + bút toán đảo + E2E cả spine tiền**: mở `settle` (payout.service.ts) nhận `result` FAIL/UNKNOWN. **FAIL** → `FAILED_RELEASED` + ghi sổ `PAYOUT_RELEASE +amount` **đúng 1 lần** (hoàn tiền về số dư) — dùng `UNIQUE(ref_type,ref_id,entry_type)` hoặc claim để không hoàn 2 lần; creator rút lại = lệnh MỚI (không ghi đè). **UNKNOWN** → `UNKNOWN_HOLD` + **KHÔNG** ghi release (giữ reserve — release vội = double-pay nếu provider thật đã chuyển); chờ Finance đối soát tay rồi mới quyết PAID/hoàn. Retry provider: `provider_ref` khác nhau mỗi lần (VD `mock-${id}-${attemptNo}`). V08/V12 nút chọn kết cục. Chạy **E2E cả spine tiền trên VN + PH**.
-- **Lát mỏng QĐ-7 (phí) + QĐ-8 (escrow)**: `platform_fee_bps` (migration nhỏ) + `PLATFORM_FEE` ledger; `PENDING_FUNDING`+`funded_at`. **QĐ-6 apply-flow**: dồn buffer N20. Cắt bớt nếu thiếu thời gian (ưu tiên spine tiền trọn vẹn).
+**3. Nhiệm vụ đầu tiên phiên sau:**
+- **Việc #0 — COMMIT N15**: cây đang bẩn (payout service/controller, prisma facade, 3 web file, 2 test file, playwright.config, LOG). Bật Docker → `corepack pnpm test` (apps/api, kỳ vọng 88/88) → `corepack pnpm -r lint` + 2×typecheck → e2e (17/17, ~1.3m) → `git add` + commit "N15: payout FAIL→hoàn 1 lần / UNKNOWN→giữ + đối soát tay + spine E2E VN+PH". `.claude/settings.local.json` KHÔNG commit.
+- **Sau đó: mở Tuần D (N16 — Bước 5 Triển khai)**: i18n hoàn thiện (vi/en + USD tham chiếu) + responsive. Rồi N17 audit+RBAC negative tests, N18 seed+README máy sạch+docker, N19 `docs/HARD_PROBLEMS.md` thành bộ Q&A (mỗi bài toán: câu hỏi + trả lời + file code chứng minh) + kịch bản demo, N20 buffer+regression.
+- **Nợ kỹ thuật (lát mỏng, nhét khi có giờ)**: QĐ-7 phí (`platform_fee_bps` + `PLATFORM_FEE` ledger + tổng brand ở builder), QĐ-8 escrow (`PENDING_FUNDING`+`funded_at`+nút nạp quỹ mock), QĐ-6 apply-flow. Cập nhật `Report/` (PPTX+Q&A) cho N11–N15 trước buổi mentor. Ưu tiên: spine đã trọn — Tuần D là polish/defense, không thêm thư viện lõi.

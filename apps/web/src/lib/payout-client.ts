@@ -70,6 +70,9 @@ export async function createPayout(
   return { ok: false, code, message };
 }
 
+export type SettleResult = "SUCCESS" | "FAIL" | "UNKNOWN";
+export type ResolveResult = "SUCCESS" | "FAIL";
+
 export async function payoutQueue(market: string): Promise<PayoutQueueItem[] | { forbidden: true }> {
   const res = await fetch(`${API_BASE}/ops/${market.toLowerCase()}/payouts`, { headers: authHeaders() });
   if (res.status === 401 || res.status === 403) return { forbidden: true };
@@ -77,11 +80,19 @@ export async function payoutQueue(market: string): Promise<PayoutQueueItem[] | {
   return (await res.json()) as PayoutQueueItem[];
 }
 
-export async function settlePayout(market: string, id: string): Promise<{ ok: boolean; code?: string }> {
-  const res = await fetch(`${API_BASE}/ops/${market.toLowerCase()}/payouts/${id}/settle`, {
+// Lệnh đang UNKNOWN_HOLD chờ đối soát tay (N15).
+export async function payoutHolds(market: string): Promise<PayoutQueueItem[] | { forbidden: true }> {
+  const res = await fetch(`${API_BASE}/ops/${market.toLowerCase()}/payouts/holds`, { headers: authHeaders() });
+  if (res.status === 401 || res.status === 403) return { forbidden: true };
+  if (!res.ok) return [];
+  return (await res.json()) as PayoutQueueItem[];
+}
+
+async function postOutcome(market: string, id: string, path: string, result: string): Promise<{ ok: boolean; code?: string }> {
+  const res = await fetch(`${API_BASE}/ops/${market.toLowerCase()}/payouts/${id}/${path}`, {
     method: "POST",
     headers: authHeaders(true),
-    body: JSON.stringify({ result: "SUCCESS" }),
+    body: JSON.stringify({ result }),
   });
   if (res.ok) return { ok: true };
   try {
@@ -89,4 +100,14 @@ export async function settlePayout(market: string, id: string): Promise<{ ok: bo
   } catch {
     return { ok: false };
   }
+}
+
+// Gọi provider mock lần đầu (PROCESSING): SUCCESS/FAIL/UNKNOWN.
+export function settlePayout(market: string, id: string, result: SettleResult = "SUCCESS") {
+  return postOutcome(market, id, "settle", result);
+}
+
+// Đối soát tay 1 lệnh UNKNOWN_HOLD: SUCCESS (đã chuyển) / FAIL (hoàn tiền).
+export function resolveHold(market: string, id: string, result: ResolveResult) {
+  return postOutcome(market, id, "resolve", result);
 }

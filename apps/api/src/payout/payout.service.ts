@@ -31,6 +31,11 @@ export interface PayoutQueueItem extends PayoutDto {
   creatorName: string;
 }
 
+// Kết cục provider mock. Lần gọi đầu (từ PROCESSING) có thể UNKNOWN; giải quyết tay (từ
+// UNKNOWN_HOLD) chỉ còn 2 ngả dứt điểm.
+export type SettleResult = "SUCCESS" | "FAIL" | "UNKNOWN";
+export type ResolveResult = "SUCCESS" | "FAIL";
+
 type CountryRow = { id: string; enabled: boolean; currencyCode: string };
 type EarningLite = { grossMinor: bigint; taxMinor: bigint };
 type PayoutRow = {
@@ -240,32 +245,108 @@ export class PayoutService {
     return rows.map((p) => ({ ...this.toDto(p), creatorName: p.profile?.user.displayName ?? "—" }));
   }
 
-  /**
-   * Finance "gọi provider mock" và ghi kết cục. N14 chỉ SUCCESS → PAID (fail/unknown ở N15).
-   * Claim `WHERE state='PROCESSING'` → double-settle 409. `payout_attempt.provider_ref` UNIQUE =
-   * callback/retry chỉ ghi 1 lần. Reserve đã trừ tiền lúc tạo lệnh nên PAID không đổi số dư.
-   */
-  async settle(auth: AuthContext, market: string, payoutId: string, result: "SUCCESS"): Promise<PayoutDto> {
+  /** Finance: lệnh đang UNKNOWN_HOLD (kết cục không rõ) chờ đối soát tay của nước mình (N15). */
+  async holds(auth: AuthContext, market: string): Promise<PayoutQueueItem[]> {
     const country = await this.requireCountry(market);
     assertStaffForCountry(auth, country.id, FINANCE_ROLES);
-    if (result !== "SUCCESS") this.badRequest('N14 only supports result="SUCCESS" (fail/unknown at N15).');
+    const rows = (await this.prisma.db.payoutRequest.findMany({
+      where: { countryId: country.id, state: "UNKNOWN_HOLD" },
+      include: { profile: { include: { user: true } } },
+      orderBy: { requestedAt: "asc" },
+    })) as PayoutRow[];
+    return rows.map((p) => ({ ...this.toDto(p), creatorName: p.profile?.user.displayName ?? "—" }));
+  }
 
+  /**
+   * Finance "gọi provider mock" và ghi kết cục cho lệnh PROCESSING (bài toán #4 — 3 kết cục):
+   *  - SUCCESS → PAID: reserve đã trừ tiền nên số dư không đổi.
+   *  - FAIL (xác nhận provider KHÔNG chuyển) → FAILED_RELEASED + **hoàn tiền đúng 1 lần**
+   *    (`PAYOUT_RELEASE +amount`); creator muốn rút lại phải tạo lệnh MỚI.
+   *  - UNKNOWN (timeout/không rõ) → UNKNOWN_HOLD: **KHÔNG hoàn** — hoàn vội = double-pay nếu
+   *    provider thật ra đã chuyển; giữ reserve chờ Finance đối soát tay (`resolveHold`).
+   */
+  async settle(auth: AuthContext, market: string, payoutId: string, result: SettleResult): Promise<PayoutDto> {
+    const country = await this.requireCountry(market);
+    assertStaffForCountry(auth, country.id, FINANCE_ROLES);
+    if (result !== "SUCCESS" && result !== "FAIL" && result !== "UNKNOWN") {
+      this.badRequest('result must be "SUCCESS" | "FAIL" | "UNKNOWN".');
+    }
+    const payout = await this.findInCountry(payoutId, country.id);
+    return this.prisma.db.$transaction((tx: PrismaClientLike) =>
+      this.applyProviderOutcome(tx, payout, "PROCESSING", result, "ALREADY_SETTLED", "This payout has already been settled."),
+    );
+  }
+
+  /**
+   * Đối soát tay 1 lệnh đang UNKNOWN_HOLD — sau khi Finance kiểm chứng với provider thật:
+   *  - SUCCESS (provider ĐÃ chuyển) → PAID, giữ nguyên reserve (không hoàn).
+   *  - FAIL (provider KHÔNG chuyển) → FAILED_RELEASED + hoàn tiền đúng 1 lần.
+   * Không nhận UNKNOWN nữa: đây là bước kết luận dứt điểm.
+   */
+  async resolveHold(auth: AuthContext, market: string, payoutId: string, result: ResolveResult): Promise<PayoutDto> {
+    const country = await this.requireCountry(market);
+    assertStaffForCountry(auth, country.id, FINANCE_ROLES);
+    if (result !== "SUCCESS" && result !== "FAIL") this.badRequest('result must be "SUCCESS" | "FAIL".');
+    const payout = await this.findInCountry(payoutId, country.id);
+    return this.prisma.db.$transaction((tx: PrismaClientLike) =>
+      this.applyProviderOutcome(tx, payout, "UNKNOWN_HOLD", result, "NOT_ON_HOLD", "This payout is not awaiting manual resolution."),
+    );
+  }
+
+  private async findInCountry(payoutId: string, countryId: string): Promise<PayoutRow> {
     const payout = (await this.prisma.db.payoutRequest.findFirst({
-      where: { id: payoutId, countryId: country.id },
+      where: { id: payoutId, countryId },
     })) as PayoutRow | null;
     if (!payout) this.notFound("Payout not found in this country.");
+    return payout;
+  }
 
-    return this.prisma.db.$transaction(async (tx: PrismaClientLike) => {
-      const claimed = (await tx.$queryRaw`
-        UPDATE payout_request SET state = 'PAID'::"PayoutState"
-        WHERE id = ${payoutId}::uuid AND state = 'PROCESSING' RETURNING id
-      `) as Array<{ id: string }>;
-      if (claimed.length === 0) this.conflict("ALREADY_SETTLED", "This payout has already been settled.");
+  /**
+   * Ghi kết cục provider trong 1 transaction. **Claim** `WHERE state=fromState` — kẻ đến sau match
+   * 0 hàng → 409 (chống xử lý 2 lần). Mỗi lần gọi provider = 1 `payout_attempt` với `provider_ref`
+   * KHÁC NHAU (`mock-{id}-{lần}`) để callback/retry idempotent (UNIQUE provider_ref). FAIL hoàn
+   * tiền `PAYOUT_RELEASE +amount` — claim + `UNIQUE(ref_type,ref_id,entry_type)` cùng đảm bảo hoàn
+   * đúng 1 lần.
+   */
+  private async applyProviderOutcome(
+    tx: PrismaClientLike,
+    payout: PayoutRow,
+    fromState: string,
+    result: SettleResult,
+    conflictCode: string,
+    conflictMsg: string,
+  ): Promise<PayoutDto> {
+    const toState = result === "SUCCESS" ? "PAID" : result === "FAIL" ? "FAILED_RELEASED" : "UNKNOWN_HOLD";
+    const claimed = (await tx.$queryRaw`
+      UPDATE payout_request SET state = ${toState}::"PayoutState"
+      WHERE id = ${payout.id}::uuid AND state = ${fromState}::"PayoutState" RETURNING id
+    `) as Array<{ id: string }>;
+    if (claimed.length === 0) this.conflict(conflictCode, conflictMsg);
 
-      await tx.payoutAttempt.create({
-        data: { payoutRequestId: payoutId, providerRef: `mock-${payoutId}`, result: "SUCCESS", raw: "mock provider success" },
-      });
-      return this.toDto({ ...payout, state: "PAID" });
+    const prior = (await tx.payoutAttempt.findMany({ where: { payoutRequestId: payout.id } })) as unknown[];
+    const attemptNo = prior.length + 1; // provider_ref khác nhau mỗi lần thử
+    await tx.payoutAttempt.create({
+      data: {
+        payoutRequestId: payout.id,
+        providerRef: `mock-${payout.id}-${attemptNo}`,
+        result,
+        raw: `mock provider ${result.toLowerCase()}`,
+      },
     });
+
+    if (result === "FAIL") {
+      // Hoàn tiền về số dư: ghi sổ +amount. FAILED_RELEASED rời khỏi tập "đang giữ" nên số dư rút
+      // được tự phục hồi (withdrawable = net AVAILABLE − Σ lệnh đang giữ).
+      await this.ledger.post(tx, {
+        countryId: payout.countryId,
+        profileId: payout.profileId,
+        entryType: "PAYOUT_RELEASE",
+        amountMinor: payout.amountMinor,
+        currency: payout.currency,
+        refType: "payout",
+        refId: payout.id,
+      });
+    }
+    return this.toDto({ ...payout, state: toState });
   }
 }
