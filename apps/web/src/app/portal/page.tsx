@@ -1,6 +1,6 @@
 import Link from "next/link";
 import s from "./portal.module.css";
-import { Icon } from "./ui";
+import { Icon, ThemeToggle } from "./ui";
 
 // Landing khu /portal: một khung liền mạch — header (logo + prototype ở góc phải) → hero thân
 // thiện → chọn vai → footer (kiểm chứng country-context /vn /ph). Server component (tĩnh).
@@ -22,14 +22,15 @@ const ROLES = [
 
 export default function PortalLanding() {
   return (
-    <div className={s.app} data-market="VN">
+    <div className={s.app} data-market="VN" data-portal-root>
       <div className={s.landing}>
         <div className={s.landFrame}>
-          {/* header: brand trái · prototype góc phải */}
+          {/* header: brand trái · theme + prototype góc phải */}
           <header className={s.landHeader}>
             <span className={s.logoMark}><Icon name="globe" size={19} /></span>
             <span className={s.brandName}>Affiliate GLOBAL<span>Control Center</span></span>
             <div className={s.landHeaderRight}>
+              <ThemeToggle />
               <Link href="/mockup" className={s.cornerBtn} data-testid="link-mockup">
                 <Icon name="eye" size={16} /> Xem prototype
               </Link>

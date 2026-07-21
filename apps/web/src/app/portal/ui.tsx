@@ -3,7 +3,7 @@
 // Bộ component dùng chung cho khu /portal (UI thật). Icon là SVG outline (không emoji),
 // Shell dựng sidebar + topbar + bottom-nav mobile, đọc màu bản sắc nước qua data-market.
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import s from "./portal.module.css";
 import { MARKETS, type Market } from "../../mockup/data";
 
@@ -12,7 +12,7 @@ type IconName =
   | "home" | "compass" | "layers" | "wallet" | "chart" | "shield" | "fileCheck"
   | "sliders" | "scale" | "globe" | "check" | "clock" | "alert" | "lock" | "coins"
   | "users" | "flag" | "bell" | "arrow" | "logout" | "info" | "plus" | "search"
-  | "spark" | "ban" | "refresh" | "eye" | "hold" | "menu";
+  | "spark" | "ban" | "refresh" | "eye" | "hold" | "menu" | "sun" | "moon";
 
 const P: Record<IconName, ReactNode> = {
   home: <path d="M3 10.5 12 3l9 7.5M5 9.5V20h5v-6h4v6h5V9.5" />,
@@ -44,6 +44,8 @@ const P: Record<IconName, ReactNode> = {
   eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
   hold: <><circle cx="12" cy="12" r="9" /><path d="M10 9v6M14 9v6" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  sun: <><circle cx="12" cy="12" r="4.2" /><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" /></>,
+  moon: <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" />,
 };
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
@@ -52,6 +54,34 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
       strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {P[name]}
     </svg>
+  );
+}
+
+/* --------------------------- Theme ---------------------------------- */
+// Áp data-theme lên MỌI gốc portal đang có trên trang (landing hoặc dashboard).
+function applyTheme(light: boolean) {
+  document.querySelectorAll("[data-portal-root]").forEach((el) =>
+    el.setAttribute("data-theme", light ? "light" : "dark"),
+  );
+}
+export function ThemeToggle() {
+  const [light, setLight] = useState(false);
+  useEffect(() => {
+    const saved = typeof window !== "undefined" && localStorage.getItem("ag_theme") === "light";
+    setLight(saved);
+    applyTheme(saved);
+  }, []);
+  const toggle = () => {
+    const next = !light;
+    setLight(next);
+    localStorage.setItem("ag_theme", next ? "light" : "dark");
+    applyTheme(next);
+  };
+  return (
+    <button className={s.themeBtn} onClick={toggle} aria-label={light ? "Chuyển nền tối" : "Chuyển nền sáng"}
+      title={light ? "Chuyển nền tối" : "Chuyển nền sáng"}>
+      <Icon name={light ? "moon" : "sun"} size={17} />
+    </button>
   );
 }
 
@@ -85,7 +115,7 @@ export function Shell({
   const initials = user.name.split(" ").slice(-2).map((w) => w[0]).join("").toUpperCase();
   const mobileNav = nav.slice(0, 5);
   return (
-    <div className={s.app} data-market={market}>
+    <div className={s.app} data-market={market} data-portal-root>
       <div className={s.shell}>
         {/* sidebar */}
         <aside className={s.sidebar}>
@@ -133,6 +163,7 @@ export function Shell({
               )}
               <button className={`${s.pillBtn} ${showUsd ? s.pillBtnOn : ""}`} onClick={() => setShowUsd(!showUsd)}
                 title="Hiện USD tham chiếu (demo, không dùng thanh toán)">$ USD</button>
+              <ThemeToggle />
               <button className={s.iconBtn} aria-label="Thông báo"><Icon name="bell" size={17} /></button>
               <div className={s.userChip}>
                 <span className={s.userName}>{user.name}<small>{user.sub}</small></span>
