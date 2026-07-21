@@ -259,13 +259,13 @@ export function Chip({ tone = "neutral", icon, children }: { tone?: Tone; icon?:
   return <span className={`${s.chip} ${chipCls[tone]}`}>{icon && <Icon name={icon} size={12} />}{children}</span>;
 }
 
-export function Btn({ children, variant = "default", onClick, href, disabled, block, sm }: {
+export function Btn({ children, variant = "default", onClick, href, disabled, block, sm, testId }: {
   children: ReactNode; variant?: "default" | "primary" | "ghost" | "danger";
-  onClick?: () => void; href?: string; disabled?: boolean; block?: boolean; sm?: boolean;
+  onClick?: () => void; href?: string; disabled?: boolean; block?: boolean; sm?: boolean; testId?: string;
 }) {
   const cls = `${s.btn} ${variant === "primary" ? s.btnPrimary : variant === "ghost" ? s.btnGhost : variant === "danger" ? s.btnDanger : ""} ${block ? s.btnBlock : ""} ${sm ? s.btnSm : ""}`;
-  if (href) return <Link href={href} className={cls}>{children}</Link>;
-  return <button className={cls} onClick={onClick} disabled={disabled}>{children}</button>;
+  if (href) return <Link href={href} className={cls} data-testid={testId}>{children}</Link>;
+  return <button className={cls} onClick={onClick} disabled={disabled} data-testid={testId}>{children}</button>;
 }
 
 export function Meter({ taken, total }: { taken: number; total: number }) {
