@@ -543,3 +543,20 @@ Sau khi dự án đã đóng N1–N20, Anh Quang giao 3 việc (ưu tiên Việc
 **Việc phụ (khi Anh Quang muốn):** (a) `git push origin main` đẩy SP-1 lên GitHub; (b) commit các docs đang dở (PRODUCT/MENTOR_QA/PPTX); (c) **điểm 3 i18n VI/EN cho `/portal`** VẪN HOÃN (portal đang VN-only hardcoded — khối lượng lớn, xem hand-off cũ ở trên); (d) làm 2 smoke-spec (`portal-admin`,`portal-global`) robust (chờ route ấm) để hết flake.
 
 **Môi trường:** Postgres Docker **port 5433** + **API dev 3001** + **web dev 3000** đang chạy (nếu cần: `corepack pnpm bootstrap` → `dev:api`+`dev:web`). E2E chạy `cd apps/web && corepack pnpm exec playwright test --workers=1`.
+
+---
+
+## Current State & Hand-off (cập nhật 2026-07-21 — phiên "Dọn docs + push", MỚI NHẤT — bổ sung mục trên)
+
+**1. Vừa xong:**
+- **Dedup 4 file docs trùng lặp** (theo yêu cầu Anh Quang): chuẩn hoá phân vai — `Report/MENTOR_QA.md` = Q&A sản phẩm/nghiệp vụ; `docs/HARD_PROBLEMS.md` = Q&A kỹ thuật + file:dòng code; `docs/DATA_MODEL.md` = đặc tả 18 bảng; `docs/PRODUCT.md` = tư duy/WHY. Chỉ sửa MENTOR_QA: thêm ghi chú phân vai đầu file; rút gọn Nhóm 3 (Q9–12→trỏ DATA_MODEL), Nhóm 5 (Q16/17/21/22/23→trỏ HARD_PROBLEMS/Nhóm 0), Nhóm 6 (Q24→trỏ HARD_PROBLEMS #1). **Giữ nguyên** Nhóm 0 (5 điểm cấn — Anh Quang chốt) + Q18/19/20/25/26. 3 file kia KHÔNG đụng.
+- **ĐÃ commit + PUSH lên GitHub** (main giờ đồng bộ origin/main): `3acd9dc` (dedup MENTOR_QA + Nhóm 0 tồn phiên trước), `908f0d4` (gom docs tồn: PRODUCT/PPTX 8slide/FIGMA/LOG). → **SP-1 + toàn bộ docs nay đã ở origin/main**, không còn commit local lẻ.
+- **`.gitignore` đã khôi phục về bản gốc** — bản working-tree bị sửa nhầm (thêm `Report/` ⇒ ignore thư mục báo cáo, + bỏ ignore `.playwright-mcp/`); đã `git checkout` bỏ.
+
+**2. Working tree còn lại (KHÔNG commit — nhiễu local, an toàn để tắt máy):**
+- `.claude/settings.local.json` (modified) + `.claude/settings.json` (untracked): permission config máy local.
+- `.playwright-mcp/`: artifact test, đã ignore lại.
+
+**3. Nhiệm vụ phiên sau: KHÔNG ĐỔI — vẫn là SP-2 "Global Admin toàn quyền"** (RBAC CRUD `apps/api/src/admin/staff` + doanh thu tổng USD `GET /admin/global/revenue`) — xem chi tiết mục hand-off SP-1 ngay trên. Việc phụ (a) đã xong (push). Còn (c) i18n /portal + (d) 2 smoke-spec robust vẫn hoãn.
+
+**Môi trường:** như mục trên (Postgres 5433 / API 3001 / web 3000).
