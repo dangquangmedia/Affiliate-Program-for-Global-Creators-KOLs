@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MARKETS, type Market } from "../../../../mockup/data";
+import { MARKETS } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, Empty, ContextBanner } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { loadSession } from "../../../../lib/auth-client";
@@ -23,11 +23,10 @@ const STATE_KIND: Record<string, "success" | "info" | "warn" | "danger" | "neutr
 const HOLDING = new Set(["JOINED", "CONTENT_SUBMITTED", "REJECTED"]);
 
 export default function MyCampaignsScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [status, setStatus] = useState<Status>("loading");
   const [rows, setRows] = useState<Participation[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
-  const { lang } = usePrefs();
+  const { lang, market, setMarket } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {

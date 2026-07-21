@@ -30,9 +30,15 @@ function isMarket(v: string | null): v is Market {
 function CampaignDetailInner() {
   const params = useSearchParams();
   const id = params.get("id");
-  const initialMarket = isMarket(params.get("m")) ? (params.get("m") as Market) : "VN";
+  const queryMarket = isMarket(params.get("m")) ? (params.get("m") as Market) : null;
 
-  const [market, setMarket] = useState<Market>(initialMarket);
+  const { lang, market, setMarket } = usePrefs();
+  // Mở link campaign của nước nào → chọn nước đó (kéo theo ngôn ngữ + tiền tệ).
+  useEffect(() => {
+    if (queryMarket && queryMarket !== market) setMarket(queryMarket);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryMarket]);
+
   const [status, setStatus] = useState<"loading" | "needLogin" | "missing" | "notFound" | "ready">("loading");
   const [c, setC] = useState<CampaignDetail | null>(null);
   const [joined, setJoined] = useState<Participation | null>(null);
@@ -40,7 +46,6 @@ function CampaignDetailInner() {
   const [suggestions, setSuggestions] = useState<CampaignSummary[]>([]);
   const [joinBusy, setJoinBusy] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null); // lưu MÃ lỗi, render qua t()
-  const { lang } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {

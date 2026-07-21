@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MARKETS, PRICING_OPTIONS, TRIGGER_OPTIONS, type Market } from "../../../../mockup/data";
+import { MARKETS, PRICING_OPTIONS, TRIGGER_OPTIONS } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, KV, mk } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { mockLogin, saveSession } from "../../../../lib/auth-client";
@@ -10,8 +10,7 @@ import { createCampaign, type CampaignDetail } from "../../../../lib/campaign-cl
 import { t, formatMoney } from "../../../../lib/i18n";
 
 export default function CampaignBuilderScreen() {
-  const [market, setMarket] = useState<Market>("VN");
-  const { lang } = usePrefs();
+  const { lang, market, setMarket } = usePrefs();
   const currency = MARKETS[market].currency;
   const locale = MARKETS[market].locale;
 

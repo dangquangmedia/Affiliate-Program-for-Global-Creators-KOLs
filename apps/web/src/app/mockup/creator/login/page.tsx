@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Market } from "../../../../mockup/data";
 import { Frame, Note, StateBar, Card, Btn, BtnRow, Badge } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { t } from "../../../../lib/i18n";
@@ -27,12 +26,11 @@ const PROVIDERS = {
 type Provider = keyof typeof PROVIDERS;
 
 export default function LoginScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [view, setView] = useState<View>("normal");
   const [session, setSession] = useState<StoredSession | null>(null);
   const [busy, setBusy] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { lang } = usePrefs();
+  const { lang, market, setMarket } = usePrefs();
   const router = useRouter();
   const NEXT = "/mockup/creator/country"; // bước tiếp theo sau đăng nhập: chọn quốc gia
 

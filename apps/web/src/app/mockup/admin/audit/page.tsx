@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { type Market } from "../../../../mockup/data";
+import type { Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, Empty, mk } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { mockLogin, saveSession } from "../../../../lib/auth-client";
@@ -23,11 +23,10 @@ const ACTION_KIND: Record<string, "success" | "danger" | "info" | "warn" | "neut
 };
 
 export default function AuditScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [allCountries, setAllCountries] = useState(true); // mặc định xem toàn cục
   const [status, setStatus] = useState<Status>("loading");
   const [events, setEvents] = useState<AuditEvent[]>([]);
-  const { lang } = usePrefs();
+  const { lang, market, setMarket } = usePrefs();
 
   const load = useCallback(async () => {
     const res = await listAudit(allCountries ? undefined : market);

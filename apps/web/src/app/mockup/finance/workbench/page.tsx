@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MARKETS, type Market } from "../../../../mockup/data";
+import { MARKETS } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, KV, Empty, mk } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { mockLogin, saveSession } from "../../../../lib/auth-client";
@@ -21,7 +21,6 @@ import {
 type Status = "loading" | "needStaff" | "ready";
 
 export default function FinanceWorkbenchScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [status, setStatus] = useState<Status>("loading");
   const [batches, setBatches] = useState<ReconBatch[]>([]);
   const [selected, setSelected] = useState<ReconBatch | null>(null);
@@ -29,7 +28,7 @@ export default function FinanceWorkbenchScreen() {
   const [holds, setHolds] = useState<PayoutQueueItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const { lang } = usePrefs();
+  const { lang, market, setMarket } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {

@@ -2,22 +2,21 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { type Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, ContextBanner, mk } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { t } from "../../../../lib/i18n";
-import { loadSession } from "../../../../lib/auth-client";
-import { getMyKyc, submitKyc, type KycCase, type KycField } from "../../../../lib/kyc-client";
+import { loadSession, saveSession, mockLogin } from "../../../../lib/auth-client";
+import { getMyKyc, submitKyc, getKycQueue, reviewKyc, type KycCase, type KycField } from "../../../../lib/kyc-client";
 
 type Status = "loading" | "needLogin" | "ready";
 
 export default function KycScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [status, setStatus] = useState<Status>("loading");
   const [kyc, setKyc] = useState<KycCase | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const { lang } = usePrefs();
+  const [qbusy, setQbusy] = useState(false);
+  const { lang, market, setMarket } = usePrefs();
 
   const load = useCallback(async () => {
     const c = await getMyKyc(market);
@@ -49,6 +48,31 @@ export default function KycScreen() {
       await load();
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Demo: mô phỏng Ops duyệt để gỡ kẹt màn "chờ duyệt" — đăng nhập Ops đúng nước, duyệt mọi field
+  // rồi TRẢ LẠI phiên creator. Ngoài nút này còn có link sang hàng đợi Ops để duyệt tay thủ công.
+  async function quickApprove() {
+    if (!kyc) return;
+    setQbusy(true);
+    const creator = loadSession();
+    try {
+      saveSession(await mockLogin(`ops.${market.toLowerCase()}@demo.affiliate.gl`, `Ops ${market}`));
+      const q = await getKycQueue(market);
+      if (!("forbidden" in q)) {
+        const mine = q.find((c) => c.caseId === kyc.caseId) ?? q[0];
+        if (mine) {
+          const decisions = mine.fields
+            .filter((f) => f.state !== "ACCEPTED")
+            .map((f) => ({ key: f.key, decision: "ACCEPT" as const }));
+          await reviewKyc(market, mine.caseId, decisions);
+        }
+      }
+    } finally {
+      if (creator) saveSession(creator); // trả lại phiên creator
+      setQbusy(false);
+      await load();
     }
   }
 
@@ -106,6 +130,25 @@ export default function KycScreen() {
             <Card>
               <Badge kind="info">{t(lang, "kyc.awaitingBadge")}</Badge>
               <p style={{ color: "#a9b6c4", fontSize: 14, marginTop: 10 }}>{t(lang, "kyc.awaitingBody", { market })}</p>
+              <BtnRow>
+                <Btn variant="primary" disabled={qbusy} onClick={quickApprove}>
+                  {qbusy
+                    ? lang === "vi" ? "Đang duyệt…" : "Approving…"
+                    : lang === "vi" ? "Duyệt nhanh (demo)" : "Quick approve (demo)"}
+                </Btn>
+                <Btn variant="ghost">
+                  <Link href="/mockup/ops/review" style={{ color: "inherit", textDecoration: "none" }}>
+                    {lang === "vi" ? "Vào hàng đợi Ops duyệt tay →" : "Open Ops queue →"}
+                  </Link>
+                </Btn>
+              </BtnRow>
+              <p style={{ fontSize: 13, color: "#8b96a3", marginTop: 10 }}>
+                {lang === "vi" ? "Trong lúc chờ, bạn vẫn có thể " : "While waiting, you can "}
+                <Link href="/mockup/creator/discover" style={{ color: "#6aa6ff" }}>
+                  {lang === "vi" ? "khám phá campaign" : "browse campaigns"}
+                </Link>
+                .
+              </p>
             </Card>
           )}
 

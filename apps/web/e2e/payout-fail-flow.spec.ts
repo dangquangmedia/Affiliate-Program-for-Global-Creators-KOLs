@@ -53,6 +53,7 @@ test("V12 payout FAIL (PH): Finance marks fail -> money released, creator sees r
   // Creator rút tiền qua UI (chọn thị trường PH) -> PROCESSING.
   await page.goto("/mockup/creator/wallet");
   await page.getByRole("button", { name: "🇵🇭 PH" }).click();
+  await page.getByRole("button", { name: "VI" }).click(); // chọn PH giờ tự đổi UI sang EN → ép lại VI cho assertion tiếng Việt
   await expect(page.getByText("Rút được (PHP)")).toBeVisible();
   await page.getByRole("button", { name: "Yêu cầu rút tiền" }).click();
   const otpText = await page.getByText(/OTP \(mock/).innerText();
@@ -65,6 +66,7 @@ test("V12 payout FAIL (PH): Finance marks fail -> money released, creator sees r
   await page.evaluate((finance) => window.localStorage.setItem("ag_session", JSON.stringify(finance)), ctx.finance);
   await page.goto("/mockup/finance/workbench");
   await page.getByRole("button", { name: "🇵🇭 PH" }).click();
+  await page.getByRole("button", { name: "VI" }).click(); // chọn PH giờ tự đổi UI sang EN → ép lại VI cho assertion tiếng Việt
   const row = page.locator(`tr[data-creator="${ctx.name}"]`);
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: "Thất bại (hoàn)" }).click();
@@ -74,6 +76,7 @@ test("V12 payout FAIL (PH): Finance marks fail -> money released, creator sees r
   await page.evaluate((creator) => window.localStorage.setItem("ag_session", JSON.stringify(creator)), ctx.creator);
   await page.goto("/mockup/creator/wallet");
   await page.getByRole("button", { name: "🇵🇭 PH" }).click();
+  await page.getByRole("button", { name: "VI" }).click(); // chọn PH giờ tự đổi UI sang EN → ép lại VI cho assertion tiếng Việt
   await expect(page.getByText("Lỗi → đã hoàn").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Yêu cầu rút tiền" })).toBeEnabled();
 });

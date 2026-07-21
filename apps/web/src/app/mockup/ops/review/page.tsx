@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Market } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, mk } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { t } from "../../../../lib/i18n";
@@ -13,7 +12,6 @@ import { contentQueue, reviewContent, type ContentQueueItem } from "../../../../
 type DecisionMap = Record<string, Record<string, { decision: "ACCEPT" | "NEEDS_CHANGES"; reason: string }>>;
 
 export default function OpsReviewScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [status, setStatus] = useState<"loading" | "needStaff" | "ready">("loading");
   const [queue, setQueue] = useState<KycQueueItem[]>([]);
   const [content, setContent] = useState<ContentQueueItem[]>([]);
@@ -21,7 +19,7 @@ export default function OpsReviewScreen() {
   const [decisions, setDecisions] = useState<DecisionMap>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const { lang } = usePrefs();
+  const { lang, market, setMarket } = usePrefs();
 
   const load = useCallback(async () => {
     const q = await getKycQueue(market);

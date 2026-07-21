@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { COUNTRY_CONFIG, MARKETS, formatMoney, type Market } from "../../../../mockup/data";
+import { COUNTRY_CONFIG, MARKETS, formatMoney } from "../../../../mockup/data";
 import { Frame, Note, StateBar, Card, Btn, BtnRow, Badge, KV, Field } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { t } from "../../../../lib/i18n";
@@ -9,9 +9,8 @@ import { t } from "../../../../lib/i18n";
 type View = "overview" | "edit";
 
 export default function AdminConfigScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [view, setView] = useState<View>("overview");
-  const { lang } = usePrefs();
+  const { lang, market, setMarket } = usePrefs();
   const cfg = COUNTRY_CONFIG[market];
   const info = MARKETS[market];
 

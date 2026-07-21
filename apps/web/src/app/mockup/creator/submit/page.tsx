@@ -17,16 +17,21 @@ function isMarket(v: string | null): v is Market {
 function SubmitInner() {
   const params = useSearchParams();
   const id = params.get("id");
-  const initialMarket = isMarket(params.get("m")) ? (params.get("m") as Market) : "VN";
+  const queryMarket = isMarket(params.get("m")) ? (params.get("m") as Market) : null;
 
-  const [market, setMarket] = useState<Market>(initialMarket);
+  const { lang, market, setMarket } = usePrefs();
+  // Mở link nộp nội dung của nước nào → chọn nước đó (kéo theo ngôn ngữ + tiền tệ).
+  useEffect(() => {
+    if (queryMarket && queryMarket !== market) setMarket(queryMarket);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryMarket]);
+
   const [status, setStatus] = useState<"loading" | "needLogin" | "missing" | "notFound" | "ready">("loading");
   const [c, setC] = useState<MyContent | null>(null);
   const [url, setUrl] = useState("");
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const { lang } = usePrefs();
 
   const load = useCallback(async () => {
     if (!id) {

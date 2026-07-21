@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MARKETS, type Market } from "../../../../mockup/data";
+import { MARKETS } from "../../../../mockup/data";
 import { Frame, Note, Card, Badge, Empty, ContextBanner } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { loadSession } from "../../../../lib/auth-client";
@@ -12,10 +12,9 @@ import { t, formatMoney } from "../../../../lib/i18n";
 type Status = "loading" | "needLogin" | "ready";
 
 export default function DiscoverScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [status, setStatus] = useState<Status>("loading");
   const [campaigns, setCampaigns] = useState<CampaignSummary[]>([]);
-  const { lang } = usePrefs();
+  const { lang, market, setMarket } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {

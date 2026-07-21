@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MARKETS, type Market } from "../../../../mockup/data";
+import { MARKETS } from "../../../../mockup/data";
 import { Frame, Note, Card, Badge, KV, Empty, ContextBanner, UsdRef } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { loadSession } from "../../../../lib/auth-client";
@@ -20,10 +20,9 @@ const STATUS_KIND: Record<Earning["status"], "warn" | "success" | "info" | "dang
 };
 
 export default function EarningsScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [status, setStatus] = useState<Status>("loading");
   const [data, setData] = useState<EarningsDashboard | null>(null);
-  const { lang, showUsd } = usePrefs();
+  const { lang, showUsd, market, setMarket } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {

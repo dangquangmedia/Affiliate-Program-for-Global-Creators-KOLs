@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MARKETS, type Market } from "../../../../mockup/data";
+import { MARKETS } from "../../../../mockup/data";
 import { Frame, Note, Card, Btn, BtnRow, Badge, KV, Field, ContextBanner, UsdRef } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
 import { loadSession } from "../../../../lib/auth-client";
@@ -21,7 +21,6 @@ const PAYOUT_KIND: Record<Payout["state"], "info" | "success" | "danger" | "warn
 };
 
 export default function WalletScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [status, setStatus] = useState<Status>("loading");
   const [w, setW] = useState<Wallet | null>(null);
   const [step, setStep] = useState<Step>("idle");
@@ -31,7 +30,7 @@ export default function WalletScreen() {
   const [idemKey, setIdemKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const { lang, showUsd } = usePrefs();
+  const { lang, showUsd, market, setMarket } = usePrefs();
   const locale = MARKETS[market].locale;
 
   const load = useCallback(async () => {

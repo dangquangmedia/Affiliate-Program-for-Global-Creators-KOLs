@@ -12,11 +12,10 @@ import { t, formatMoney } from "../../../../lib/i18n";
 type Status = "loading" | "needLogin" | "ready";
 
 export default function CountryScreen() {
-  const [market, setMarket] = useState<Market>("VN");
   const [status, setStatus] = useState<Status>("loading");
   const [profiles, setProfiles] = useState<MyCountryProfile[]>([]);
   const [busy, setBusy] = useState<Market | null>(null);
-  const { lang } = usePrefs();
+  const { lang, market, setMarket } = usePrefs();
   const has = (m: Market): boolean => profiles.some((p) => p.context.market === m);
   const active = profiles.find((p) => p.context.market === market);
 
