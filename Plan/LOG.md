@@ -485,9 +485,10 @@ Sau khi dự án đã đóng N1–N20, Anh Quang giao 3 việc (ưu tiên Việc
 ## Current State & Hand-off (cập nhật 2026-07-21)
 
 **1. Vừa xong / trạng thái:**
-- 3 việc trên **XONG**. Money-spine N1–N20 vẫn nguyên (API 105/105 · E2E 17/17). UI `/portal` là lớp mới **thêm vào**, không đụng `/mockup` nên E2E cũ không ảnh hưởng.
-- **Đã commit phiên này** (xem `git log`): UI portal / dọn docs / PPTX. `main` sạch sau commit (trừ `.claude/settings.local.json` ignore).
-- **Môi trường lúc tắt máy**: dev:web nền đã **tắt**; Postgres Docker 54329 tuỳ máy Anh Quang.
+- Phiên gần nhất xử lý **5 điểm góp ý prototype** (ưu tiên 4-5-3-2-1): **điểm 4** (đổi nước → đổi lang+tiền tệ, market dùng chung), **điểm 5** (gỡ kẹt KYC "chờ duyệt" + nút Duyệt nhanh demo), **điểm 2** (USD tự tính — fixed bởi 4) → XONG + verify Playwright. **Điểm 3** (/portal i18n) HOÃN (xem mục 3 dưới). **Điểm 1** (FE/BE) — Anh Quang đã rõ, bỏ qua.
+- Trước đó cùng phiên: **fix login prototype** (mock-login xong tự sang chọn quốc gia) + **fix DB port 54329→5433** (Windows reserved) + **theme sáng/tối + responsive `/portal`**.
+- **E2E 18/18 xanh**, typecheck xanh. `main` sạch sau các commit (trừ `.claude/settings.local.json` + file tạm `~$*.pptx` do PowerPoint mở).
+- Trạng thái nền cũ N1–N20 vẫn nguyên (money-spine API 105/105). `/portal` là lớp thêm, không đụng spine.
 
 **2. File/biến quan trọng:**
 - UI mới: `apps/web/src/app/portal/` (`page.tsx` landing · `ui.tsx` · `portal.module.css` · `{creator,ops,admin,finance,global}/page.tsx`). Dùng chung `mockup/data.ts` + `formatMoney`.
@@ -499,8 +500,46 @@ Sau khi dự án đã đóng N1–N20, Anh Quang giao 3 việc (ưu tiên Việc
 - **Market↔lang↔currency coupling (commit `787c389`)**: `market` giờ nằm trong `mockup/prefs.tsx` (DÙNG CHUNG mọi màn /mockup, persist `ag_pref_market`); `setMarket` kéo theo lang (VN→vi, PH→en) + tiền tệ. 14 màn dùng `usePrefs().market` thay `useState`. → điểm 2 (USD tự tính khi đổi nước) & điểm 3-cho-/mockup được giải quyết luôn vì mọi màn couple lang. **Lưu ý E2E**: bấm 🇵🇭 PH giờ đổi UI sang EN — test nào assert chuỗi tiếng Việt sau khi chọn PH phải ép lại VI (xem `payout-fail-flow.spec`). KYC "chờ duyệt" có nút "Duyệt nhanh (demo)" (mô phỏng Ops) + link hàng đợi Ops.
 - **CÒN LẠI (Anh Quang xếp ưu tiên 4-5-3-2-1)**: điểm 4,5 XONG+verify; điểm 2 fixed bởi 4; **điểm 3 cho /portal (VI/EN + i18n toàn bộ dashboard) CHƯA làm — khối lượng lớn (portal đang VN-only hardcoded), cần làm đợt riêng**; điểm 1 = FE `apps/web` / BE `apps/api` (chỉ cần chỉ rõ, chưa đổi cấu trúc).
 
-**3. Nhiệm vụ đầu tiên phiên sau (đều OPTIONAL):**
-- (A) Render/soát PPTX trên máy có PowerPoint (em chưa xem trực quan được); chỉnh nếu lệch.
-- (B) Mở rộng `/portal`: đủ 12 màn theo Figma spec, hoặc thêm E2E cho `/portal`.
-- (C) Đồng bộ `Report/MENTOR_QA.md` N11–N19; hoặc lát mỏng QĐ-7/8/6.
-- **Khởi động lại nhanh**: `corepack pnpm bootstrap` → `dev:api` + `dev:web` → `/portal` (UI thật) · `/mockup` (prototype cũ).
+**3. VIỆC HOÃN — ƯU TIÊN LÀM ĐẦU PHIÊN SAU: i18n song ngữ VI/EN cho khu `/portal`** (điểm 3 Anh Quang):
+- **Bối cảnh**: `/portal` (5 dashboard + landing) đang **hardcode tiếng Việt**, chưa có lớp i18n. Yêu cầu: thêm nút VI/EN + **tự đổi ngôn ngữ theo nước** (giống /mockup đã làm ở `787c389`).
+- **Việc cần làm**:
+  1. Tạo lớp lang cho `/portal` — tái dùng ý tưởng `mockup/prefs.tsx` (market→lang coupling: VN→vi, PH→en) HOẶC dict riêng trong `app/portal/`.
+  2. Thêm nút **VI/EN** vào `Shell` topbar (`app/portal/ui.tsx`, cạnh `ThemeToggle`) + `landing header` (`app/portal/page.tsx`).
+  3. Couple với market switch sẵn có ở portal creator + global (đổi nước → đổi lang).
+  4. **Dịch toàn bộ chuỗi** (khối lượng LỚN, hàng trăm string): `ui.tsx` (nav labels, roleTag, MarketStrip), `page.tsx` landing (hero/role cards/footer), 5 file `{creator,ops,admin,finance,global}/page.tsx` (KPI labels, panel titles, chips, buttons, notes, table headers, task items).
+  - Tiền tệ ĐÃ đúng theo market (dùng `formatMoney` + `MARKETS[market].currency`) — không cần đụng.
+- **Cách làm gợi ý**: rút chuỗi ra 1 dict `{vi, en}` giống `lib/i18n.ts`, thay hardcode bằng `t(lang, key)`. Có thể chia nhỏ theo file để không vỡ 1 lần.
+
+**Việc OPTIONAL khác** (sau điểm 3): render/soát PPTX trên máy có PowerPoint; mở rộng `/portal` đủ 12 màn Figma; đồng bộ `Report/MENTOR_QA.md` N11–N19.
+
+**Môi trường hiện tại (phiên này KHÔNG tắt server)**: Postgres Docker **port 5433** đang chạy (đã migrate+seed); **API dev 3001 đang chạy** (em start, đọc `.env` port 5433); **web dev 3000 là bản Anh Quang đang mở** (code mới đã HMR). Khởi động lại nếu cần: `corepack pnpm bootstrap` → `dev:api` + `dev:web` → `/portal` (UI thật) · `/mockup` (prototype). **Điểm 1 (FE/BE): Anh Quang xác nhận đã rõ — FE `apps/web`, BE `apps/api`, không cần đổi.**
+
+---
+
+## Current State & Hand-off (cập nhật 2026-07-21 — phiên "SP-1 Portal sống", MỚI NHẤT — thay thế mục trên)
+
+**1. Vừa xong / trạng thái:**
+- **SP-1 "Portal sống" ĐÃ XONG + MERGE vào `main`** (merge commit `768f60b`, nhánh `feat/portal-song-cross-link` đã xoá). 5 dashboard `/portal` từ TĨNH → gọi API thật, nút hoạt động, cross-link chạy qua chung DB.
+- **Cross-link chứng minh bằng capstone E2E** (`portal-cross-link.spec.ts`): Creator nộp link → Ops thấy & duyệt → Finance đối soát+lock+payout → ví Creator PAID, **trọn trong /portal**.
+- Cổng chọn vai → `mockLogin` ngầm bằng account seed (phiên + RBAC thật). Mọi dashboard xử lý lỗi nhất quán (business + transport, tiếng Việt).
+- **Test**: full E2E 23/25 xanh; 2 spec (`portal-admin`, `portal-global`) flake do dev-server cold-compile route > timeout 5s — PASS khi chạy riêng (3.4s/1.8s), không lỗi code, không flake trên production build. Typecheck sạch (api+web). Capstone verify lại trên main sau merge: xanh.
+- Làm theo quy trình subagent-driven: 7 task TDD, mỗi task có task-review + fix loop; final whole-branch review (opus) bắt 1 gap (creator thiếu bắt lỗi transport) → đã fix (`bc28d57`) + re-review sạch.
+- **CHƯA push GitHub** (main ahead origin 53 commit — Anh Quang chọn merge local).
+- **Docs CHƯA commit** (working tree): `docs/PRODUCT.md` (thêm §3.0 tư duy 3-giải-pháp + 5 điểm cấn), `Report/MENTOR_QA.md` (Nhóm 0: 5 điểm cấn × 3 giải pháp), `Report/Affiliate_GLOBAL_Prototype_Review.pptx` (dựng lại 8 slide theo narrative PM: Product→DB→Kiến trúc→Coding→Triển khai), `Plan/LOG.md`, `.gitignore`.
+
+**2. File/biến quan trọng:**
+- **Mới**: `apps/web/src/app/portal/session.ts` — `enterAs(role,market)` (mockLogin seed→saveSession→set `ag_pref_market`→hard-nav), `roleEmail()`, **`readPrefMarket(): "VN"|"PH"`** (shared, mọi dashboard đọc market qua nó). `apps/web/src/app/portal/role-buttons.tsx` — client component nút chọn vai (tách khỏi `page.tsx` vì page export `metadata`).
+- 5 dashboard `apps/web/src/app/portal/{creator,ops,admin,finance,global}/page.tsx` nay fetch qua 9 client lib `apps/web/src/lib/*-client.ts`; pattern action = `busy/err → try{business-branch} catch{setErr(vi)} finally{setBusy(false)}` + `load()` try/catch + narrow union (`"forbidden"/"unauthorized" in res`). `ui.tsx` `Btn` có prop optional `testId`.
+- **testid** để E2E/demo: `enter-{role}` (landing) · `creator-campaign/-submit-content/-request-payout/-payout-history` · `ops-content-queue/-approve-content` · `finance-create-batch/-payout-queue` · `admin-campaign-list/-create-campaign` · `global-audit-feed`.
+- E2E mới: `apps/web/e2e/portal-{role-entry,creator,ops,finance,admin,global,cross-link}.spec.ts`. Chạy `--workers=1` để tránh flake dev cold-compile.
+- Spec+plan SP-1: `docs/superpowers/specs/2026-07-21-portal-song-cross-link-design.md` (có **phụ lục vision SP-2**), `docs/superpowers/plans/2026-07-21-portal-song-cross-link.md`. Ledger SDD: `.superpowers/sdd/progress.md` (+ briefs/reports — scratch).
+- Không đụng backend, không đụng `/mockup`.
+
+**3. NHIỆM VỤ ĐẦU PHIÊN SAU: SP-2 — "Global Admin toàn quyền"** (Anh Quang đã duyệt hướng, để spec riêng):
+- **(A) RBAC CRUD** — module backend MỚI `apps/api/src/admin/staff` (guard chỉ GLOBAL_ADMIN, **audit mọi thao tác**): `GET /admin/staff` (lọc nước/toàn cục) · `POST` tạo staff (email+role+country → upsert `app_user`+`role_assignment`) · `PATCH /:id` đổi role · `DELETE /:id` = vô hiệu hoá (gỡ role_assignment). KHÔNG mật khẩu/2FA (vẫn mock SSO).
+- **(B) Doanh thu tổng đa nước** — `GET /admin/global/revenue`: mỗi nước gross/phí sàn(`PLATFORM_FEE`)/đã chi payout/net bằng **tiền bản địa** + cột **quy USD** (tỷ giá tĩnh, ghi chú demo) + **1 dòng tổng USD** (không cộng thẳng VND+PHP). UI: thẻ nước cạnh nhau + 1 dòng tổng USD. Chỗ chờ đã có: `/portal/global` nav "Quản lý quyền"/"Doanh thu tổng" đang render placeholder "Đang phát triển — SP-2".
+- **Cách vào**: brainstorm → spec (đã có vision ở phụ lục design doc) → writing-plans → subagent-driven, giống SP-1.
+
+**Việc phụ (khi Anh Quang muốn):** (a) `git push origin main` đẩy SP-1 lên GitHub; (b) commit các docs đang dở (PRODUCT/MENTOR_QA/PPTX); (c) **điểm 3 i18n VI/EN cho `/portal`** VẪN HOÃN (portal đang VN-only hardcoded — khối lượng lớn, xem hand-off cũ ở trên); (d) làm 2 smoke-spec (`portal-admin`,`portal-global`) robust (chờ route ấm) để hết flake.
+
+**Môi trường:** Postgres Docker **port 5433** + **API dev 3001** + **web dev 3000** đang chạy (nếu cần: `corepack pnpm bootstrap` → `dev:api`+`dev:web`). E2E chạy `cd apps/web && corepack pnpm exec playwright test --workers=1`.

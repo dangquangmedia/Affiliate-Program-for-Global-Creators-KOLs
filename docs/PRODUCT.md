@@ -194,7 +194,7 @@ matching 2 chiều, không chỉ là cái cổng chặn.
 không kiểm soát.* Tự khai láo sẽ tự triệt tiêu: vào campaign → content kém → reject → strike/
 tier tụt → tự đào thải. Lịch sử nội sinh là bộ lọc sự thật cuối cùng.
 
-**Chốt (Quang): mô hình Apply → duyệt (kiểu AccessTrade — advertiser duyệt publisher):**
+**Chốt (Quang): mô hình Apply → duyệt (tham khảo kiểu AccessTrade — advertiser duyệt publisher):**
 - Campaign có cờ `requires_approval` (builder bật cho campaign đặc thù; campaign mở giữ nguyên
   join thẳng như hiện tại — không phải mọi campaign đều qua duyệt).
 - Join campaign đặc thù → tạo participation state **`APPLIED`** (nộp đơn, **KHÔNG chiếm suất**

@@ -2,7 +2,11 @@
 
 > Bản chốt sau khi đối chiếu yêu cầu gốc trong đặc tả yêu cầu sản phẩm và
 > tài liệu quy trình phát triển, tài liệu product/data model, toàn bộ route UI hiện tại,
-> ảnh prototype và UI chạy thật ngày 2026-07-20.
+> ảnh prototype và UI chạy thật.
+> **Cập nhật 2026-07-21:** toàn bộ token màu, signature và app shell lấy trực tiếp từ design
+> system production đang chạy ở `/portal` (`apps/web/src/app/portal/portal.module.css`) — bảng màu
+> hand-tuned, lệch khỏi swatch mặc định framework nên không mang "vân tay AI"; giữ nguyên giá trị
+> hex, đừng làm tròn về stop Tailwind/Material.
 
 ## 1. Cách dùng nhanh
 
@@ -101,33 +105,69 @@ Create these Figma pages:
 Do not count dialogs, drawers, bottom sheets or state variants as additional numbered screens.
 
 VISUAL DIRECTION
-- Premium dark creator-economy operations product: confident, modern, data-rich and calm.
+- A calm two-market operations room, not a marketing site: confident, modern, data-dense and quiet.
+- The signature is a market-identity accent color that runs through the whole shell (see SIGNATURE
+  below). It is the single memorable idea; keep everything around it disciplined and let it do the work.
 - Avoid a generic crypto dashboard, neon overload, excessive glassmorphism, giant marketing heroes,
-  random gradients and decorative charts with no meaning.
-- Dark mode is the rendered default. Also create variable modes that can support a future light theme.
-- Source currently uses system-ui. In Figma use SF Pro Display/Text when available; otherwise use a
-  clearly documented system-ui equivalent. Use tabular numerals for money, counts and deadlines.
+  meaningless gradients and decorative charts with no data source.
+- Background is not a flat fill: use two very low-intensity radial glows on the near-black canvas — one
+  brand-tinted from the top-right, one market-tinted from the top-left at ~10–15% alpha — then the ink
+  color underneath. This is the only ambient effect; do not scatter more.
+- Dark mode is the rendered default AND a real light theme already ships. Build both as variable modes:
+  in light mode invert ink/surface/text/border, and keep brand, market identity, success, info and hold
+  hues identical so the interface stays recognizable; only darken warning (~#B9791A) and danger (~#D94B4B)
+  enough to pass AA on white, and lift the soft-fill alphas slightly. Do not restyle per screen.
+- Source uses ui-sans-serif/system-ui. In Figma use SF Pro Display/Text when available; otherwise a
+  clearly documented system-ui equivalent. Use tabular numerals for every money value, count and deadline.
 - Use crisp 20 px outline SVG icons, never emoji and never hand-drawn icon primitives.
 
 SEMANTIC TOKENS
-Create Figma variables instead of hardcoded one-off values:
-- Background / canvas: #070A12
-- Surface / default: #0F172A
-- Surface / elevated: #131E34
-- Surface / interactive: #18243D
-- Border / subtle: #22304A
-- Text / primary: #F8FAFC
-- Text / secondary: #94A3B8
-- Brand / primary: #5B7CFF
-- Brand / cyan accent: #22D3EE
-- Success: #22C55E
-- Warning: #F59E0B
-- Danger: #F43F5E
-- Info: #38BDF8
-Verify WCAG AA contrast and adjust token values if needed.
+Create Figma variables instead of hardcoded one-off values. These exact values are what the shipping
+product renders; they are deliberately hand-tuned and sit OFF the default framework swatches — that
+off-round quality is precisely what keeps the interface from reading as an auto-generated AI dashboard.
+Do not normalize them back to Tailwind/Material stops.
+
+Neutrals — cool near-black navy, warmer and less "slate template" than #0F172A:
+- Canvas / ink:                  #0A0E17
+- Surface / default:             #111828
+- Surface / raised:              #172033
+- Surface / elevated:            #1C2740
+- Surface / deep (gradient foot): #0D1320   (panels/sidebar fade from surface → this)
+- Border / default:              #253149
+- Border / soft:                 #1A2338
+- Text / primary:                #EDF1F8
+- Text / secondary:              #93A1B8
+- Text / muted:                  #5F6E86
+
+Brand:
+- Brand / primary (periwinkle indigo): #6E7BFF   — softer, warmer indigo, not the stock #5B7CFF/#3B82F6
+- Brand / accent (cyan):               #22D3EE
+- Brand / soft fill:                   #6E7BFF26  (~15% alpha, for tinted fills and focus glow)
+
+Status — chosen for hue separation, each intentionally NOT the framework default it is closest to:
+- Success (spring green):  #35D08A   (not #22C55E)
+- Warning (honey amber):   #F5B342   (not #F59E0B)
+- Danger (coral):          #FB6767   (not #EF4444 / #F43F5E)
+- Info (sky):              #5AB0F0   (not #38BDF8)
+- Hold (violet):           #B98BFF   — a DEDICATED hue for payout UNKNOWN_HOLD, so "funds held" never
+                                        looks like "failed" or "pending". This state is real; include it.
+Give every status a soft-fill variant (~12% alpha) and a matching border tint (~27% alpha) for chips,
+badges and inline alerts. Status is always icon + label + color, never color alone.
+
+SIGNATURE — market-identity accent (the one thing this product is remembered by):
+- Vietnam market:      #F6B44C  (honey / amber)
+- Philippines market:  #2DD4BF  (jade / teal)
+Bind a "market" variable the entire shell reads: active nav indicator (inset bar + icon), KPI accent
+rail, the market context strip, avatar/cover gradients, slot meters and focus glow all take the current
+market color. Turning amber means you are operating in Vietnam; jade means the Philippines. This makes
+country isolation visible at a glance and is specific to a two-country affiliate operations room — it
+cannot be mistaken for a template. In Figma, expose it as a mode/variable so a frame can be switched
+between VN and PH without restyling.
+
 - 8-point spacing system: 4, 8, 12, 16, 24, 32, 40, 48, 64.
-- Radius: 8 for controls, 12 for cards, 16 for large panels, 999 for chips.
-- Subtle elevation only: one low shadow and one modal shadow.
+- Radius: 8 for controls, 12 for cards, 16 for large panels/cards, 24 for the auth frame, 999 for chips.
+- Elevation is subtle: one low card shadow and one large modal/landing shadow; nothing heavier.
+Verify WCAG AA contrast on text and adjust a token only if a pair fails — keep the hand-tuned character.
 
 TYPOGRAPHY
 - Display 32/40 semibold; H1 28/36 semibold; H2 22/30 semibold; H3 18/26 semibold.
@@ -152,9 +192,10 @@ LAYOUT AND RESPONSIVE RULES
 
 APP SHELLS
 Create reusable shells, not duplicated frames:
-1. Creator Shell: left sidebar on desktop, header with breadcrumb/page title, global search where useful,
-   country profile switcher, VI/EN selector, Local/USD-reference toggle, notification icon and avatar.
-   Mobile uses the five-item bottom navigation.
+1. Creator Shell: 248 px left sidebar on desktop, header with breadcrumb/page title, global search where
+   useful, country profile switcher, VI/EN selector, Local/USD-reference toggle, light/dark theme toggle,
+   notification icon and avatar. The sidebar fades surface → deep-surface; the active nav item carries an
+   inset market-colored bar. Mobile uses the five-item bottom navigation.
 2. Local Staff Shell: sidebar + fixed country badge + role badge. Local country is informative, not a
    cross-country switch. Header contains search, help, audit-safe user menu and density control.
 3. Global Admin Shell: sidebar + true VN/PH/All Markets filter + admin identity and audit access.
@@ -169,7 +210,10 @@ Build each repeated element once as a component set, then use instances:
 - Tabs, SegmentedControl, FilterChip, Pagination, Stepper.
 - KPI card, Campaign card, Money summary, Balance card, Deadline card.
 - StatusChip with icon + text; never communicate status using color alone.
-- Progress bar/ring, Slots meter, Simple stacked distribution bar, Skeleton.
+- Progress bar/ring, Slots meter (fills with a market→cyan gradient), Skeleton.
+- MoneySpine: the signature stacked distribution bar for Pending / Available / Paid, with a labeled
+  dot legend below it. Reuse it for the creator earnings split and the finance overview; never replace
+  it with an invented time-series line chart.
 - Responsive DataTable, Mobile DataCard, ListRow, ReviewItem, Timeline, AuditEventRow.
 - EmptyState, ErrorState, PermissionState, Conflict409 banner, Toast, InlineAlert.
 - Modal, Drawer, BottomSheet, StickyActionBar, Confirmation pattern.
@@ -179,7 +223,8 @@ STATUS LANGUAGE
 - KYC: Draft, Submitted, Resubmitted, Approved, Needs changes/Rejected.
 - Participation: Joined, Content submitted, Approved, Rejected, Waitlisted, Expired, Left.
 - Earning: Pending, Available, Paid, Reversed.
-- Payout: Processing, Paid, Failed — balance released, Unknown — funds held.
+- Payout: Processing (info), Paid (success), Failed / balance released (danger), Unknown / funds held
+  (use the dedicated violet Hold token, never danger — held money is safe, not lost).
 - Reconciliation: Open, Locked.
 Every status uses icon + label + accessible semantic color.
 
