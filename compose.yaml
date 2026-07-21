@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${AFFILIATE_DB_USER:-affiliate_app}
       POSTGRES_PASSWORD: ${AFFILIATE_DB_PASSWORD:?Set AFFILIATE_DB_PASSWORD in local environment}
     ports:
-      - "${AFFILIATE_DB_PORT:-54329}:5432"
+      - "${AFFILIATE_DB_PORT:-5433}:5432"
     volumes:
       - affiliate_postgres_data:/var/lib/postgresql/data
     healthcheck:
