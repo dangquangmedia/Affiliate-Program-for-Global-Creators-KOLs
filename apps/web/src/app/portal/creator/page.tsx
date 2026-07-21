@@ -33,6 +33,17 @@ function readPrefMarket(): Market {
   return window.localStorage.getItem("ag_pref_market") === "PH" ? "PH" : "VN";
 }
 
+// Mã lỗi thật từ apps/api/src/campaign/join.service.ts (đầy suất thì vào waitlist -> vẫn ok:true,
+// nên không có mã "hết suất" ở đây — chỉ 3 nhánh conflict thật + fallback chung).
+const JOIN_ERROR_MESSAGES: Record<string, string> = {
+  KYC_REQUIRED: "Cần duyệt KYC trước khi tham gia",
+  CAMPAIGN_NOT_JOINABLE: "Chiến dịch đã tạm dừng hoặc kết thúc",
+  JOIN_BLOCKED_STRIKE: "Bạn đã bị chặn tham gia lại chiến dịch này (quá số lần bị thu hồi suất)",
+};
+function joinErrorMessage(code: string): string {
+  return JOIN_ERROR_MESSAGES[code] ?? "Không tham gia được, thử lại sau.";
+}
+
 export default function CreatorDashboard() {
   const [market, setMarketState] = useState<Market>(readPrefMarket);
   const [showUsd, setShowUsd] = useState(false);
@@ -66,8 +77,15 @@ export default function CreatorDashboard() {
     if (typeof window !== "undefined") window.localStorage.setItem("ag_pref_market", m);
   }
 
+  const [joinErr, setJoinErr] = useState<string | null>(null);
+
   async function onJoin(id: string) {
-    await joinCampaign(market, id);
+    const res = await joinCampaign(market, id);
+    if (!res.ok) {
+      setJoinErr(joinErrorMessage(res.code));
+      return;
+    }
+    setJoinErr(null);
     await load();
   }
 
@@ -140,9 +158,13 @@ export default function CreatorDashboard() {
   const kycPending = (kyc?.fields ?? []).some((f) => f.state === "NEEDS_CHANGES");
   const openTasks = mine.filter((p) => p.state === "JOINED" || p.state === "REJECTED");
   const minPayout = wallet?.minPayoutMinor ?? 0;
+  const navWithBadge = useMemo<NavItem[]>(
+    () => NAV.map((n) => (n.key === "campaigns" ? { ...n, badge: openTasks.length } : n)),
+    [openTasks.length],
+  );
 
   return (
-    <Shell role={ROLE} market={market} setMarket={setMarket} nav={NAV} active={active} setActive={setActive}
+    <Shell role={ROLE} market={market} setMarket={setMarket} nav={navWithBadge} active={active} setActive={setActive}
       title={NAV.find((n) => n.key === active)?.label ?? "Trang chủ"}
       subtitle="Hồ sơ Creator — dữ liệu tách biệt theo từng nước"
       user={{ name: "Nguyễn Minh Anh", sub: `Creator · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}>
@@ -195,12 +217,16 @@ export default function CreatorDashboard() {
           </div>
 
           <SectionHead title="Đề xuất cho bạn" hint={`chỉ campaign ở ${MARKETS[market].name}`} more={<button className={s.more} onClick={() => setActive("discover")}>Xem tất cả →</button>} />
+          {joinErr && <div style={{ marginBottom: 12 }}><Chip tone="danger">{joinErr}</Chip></div>}
           <CampaignGrid campaigns={campaigns.slice(0, 3)} mine={mine} onJoin={onJoin} onOpen={() => setActive("campaigns")} />
         </>
       )}
 
       {active === "discover" && (
-        <CampaignGrid campaigns={campaigns} mine={mine} onJoin={onJoin} onOpen={() => setActive("campaigns")} full />
+        <>
+          {joinErr && <div style={{ marginBottom: 12 }}><Chip tone="danger">{joinErr}</Chip></div>}
+          <CampaignGrid campaigns={campaigns} mine={mine} onJoin={onJoin} onOpen={() => setActive("campaigns")} full />
+        </>
       )}
 
       {active === "campaigns" && (
