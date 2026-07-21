@@ -436,17 +436,19 @@ function WalletPanel({
         <Note>OTP demo được server tự công bố kèm phản hồi nên bấm 1 lần là rút xong. Khi rút, tiền được <b>reserve</b> khỏi số dư ngay. Nếu provider báo <b>FAIL</b> → hoàn về ví đúng 1 lần. Nếu <b>UNKNOWN</b> → giữ tiền chờ Finance xác minh, không tự hoàn.</Note>
       </div>
 
-      <Panel title="Lịch sử rút tiền" sub="nguồn sự thật của payout">
-        {history.length ? history.map((p) => (
-          <div key={p.id} className={s.kv}>
-            <span className={s.k}><span className={s.num}>{new Date(p.requestedAt).toLocaleString(MARKETS[market].locale)}</span></span>
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span className={s.num} style={{ fontWeight: 650 }}>{fm(p.amountMinor)}</span>
-              <PayoutChip state={p.state} />
-            </span>
-          </div>
-        )) : <Empty>Chưa có yêu cầu rút nào ở {market}.</Empty>}
-      </Panel>
+      <div data-testid="creator-payout-history">
+        <Panel title="Lịch sử rút tiền" sub="nguồn sự thật của payout">
+          {history.length ? history.map((p) => (
+            <div key={p.id} className={s.kv}>
+              <span className={s.k}><span className={s.num}>{new Date(p.requestedAt).toLocaleString(MARKETS[market].locale)}</span></span>
+              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span className={s.num} style={{ fontWeight: 650 }}>{fm(p.amountMinor)}</span>
+                <PayoutChip state={p.state} />
+              </span>
+            </div>
+          )) : <Empty>Chưa có yêu cầu rút nào ở {market}.</Empty>}
+        </Panel>
+      </div>
     </div>
   );
 }
