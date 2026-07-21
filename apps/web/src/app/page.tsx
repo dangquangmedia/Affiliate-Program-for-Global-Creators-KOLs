@@ -21,6 +21,11 @@ export default function HomePage() {
         </li>
       </ul>
       <p style={{ marginTop: 24 }}>
+        <Link href="/portal" data-testid="link-portal">
+          → Control Center (UI thật — dashboard theo từng vai)
+        </Link>
+      </p>
+      <p style={{ marginTop: 8 }}>
         <Link href="/mockup" data-testid="link-mockup">
           → Prototype product (N2 — luồng Creator)
         </Link>
