@@ -2,7 +2,7 @@
 
 > **Loại tài liệu:** Audit độc lập, chỉ đọc & đối chiếu — **không sửa code, không triển khai.**
 > **Ngày lập:** 2026-07-20 · **Người audit:** Claude (TPM/BA/Solution Architect).
-> **Nguồn:** `requirements/Book1.xlsx`, `requirements/Requirements.xlsx`, `Report/assets/*.png`
+> **Nguồn:** đặc tả yêu cầu sản phẩm, tài liệu quy trình phát triển, `Report/assets/*.png`
 > (13 ảnh mockup), `Plan/`, `docs/`, source `apps/`, git (32 commit).
 >
 > **Tài liệu kèm theo:** `REQUIREMENT_TRACEABILITY_MATRIX.md` · `MVP_GAP_ANALYSIS.md` ·
@@ -17,13 +17,13 @@
 
 🟩 Dự án **KHÔNG phải prototype** như giả định ban đầu. Đây là một **modular monolith chạy
 thật** (NestJS + Next.js + PostgreSQL) đã hoàn thành **toàn bộ luồng nghiệp vụ lõi (money
-spine)** với **9/9 chặng MVP theo đúng định nghĩa của đề bài** đều có code + file test E2E phủ.
+spine)** với **9/9 chặng MVP theo đúng định nghĩa MVP** đều có code + file test E2E phủ.
 
 🟩 "N15" / "N20" **là mốc kế hoạch (đơn vị ~1 buổi công 7–8h), không phải ngày lịch** — bằng
 chứng: cả 32 commit dồn trong 3 ngày lịch (2026-07-18 → 2026-07-20). Hôm nay đã đóng N15.
 
 🟦 Trạng thái: **"MVP có thể demo" cho luồng lõi**, còn **"chưa hoàn chỉnh" ở lớp UX/i18n/audit**.
-Tiến độ: đếm Must **86%** · trọng-số-nghiệp-vụ **~89%** · điểm-rubric ước **~0.80/1.0**. Điểm
+Tiến độ: đếm Must **86%** · trọng-số-nghiệp-vụ **~89%** · mức độ hoàn thiện ước **~0.80/1.0**. Điểm
 yếu nhất là **UX/i18n (0.15)** — hiện gần như đơn ngữ tiếng Việt.
 
 🟦 MVP luồng lõi **demo được ngay hôm nay**; N16–N20 (Tuần D) là **hoàn thiện + defense**, không
@@ -36,7 +36,7 @@ phải mới bắt đầu có MVP. Khả năng đạt "MVP hoàn chỉnh" vào N
 | Câu hỏi | Trả lời |
 |---|---|
 | Prototype hay MVP? | 🟦 **MVP có thể demo (luồng lõi)** — vượt xa prototype |
-| Đạt định nghĩa MVP đề bài chưa? | 🟩 **Rồi** — 9/9 chặng có code + E2E |
+| Đạt định nghĩa MVP chưa? | 🟩 **Rồi** — 9/9 chặng có code + E2E |
 | Backend/Frontend/UI có thật không? | 🟩 **Có thật cả 3** (không phải chưa nhìn thấy) |
 | Còn thiếu gì để nghiệm thu sạch? | 🟦 AD-02 audit, i18n phủ chuỗi, USD toggle, responsive |
 | N20 có kịp MVP hoàn chỉnh? | 🟦 **Khả thi cao** — chỉ còn Tuần D polish/defense |
@@ -60,23 +60,23 @@ phải mới bắt đầu có MVP. Khả năng đạt "MVP hoàn chỉnh" vào N
 
 ---
 
-## 4. Phạm vi thực tế của đề bài (đã xác minh từ Excel)
+## 4. Phạm vi sản phẩm Phase 1 (đã xác minh từ Excel)
 
-🟩 `Book1.xlsx` (2 bản trùng nội dung: `requirements/` và `Plan/docs/`): **22 Must + 7 Should**,
+🟩 đặc tả yêu cầu sản phẩm (2 bản trùng nội dung: `requirements/` và `Plan/docs/`): **22 Must + 7 Should**,
 chia 3 nhóm — Core Platform (CP-01..09), Admin (AD-01..10), Creator (CR-01..10). Thời gian gợi
 ý **6–8 tuần**; công nghệ gợi ý Next.js + NestJS + PostgreSQL (dự án theo đúng). Tiêu chí chấm:
 **0.4 / 0.25 / 0.15 / 0.1 / 0.1**.
 
-🟩 `Requirements.xlsx`: 5 bước (Product mockup → Database → Kiến trúc → Coding → Hạ tầng) + 4 kỳ
+🟩 tài liệu quy trình phát triển: 5 bước (Product mockup → Database → Kiến trúc → Coding → Hạ tầng) + 4 kỳ
 vọng năng lực (ưu tiên có lý do · chỉ ra bài toán khó · mock được dữ liệu · hiểu sâu để hỏi đáp).
 
 Bảng tổng hợp yêu cầu gốc (rút gọn — bản đầy đủ 22+7 ở `REQUIREMENT_TRACEABILITY_MATRIX.md §2`):
 
 | Mã | Yêu cầu gốc | Nguồn | Tiêu chí hoàn thành | Ưu tiên |
 |---|---|---|---|---|
-| CP-01..09 | Nền đa quốc gia: config/cách ly/routing/identity/i18n/tiền tệ/thuế/flag | Book1 §4A | Nước VN+PH chạy độc lập, cách ly, tiền/thuế đúng | 7 Must + 2 Should |
-| AD-01..10 | Admin: RBAC/audit/duyệt content+KYC/đối soát/payout/campaign | Book1 §4B | Ops/Finance/Admin thao tác đúng quyền, đối soát+chi trả chạy | 7 Must + 3 Should |
-| CR-01..10 | Creator: SSO/onboarding/KYC/join/content/earnings/payout | Book1 §4C | Creator đi trọn login→rút tiền | 8 Must + 2 Should |
+| CP-01..09 | Nền đa quốc gia: config/cách ly/routing/identity/i18n/tiền tệ/thuế/flag | Đặc tả §4A | Nước VN+PH chạy độc lập, cách ly, tiền/thuế đúng | 7 Must + 2 Should |
+| AD-01..10 | Admin: RBAC/audit/duyệt content+KYC/đối soát/payout/campaign | Đặc tả §4B | Ops/Finance/Admin thao tác đúng quyền, đối soát+chi trả chạy | 7 Must + 3 Should |
+| CR-01..10 | Creator: SSO/onboarding/KYC/join/content/earnings/payout | Đặc tả §4C | Creator đi trọn login→rút tiền | 8 Must + 2 Should |
 
 🟩 Ảnh yêu cầu = 13 file `Report/assets/00..12-*.png` — chính là **12 màn mockup V01–V12 do
 người làm tự render** (index, login, country, kyc, discover, campaign, my-campaigns, earnings,
@@ -229,7 +229,7 @@ chạy test** (quy định không đổi DB/hạ tầng). Cần `corepack pnpm t
 |---|---:|---|
 | Đếm Must (partial=0.5) | **86%** | Số lượng yêu cầu |
 | Trọng số nghiệp vụ | **~89%** | Giá trị/rủi ro — lõi tiền xong hết |
-| Điểm rubric đề bài | **~0.80/1.0** | UX/i18n kéo xuống |
+| Điểm tiêu chí đánh giá | **~0.80/1.0** | UX/i18n kéo xuống |
 | Sẵn sàng demo luồng lõi | **~85%** | thiếu demo rehearsed |
 | Sẵn sàng "MVP hoàn chỉnh" | **~80%** | còn N16–N20 |
 
@@ -237,7 +237,7 @@ chạy test** (quy định không đổi DB/hạ tầng). Cần `corepack pnpm t
 
 ## 14. Khoảng cách tới MVP
 
-🟩 **Theo định nghĩa MVP đề bài (9 chặng): đã đạt luồng lõi** (`MVP_GAP_ANALYSIS.md §1`).
+🟩 **Theo định nghĩa MVP (9 chặng): đã đạt luồng lõi** (`MVP_GAP_ANALYSIS.md §1`).
 
 🟦 Khoảng cách tới **"MVP hoàn chỉnh đủ điểm"**:
 - **Bắt buộc (P0):** audit ghi thật (AD-02) · i18n phủ chuỗi (CP-05) · USD toggle (CP-06) ·
@@ -264,7 +264,7 @@ defense** (không thêm module lõi mới); nhịp làm hiện tại ~2 mốc/ng
 |---|---|---|---|
 | B1 | Cần Docker Desktop bật (Postgres 54329) để test/demo | Thấp | Đã tài liệu hoá |
 | B2 | `docs/HARD_PROBLEMS.md` chưa có → hỏi đáp thiếu tập trung | TB | N19 |
-| B3 | `Report/` (PPTX+Q&A) chưa có N11–N15 | TB | Cập nhật trước buổi mentor |
+| B3 | `Report/` (PPTX+Q&A) chưa có N11–N15 | TB | Cập nhật trước buổi trình bày |
 | B4 | Demo end-to-end chưa rehearsed | TB | N20 |
 
 🟩 **Không có blocker kỹ thuật chặn cứng** (money spine đã trọn, không nợ lõi).
@@ -334,7 +334,7 @@ cả VN và PH** (tiền/thuế/locale khác nhau). Dữ liệu seed sẵn — k
 ## 21. Kết luận và khuyến nghị
 
 🟩 **Kết luận:** Dự án đã ở mức **MVP có thể demo cho luồng lõi**, đạt **9/9 chặng MVP theo định
-nghĩa đề bài**, với nền kỹ thuật (money spine + cách ly + DB) **rất chắc**. Giả định "prototype"
+nghĩa đặc tả yêu cầu**, với nền kỹ thuật (money spine + cách ly + DB) **rất chắc**. Giả định "prototype"
 và "phải hết N20 mới có MVP" **không đúng với bằng chứng** — MVP lõi đã có ở N15 (hôm nay).
 
 🟦 **Điểm mạnh:** money spine trọn vẹn, 7 bài toán khó có code, kiến trúc/DB sạch, git kỷ luật,
@@ -347,7 +347,7 @@ tài liệu thiết kế tốt, chủ động (8 QĐ sản phẩm có lý lẽ).
 1. **N16 ưu tiên tuyệt đối cho i18n + USD + responsive** — đây là chỗ mất điểm dễ nhất, rẻ nhất để lấy lại.
 2. **N17 gắn audit + negative tests** — biến Must AD-02 từ ❌ thành ✅, đồng thời tăng sức thuyết phục "bảo mật".
 3. **Tái chạy `pnpm test` (DB bật) để tự xác nhận 88/88 + 17/17** — không chỉ tin LOG.
-4. **Cập nhật `Report/` (PPTX + MENTOR_QA) cho N11–N15 + viết HARD_PROBLEMS.md** trước buổi mentor.
+4. **Cập nhật `Report/` (PPTX + MENTOR_QA) cho N11–N15 + viết HARD_PROBLEMS.md** trước buổi trình bày.
 5. **Giữ nguyên kỷ luật cắt Should** — không mở rộng ngoài 22 Must khi chưa đủ điểm phần lõi.
 
 🟨 **Cần bổ sung để chốt hoàn toàn:** chạy test độc lập (xác nhận số xanh) + kiểm responsive
@@ -367,7 +367,7 @@ thực tế trên trình duyệt — hai việc audit đọc-tĩnh này chưa th
 | Auth/Authz | Hoàn thành | 90% | `auth/*` + `rbac.ts` | MFA admin |
 | Business logic | Hoàn thành | 92% | money spine modules | chi tiết thứ cấp |
 | Worker/Queue | Chưa hoàn chỉnh | 40% | `reclaim.scheduler.ts`; `apps/worker` rỗng | worker process |
-| Tích hợp bên thứ 3 | Hoàn thành (mock) | 100% | SSO/eKYC/OTP/payment/FX mock có công bố | (đề bài cho phép mock) |
+| Tích hợp bên thứ 3 | Hoàn thành (mock) | 100% | SSO/eKYC/OTP/payment/FX mock có công bố | (phạm vi Phase 1 cho phép mock) |
 | Testing | Có triển khai | 85% | 86–88 API + 17 E2E (file) | 🟨 kết quả chưa tự chạy |
 | Docker/Infra | Chưa hoàn chỉnh | 40% | `compose.yaml` (Postgres) | Docker hoá API/Web |
 | Logging/Monitoring | Chưa triển khai | 10% | — | audit + observability |

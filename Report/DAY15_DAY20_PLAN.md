@@ -21,7 +21,7 @@
 | Đến N15 phải xong gì? | Toàn bộ Tuần A+B+C: product→DB→kiến trúc→core spine→money spine. **Đã xong (`commit 2df0d9d`).** |
 | "Ngày 20" là gì? | **Milestone N20** = mốc cuối Tuần D: buffer + tổng duyệt demo + regression → bàn giao. |
 | Kế hoạch có ghi N20 phải có MVP? | Có — Tuần D là "Triển khai + Defense"; **MVP luồng lõi đã có từ N15**, N16–N20 là hoàn thiện + chuẩn bị hỏi đáp/demo. |
-| Có tiêu chí nghiệm thu MVP? | Có: định nghĩa 9 chặng trong `Book1.xlsx` (xem `MVP_GAP_ANALYSIS.md §1`) — **đã đạt luồng lõi**. |
+| Có tiêu chí nghiệm thu MVP? | Có: định nghĩa 9 chặng trong đặc tả yêu cầu sản phẩm (xem `MVP_GAP_ANALYSIS.md §1`) — **đã đạt luồng lõi**. |
 
 > **Đính chính giả định quản lý:** "có khả năng phải hết ngày 20 mới có MVP" — thực tế **MVP
 > luồng lõi đã demo được từ N15 (hôm nay)**. N16–N20 nâng từ "MVP lõi" lên "MVP hoàn chỉnh +
@@ -60,19 +60,19 @@ gantt
 ### 3.1 Kịch bản KHẢ QUAN
 - **Giả định:** người làm giữ nhịp ~2 mốc/ngày lịch như hiện tại; không phát sinh bug lớn.
 - **Kết quả:** N16–N20 xong trong **~3 ngày lịch** (≈ 2026-07-23). MVP hoàn chỉnh + i18n +
-  audit + demo rehearsed + HARD_PROBLEMS đầy đủ. Điểm rubric ước lên **~0.90**.
+  audit + demo rehearsed + HARD_PROBLEMS đầy đủ. mức độ hoàn thiện ước lên **~0.90**.
 
 ### 3.2 Kịch bản THỰC TẾ
 - **Giả định:** i18n phủ chuỗi tốn công hơn dự kiến (nhiều màn hardcode VI); responsive phát
   sinh chỉnh sửa; 1 mốc/ngày ở phần polish.
 - **Kết quả:** N16–N20 xong trong **~5 ngày lịch** (≈ 2026-07-25). MVP hoàn chỉnh, có thể còn
-  vài chi tiết P2 (bulk/export) để ngỏ. Điểm rubric **~0.85**.
+  vài chi tiết P2 (bulk/export) để ngỏ. mức độ hoàn thiện **~0.85**.
 
 ### 3.3 Kịch bản XẤU
 - **Giả định:** DB/Docker trục trặc; test regression phát hiện lỗi money spine ẩn; tài liệu +
   demo ngốn thời gian; người làm mệt/gián đoạn.
 - **Kết quả:** chỉ kịp **N16–N17 (Must gap) + demo lõi**; N19 HARD_PROBLEMS sơ sài; P2 bỏ ngỏ.
-  **Vẫn có MVP demo được** (đã có từ N15) nhưng lớp defense/UX yếu. Điểm rubric **~0.72–0.75**.
+  **Vẫn có MVP demo được** (đã có từ N15) nhưng lớp defense/UX yếu. mức độ hoàn thiện **~0.72–0.75**.
 
 > **Phương án dự phòng chung:** nếu quỹ giờ hụt, **ưu tiên cứng theo thứ tự P0 → tài liệu →
 > demo rehearsed**, hy sinh mọi P2. Không bao giờ hy sinh: cách ly country, tính đúng tiền,
@@ -124,7 +124,7 @@ Không bắt buộc thêm người — 1 người vẫn về đích theo kịch 
 | Campaign đa ngôn ngữ + analytics/export | AD-09 | Create + budget đã Must |
 | MFA login admin | AD-01 | OTP payout đã minh hoạ cơ chế |
 | Nợ kỹ thuật QĐ-6/7/8 (apply-flow, fee, escrow) | mở rộng | Model đã chừa đường |
-| Các Should còn lại (AD-05/08/10, CR-09/10, CP-09) | Should | Đề bài cho phép hoãn |
+| Các Should còn lại (AD-05/08/10, CR-09/10, CP-09) | Should | Đặc tả yêu cầu cho phép hoãn |
 
 ---
 

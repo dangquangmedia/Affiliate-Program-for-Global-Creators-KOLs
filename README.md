@@ -1,9 +1,8 @@
 # Affiliate GLOBAL
 
-Nền tảng affiliate marketing **đa quốc gia** (Việt Nam + Philippines), MVP chạy local. Đây là bản
-dựng theo `Plan/KE_HOACH_V2.md` (4 tuần, N1–N20): một luồng tiền **chạy thật end-to-end** trên 2
-nước có tiền tệ / thuế / mức rút tối thiểu khác nhau, cộng bộ **13 màn prototype** để demo tư duy
-product.
+Nền tảng affiliate marketing **đa quốc gia** (Việt Nam + Philippines), MVP chạy local: một luồng
+tiền **chạy thật end-to-end** trên 2 nước có tiền tệ / thuế / mức rút tối thiểu khác nhau, cộng bộ
+**prototype nhiều màn** để trình bày tư duy product.
 
 ## Nó làm được gì
 

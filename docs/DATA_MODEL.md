@@ -115,7 +115,7 @@ erDiagram
 - Cột: `country_id`, `brand`, `title`, `reward_minor`, `currency`, `slots_total`,
   `slots_taken`, `status` ∈ {`ACTIVE`,`PAUSED`,`ENDED`}, `platform`, `required_hashtag`, `brief`.
 - Invariant: `currency` PHẢI = currency của `country` (VN→VND, PH→PHP).
-- **"Đầy" KHÔNG phải cột** — suy ra `slots_taken >= slots_total` (mentor Q4). Chỉ lưu 2 số đếm.
+- **"Đầy" KHÔNG phải cột** — suy ra `slots_taken >= slots_total`. Chỉ lưu 2 số đếm.
 - Cách ly: V04 lọc `campaigns` theo country phiên → VN không thấy campaign PH (bài toán #1
   hiện ngay trên UI).
 
@@ -246,7 +246,7 @@ erDiagram
 
 → 18 bảng, mỗi bảng ít nhất 1 màn cần. Không bảng nào mồ côi.
 
-## 4. 7 bài toán khó neo vào schema chỗ nào (bảng chứng minh cho mentor)
+## 4. 7 bài toán khó neo vào schema chỗ nào (bảng chứng minh)
 
 | # | Bài toán | Schema enforce ở đâu |
 |---|---|---|

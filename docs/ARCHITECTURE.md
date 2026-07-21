@@ -8,12 +8,12 @@
 Một tiến trình API (NestJS) + một web (Next.js) + một Postgres. Chia **module theo miền
 nghiệp vụ** trong cùng một tiến trình, không tách service mạng.
 
-**Vì sao không microservices (câu trả lời cho mentor):**
-- Bài toán khó của đề là **tính đúng của tiền** (exactly-once, ledger, payout 3 trạng thái) —
+**Vì sao không microservices:**
+- Bài toán khó cốt lõi là **tính đúng của tiền** (exactly-once, ledger, payout 3 trạng thái) —
   những thứ này cần **transaction trong 1 database**. Tách service = mất transaction, phải làm
   saga/2PC → phức tạp gấp bội, dễ sai tiền. Sai kiến trúc đắt hơn nhiều so với lợi ích scale.
-- Đội 1 người, 4 tuần: microservices là chi phí vận hành (deploy, network, tracing) không đổi
-  lấy giá trị nào ở quy mô này.
+- Ở quy mô hiện tại, microservices là chi phí vận hành (deploy, network, tracing) không đổi
+  lấy giá trị nào tương xứng.
 - Monolith **có module ranh giới rõ** vẫn tách được về sau nếu thật sự cần — ngược lại thì khó.
 
 ## 2. Sơ đồ module (trong 1 tiến trình API)

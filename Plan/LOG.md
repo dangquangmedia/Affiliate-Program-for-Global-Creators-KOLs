@@ -18,8 +18,11 @@
 - **Schema**: lean 18 bảng, 3 migration (`init_lean_18_tables` → `add_session` → `join_slots_waitlist`).
 - Git: `main`; mốc N16–N20: `9c7ce69`(N16)→`ed57342`(N17)→`536a4d8`(N18)→`31eeaa7`(N19)→N20.
 - **Nợ kỹ thuật còn (không chặn chấm điểm)**: QĐ-7 phí / QĐ-8 escrow / QĐ-6 apply-flow (docs-only,
-  chưa code runtime); i18n index launcher + 3 nhãn `data.ts`; `Report/` PPTX + `MENTOR_QA.md` phủ
-  N1–N10b, chưa cập nhật N11–N19 (`HARD_PROBLEMS.md` đã phủ money-spine + audit).
+  chưa code runtime); i18n index launcher + 3 nhãn `data.ts`; `Report/MENTOR_QA.md` phủ N1–N10b
+  (chưa cập nhật N11–N19; `HARD_PROBLEMS.md` đã phủ money-spine + audit).
+- **Phiên bổ sung 2026-07-21 (sau khi đóng)**: (1) **UI thật `/portal`** — 5 dashboard theo vai +
+  design system + responsive (build 6 route static xanh); (2) **làm sạch tài liệu** báo cáo (bỏ khung
+  mentor/đề bài/Book1, giữ Q&A); (3) **PPTX 8 slide** dựng lại (`Report/Affiliate_GLOBAL_Prototype_Review.pptx`).
 
 ## Tổng kết Tuần A — Product & Database (N1-N5) ✅ XONG
 
@@ -457,21 +460,42 @@ Mỗi ngày N: 1 dòng bên dưới (ngày, việc chính, kết quả, việc k
   token + tài nguyên VN → 404); gọi route VN bằng token PH là 403 — ngữ nghĩa khác. Kế: **N12**
   ledger append-only + dashboard earnings (V07) Gross–Thuế–Net.
 
-## Current State & Hand-off (cập nhật 2026-07-20 — **HOÀN THÀNH N1–N20, đóng dự án**)
+## Phiên 2026-07-21 — UI thật /portal + dọn tài liệu + PPTX (3 việc theo yêu cầu)
+
+Sau khi dự án đã đóng N1–N20, Anh Quang giao 3 việc (ưu tiên Việc 2 trước):
+
+- **Việc 2 — UI thật (trọng tâm):** dựng khu mới **`apps/web/src/app/portal/`**, tách biệt `/mockup`.
+  Design system dark premium (`portal.module.css`, biến trên `.app`), component kit (`ui.tsx`:
+  Icon SVG, Shell sidebar→bottom-nav, Kpi/Panel/Chip/MoneySpine…). **5 dashboard theo vai**
+  `/portal/{creator,ops,admin,finance,global}` + landing `/portal`. Signature = màu bản sắc nước
+  (VN hổ phách / PH ngọc lam) qua `data-market`; đổi VN/PH re-scope dữ liệu thật; money-spine.
+  Thêm lối vào ở `app/page.tsx`. **Xác minh**: typecheck strict xanh · `next build` 6 route static ·
+  chụp Playwright desktop+mobile · tương tác chạy thật. Gotcha gặp: chạy `next build` khi đang
+  `next dev` → 404 chunk `main-app.js` chết tương tác → `rm -rf apps/web/.next` rồi `dev` lại.
+- **Việc 1 — dọn tài liệu báo cáo:** bỏ dấu vết mentor/đề bài/Book1.xlsx/Requirements.xlsx/rubric–
+  thang điểm/khung N1–N20-thực-tập trong `docs/PRODUCT|DATA_MODEL|ARCHITECTURE.md`, `Plan/KE_HOACH_V2.md`,
+  `README.md`, `Report/{DAY15_DAY20_PLAN,MVP_GAP_ANALYSIS,PROJECT_AUDIT_DAY15_TO_DAY20,REQUIREMENT_TRACEABILITY_MATRIX,FIGMA_UI_PROMPTS_12_SCREENS}.md`.
+  **GIỮ Q&A**: `Report/MENTOR_QA.md` + `docs/HARD_PROBLEMS.md`. `Plan/LOG.md` để nguyên (nhật ký nội bộ).
+  → memory `reports_business_tone.md`.
+- **Việc 3 — PPTX 8 slide:** dựng lại `Report/Affiliate_GLOBAL_Prototype_Review.pptx` (script python-pptx
+  ở scratchpad), nhúng screenshot dashboard mới (`Report/assets/portal/*.png`). 8 slide: bìa · vấn đề ·
+  5 vai+luồng tiền · 4 trụ cột kỹ thuật · UI theo vai · 7 bài toán khó · tiến độ · lộ trình.
+  Máy KHÔNG có LibreOffice/PowerPoint COM → chưa render preview được, chỉ verify cấu trúc (8 slide, no overflow).
+
+## Current State & Hand-off (cập nhật 2026-07-21)
 
 **1. Vừa xong / trạng thái:**
-- **XONG TRỌN N1–N20** — dự án đóng, KHÔNG có việc đang dở. Vòng đời tiền end-to-end + **13 màn V01–V13**; **22/22 Must có bằng chứng**.
-- **Xác minh cuối N20 (DB sạch)**: lint + 2×typecheck + **API 105/105** + **E2E 17/17** + build api+web — tất cả **xanh**; 3 migration áp từ DB rỗng OK; V13 audit render thật.
-- **Git `main` sạch**, đã commit hết: N17 `ed57342` · N18 `536a4d8` · N19 `31eeaa7` · N20 `1644703`. Chỉ còn untracked/ignore: `.claude/settings.local.json`, `Report/FIGMA_UI_PROMPTS_12_SCREENS.md` (cố ý không commit).
-- **Môi trường**: Postgres Docker 54329 **đang chạy**; **API dev 3001 CÒN chạy, WEB dev 3000 ĐÃ TẮT** (kill để `next build`) → cần demo thì `corepack pnpm dev:web`.
+- 3 việc trên **XONG**. Money-spine N1–N20 vẫn nguyên (API 105/105 · E2E 17/17). UI `/portal` là lớp mới **thêm vào**, không đụng `/mockup` nên E2E cũ không ảnh hưởng.
+- **Đã commit phiên này** (xem `git log`): UI portal / dọn docs / PPTX. `main` sạch sau commit (trừ `.claude/settings.local.json` ignore).
+- **Môi trường lúc tắt máy**: dev:web nền đã **tắt**; Postgres Docker 54329 tuỳ máy Anh Quang.
 
-**2. File/biến quan trọng (chốt của N17 audit — mốc code cuối):**
-- `audit/audit.service.ts` `record(client,input)` append-only **nhận tx** + `list(auth,market?)` chỉ GLOBAL_ADMIN (`take:200`); `audit/audit.controller.ts` `GET /admin/audit`; `auth/rbac.ts` `assertGlobalAdmin`; facade `auditEvent` trong `prisma.service.ts`; seed `global.admin@` (country NULL, `ON CONFLICT (id)`). Nối 5 điểm: `content/reconciliation/payout.service.ts` (tx CÓ SẴN) + `kyc/campaign.service.ts` (bọc `$transaction` mới). Web V13 `app/mockup/admin/audit/page.tsx` + `lib/audit-client.ts` + `lib/i18n.ts` khối `audit.*`. Test `test/audit.test.ts` + `test/rbac.negative.test.ts`.
-- **Gotcha carry-forward**: (a) prisma CLI cần env (`bootstrap` tự nạp); (b) đừng `next build`/xoá `.next` khi dev:web chạy; (c) test email/tên unique; (h) test API `--test-concurrency=1`; (j) e2e dùng **PH**/`data-creator` duy nhất; (s) E2E cần Docker sống — `/health` 503 thì `docker info` + `compose up -d postgres`; (u) script bootstrap phải tên KHÁC `setup` (đụng built-in `pnpm setup`).
+**2. File/biến quan trọng:**
+- UI mới: `apps/web/src/app/portal/` (`page.tsx` landing · `ui.tsx` · `portal.module.css` · `{creator,ops,admin,finance,global}/page.tsx`). Dùng chung `mockup/data.ts` + `formatMoney`.
+- Audit N17 (mốc code money-spine cuối): `audit/audit.service.ts` `record(client,input)` nhận tx + `list(auth,market?)`; `assertGlobalAdmin`; facade `auditEvent`; nối 5 service; V13 `/mockup/admin/audit`.
+- **Gotcha carry-forward**: (a) prisma CLI cần env (`bootstrap` tự nạp); (b) **đừng `next build` khi `dev:web` chạy** (404 chunk → `rm -rf apps/web/.next`); (h) test API `--test-concurrency=1`; (j) e2e dùng PH/`data-creator`; (s) E2E cần Docker — `/health` 503 thì `docker info` + `compose up -d postgres`; (u) bootstrap ≠ tên `setup`.
 
-**3. Nhiệm vụ đầu tiên phiên sau (dự án đã đóng — mọi việc OPTIONAL, đợi Anh Quang chọn hướng):**
-- **Không có việc bắt buộc.** Nếu Anh Quang muốn tiếp, chọn 1 trong:
-  - (A) **Đồng bộ tài liệu bảo vệ**: cập nhật `Report/MENTOR_QA.md` (đang phủ N1–N10b) cho N11–N19, nguồn = `docs/HARD_PROBLEMS.md`.
-  - (B) **Mở rộng chiều sâu (lát mỏng)**: QĐ-7 phí (`platform_fee_bps`+builder) / QĐ-8 escrow (`PENDING_FUNDING`) / QĐ-6 apply-flow (`requires_approval`+APPLIED).
-  - (C) **Polish nhỏ**: i18n `mockup/page.tsx` index + 3 nhãn `data.ts`.
-- **Khởi động lại nhanh**: `corepack pnpm bootstrap` → `dev:api` + `dev:web` → `/mockup`. Verify đầy đủ: tắt dev:web rồi `corepack pnpm verify`.
+**3. Nhiệm vụ đầu tiên phiên sau (đều OPTIONAL):**
+- (A) Render/soát PPTX trên máy có PowerPoint (em chưa xem trực quan được); chỉnh nếu lệch.
+- (B) Mở rộng `/portal`: đủ 12 màn theo Figma spec, hoặc thêm E2E cho `/portal`.
+- (C) Đồng bộ `Report/MENTOR_QA.md` N11–N19; hoặc lát mỏng QĐ-7/8/6.
+- **Khởi động lại nhanh**: `corepack pnpm bootstrap` → `dev:api` + `dev:web` → `/portal` (UI thật) · `/mockup` (prototype cũ).

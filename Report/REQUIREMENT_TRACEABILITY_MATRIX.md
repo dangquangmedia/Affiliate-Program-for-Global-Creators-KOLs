@@ -1,8 +1,8 @@
 # MA TRẬN TRUY XUẤT YÊU CẦU — Affiliate GLOBAL
 
 > Lập ngày 2026-07-20 (audit độc lập, chỉ đọc — không sửa code).
-> Nguồn yêu cầu: `requirements/Book1.xlsx` (= `Plan/docs/Book1.xlsx`, 22 Must + 7 Should) và
-> `requirements/Requirements.xlsx` (5 bước mentor). Mọi kết luận đều dẫn file/endpoint/test.
+> Nguồn yêu cầu: đặc tả yêu cầu sản phẩm (= đặc tả yêu cầu sản phẩm, 22 Must + 7 Should) và
+> tài liệu quy trình phát triển (5 bước quy trình phát triển). Mọi kết luận đều dẫn file/endpoint/test.
 >
 > **Quy ước trạng thái** (chỉ dùng đúng các nhãn cho phép):
 > Hoàn thành · Có triển khai nhưng chưa hoàn chỉnh · Prototype · Chỉ có tài liệu · Chưa triển
@@ -19,15 +19,15 @@
 
 | Nguồn | Đường dẫn | Ghi chú |
 |---|---|---|
-| Đề bài gốc | `requirements/Book1.xlsx` Sheet1 A1:F93 | 22 Must + 7 Should + tiêu chí chấm |
-| 5 bước mentor | `requirements/Requirements.xlsx` Sheet1 | Bước 1–5 + 4 kỳ vọng năng lực |
+| Đặc tả yêu cầu | đặc tả yêu cầu sản phẩm | 22 Must + 7 Should + tiêu chí đánh giá |
+| 5 bước quy trình phát triển | tài liệu quy trình phát triển Sheet1 | Bước 1–5 + 4 kỳ vọng năng lực |
 | Ảnh yêu cầu (mockup) | `Report/assets/00..12-*.png` | 13 ảnh màn V01–V12 (do người làm render) |
 | Kế hoạch | `Plan/KE_HOACH_V2.md` | 20 mốc N1–N20, phạm vi cắt/giữ |
 | Nhật ký | `Plan/LOG.md` | Nhật ký N1–N15 có dẫn chứng |
 | Product | `docs/PRODUCT.md` | 8 quyết định sản phẩm (QĐ-1..8) |
 | Data model | `docs/DATA_MODEL.md` | 18 bảng suy từ mockup |
 | Kiến trúc | `docs/ARCHITECTURE.md` | Modular monolith + đường đi lòng tin |
-| Q&A mentor | `Report/MENTOR_QA.md` | Bộ hỏi đáp giả lập (đến N10b) |
+| Q&A thẩm định | `Report/MENTOR_QA.md` | Bộ hỏi đáp giả lập (đến N10b) |
 | Source | `apps/api/src`, `apps/web/src`, `apps/api/prisma` | Xác minh endpoint/model/seed |
 | Git | 32 commit, 2026-07-18 → 2026-07-20 | 1 commit/mốc, lịch sử sạch |
 
@@ -40,7 +40,7 @@ Cột: **BE** backend · **FE** frontend/màn · **DB** schema · **Test** (file
 
 ### A. CORE PLATFORM
 
-| Mã | Yêu cầu (Book1) | Ưu tiên | BE | FE | DB | Test | Demo | Kết luận | Bằng chứng |
+| Mã | Yêu cầu (đặc tả) | Ưu tiên | BE | FE | DB | Test | Demo | Kết luận | Bằng chứng |
 |---|---|---|:--:|:--:|:--:|:--:|:--:|---|---|
 | CP-01 | Cấu hình theo quốc gia (Global Admin sửa nước) | Must | 🟡 | 🟡 | ✅ | 🟡 | 🟡 | **Chưa hoàn chỉnh** | `CountryConfig` + seed VN/PH (tax 10/8, min_payout, feature_kyc/payout/cps) `apps/api/prisma/seed.sql`; đọc config qua `markets.service.ts`. **Ghi/sửa config bởi Global Admin = mockup tĩnh** `mockup/admin/config/page.tsx`, chưa có endpoint ghi. |
 | CP-02 | Cách ly dữ liệu theo country | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành** | `auth/rbac.ts` `assertStaffForCountry`; cross-country 404 test ở `kyc/content/campaign/reconciliation/payout.smoke.test.ts`; nguyên tắc "đường đi lòng tin" `docs/ARCHITECTURE.md §3`. |
@@ -54,7 +54,7 @@ Cột: **BE** backend · **FE** frontend/màn · **DB** schema · **Test** (file
 
 ### B. ADMIN
 
-| Mã | Yêu cầu (Book1) | Ưu tiên | BE | FE | DB | Test | Demo | Kết luận | Bằng chứng |
+| Mã | Yêu cầu (đặc tả) | Ưu tiên | BE | FE | DB | Test | Demo | Kết luận | Bằng chứng |
 |---|---|---|:--:|:--:|:--:|:--:|:--:|---|---|
 | AD-01 | Đăng nhập & RBAC (MFA cho Finance/Global) | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành (lõi); MFA-admin thiếu** | `auth/*` mock-login+session; `rbac.ts` 4 vai (LOCAL_OPS/FINANCE/ADMIN, GLOBAL); RBAC 403 test rải khắp. **MFA/OTP mới áp cho payout creator**, chưa áp login admin. |
 | AD-02 | Audit trail | Must | ❌ | ❌ | ✅ | ❌ | ❌ | **Chưa triển khai (chỉ schema)** | Model `AuditEvent` tồn tại (`schema.prisma`) nhưng **không có lệnh ghi audit nào** trong `apps/api/src` (grep 0 hit ngoài code sinh). Chữ "audit" ở web chỉ là nhãn mockup. Kế hoạch N17. |
@@ -69,12 +69,12 @@ Cột: **BE** backend · **FE** frontend/màn · **DB** schema · **Test** (file
 
 ### C. CREATOR
 
-| Mã | Yêu cầu (Book1) | Ưu tiên | BE | FE | DB | Test | Demo | Kết luận | Bằng chứng |
+| Mã | Yêu cầu (đặc tả) | Ưu tiên | BE | FE | DB | Test | Demo | Kết luận | Bằng chứng |
 |---|---|---|:--:|:--:|:--:|:--:|:--:|---|---|
-| CR-01 | Đăng nhập SSO (TikTok/Google) | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành (mock có công bố)** | `auth/mock-login` upsert user+session; `lib/auth-client.ts`; V01 login; `e2e/creator-login`. SSO thật = mock đúng định dạng (đề bài cho phép). |
+| CR-01 | Đăng nhập SSO (TikTok/Google) | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành (mock có công bố)** | `auth/mock-login` upsert user+session; `lib/auth-client.ts`; V01 login; `e2e/creator-login`. SSO thật = mock đúng định dạng (phạm vi Phase 1 cho phép). |
 | CR-02 | Onboarding country profile + chuyển nước | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành** | `country/profile.*` upsert theo phiên; V02 chọn/đổi nước; `country-profile.smoke.test.ts`. |
 | CR-03 | i18n + tiền hiển thị (USD/local) | Must | ➖ | 🟡 | ✅ | ❌ | 🟡 | **Chưa hoàn chỉnh** | Như CP-05/CP-06 — cơ chế có, phủ chuỗi mỏng, nút chọn tiền chưa nối. |
-| CR-04 | KYC theo checklist (upload, bank/tax, sửa đúng phần) | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành (lõi); upload file thật mock** | `kyc.service.ts` 4 field, nộp lại chỉ field chưa duyệt, ACCEPTED khoá; V03; `e2e/kyc-flow`. **Upload giấy tờ/ký hợp đồng là field text mock** (đề bài cho phép). |
+| CR-04 | KYC theo checklist (upload, bank/tax, sửa đúng phần) | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành (lõi); upload file thật mock** | `kyc.service.ts` 4 field, nộp lại chỉ field chưa duyệt, ACCEPTED khoá; V03; `e2e/kyc-flow`. **Upload giấy tờ/ký hợp đồng là field text mock** (phạm vi Phase 1 cho phép). |
 | CR-05 | Khám phá & join campaign + My Campaigns | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành** | `campaign.controller` discover/detail; `join.service.ts` `FOR UPDATE` race-safe + snapshot + KYC-gate + waitlist; `join.smoke.test.ts` (10, gồm RACE); `e2e/join-flow`,`waitlist-flow`. **Hashtag cá nhân = hashtag campaign** (chưa cá nhân hoá per-creator). |
 | CR-06 | Nộp & theo dõi content (kiểm link/hashtag/platform, resubmit) | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành** | `content.service.ts` chặn sai nền tảng, cờ hashtag, chuỗi attempt/supersedes; V06; `e2e/content-flow`. |
 | CR-07 | Thu nhập & minh bạch thuế | Must | ✅ | ✅ | ✅ | ✅ | ✅ | **Hoàn thành** | `earnings.service.ts` Gross/Tax/Net + trạng thái PENDING/AVAILABLE/PAID + ledger view; V07; `e2e/earnings-flow`. |
@@ -107,7 +107,7 @@ Cột: **BE** backend · **FE** frontend/màn · **DB** schema · **Test** (file
 
 ---
 
-## 4. 5 bước mentor (Requirements.xlsx) ↔ hiện trạng
+## 4. 5 bước quy trình phát triển (tài liệu quy trình phát triển) ↔ hiện trạng
 
 | Bước | Yêu cầu | Trạng thái | Bằng chứng |
 |---|---|---|---|
