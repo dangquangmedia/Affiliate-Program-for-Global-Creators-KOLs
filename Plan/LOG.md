@@ -492,6 +492,7 @@ Sau khi dự án đã đóng N1–N20, Anh Quang giao 3 việc (ưu tiên Việc
 **2. File/biến quan trọng:**
 - UI mới: `apps/web/src/app/portal/` (`page.tsx` landing · `ui.tsx` · `portal.module.css` · `{creator,ops,admin,finance,global}/page.tsx`). Dùng chung `mockup/data.ts` + `formatMoney`.
 - **Tinh chỉnh landing (commit `9bafb4d`)**: `/` redirect → `/portal` (bỏ walking-skeleton); landing bọc 1 khung `.landFrame`; nút "Xem prototype" ở góc phải; tiêu đề "Chào mừng đến Trung tâm điều hành"; testid `link-vn`/`link-ph` chuyển xuống footer portal → E2E `market-round-trip` vẫn xanh.
+- **Theme + responsive (commit `e63b963`)**: thêm `ThemeToggle` (sáng/tối, `data-theme` trên `[data-portal-root]`, lưu `localStorage.ag_theme`, biến màu đảo nền/chữ giữ accent). Sửa tràn ngang: `box-sizing:border-box` toàn khu + `minmax(0,1fr)` grid + `min-width:0` content + topbar mobile xuống dòng/ẩn tên user. Đã đo overflowX=false ở 1440/900/390. (Bản ảnh user báo "mobile trên PC" gốc là CSS viewport nhỏ do zoom — code vốn full-width ở desktop.)
 - Audit N17 (mốc code money-spine cuối): `audit/audit.service.ts` `record(client,input)` nhận tx + `list(auth,market?)`; `assertGlobalAdmin`; facade `auditEvent`; nối 5 service; V13 `/mockup/admin/audit`.
 - **Gotcha carry-forward**: (a) prisma CLI cần env (`bootstrap` tự nạp); (b) **đừng `next build` khi `dev:web` chạy** (404 chunk → `rm -rf apps/web/.next`); (h) test API `--test-concurrency=1`; (j) e2e dùng PH/`data-creator`; (s) E2E cần Docker — `/health` 503 thì `docker info` + `compose up -d postgres`; (u) bootstrap ≠ tên `setup`.
 
