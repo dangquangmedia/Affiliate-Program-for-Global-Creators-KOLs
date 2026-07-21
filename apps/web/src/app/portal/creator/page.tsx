@@ -51,17 +51,24 @@ export default function CreatorDashboard() {
   const [earn, setEarn] = useState<EarningsDashboard | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [kyc, setKyc] = useState<KycCase | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!loadSession()) return;
-    const [c, p, e, w, k] = await Promise.all([
-      listCampaigns(market), myParticipations(market), getEarnings(market), getWallet(market), getMyKyc(market),
-    ]);
-    if (!("unauthorized" in c)) setCampaigns(c);
-    setMine(p);
-    if (!("unauthorized" in e)) setEarn(e);
-    if (!("unauthorized" in w)) setWallet(w);
-    setKyc(k);
+    try {
+      const [c, p, e, w, k] = await Promise.all([
+        listCampaigns(market), myParticipations(market), getEarnings(market), getWallet(market), getMyKyc(market),
+      ]);
+      if (!("unauthorized" in c)) setCampaigns(c);
+      setMine(p);
+      if (!("unauthorized" in e)) setEarn(e);
+      if (!("unauthorized" in w)) setWallet(w);
+      setKyc(k);
+      setLoadErr(null);
+    } catch {
+      // Lỗi mạng/transport — KHÔNG để dữ liệu trống bị hiểu nhầm là "chưa có gì".
+      setLoadErr("Không tải được dữ liệu, thử lại sau.");
+    }
   }, [market]);
 
   useEffect(() => {
@@ -76,13 +83,17 @@ export default function CreatorDashboard() {
   const [joinErr, setJoinErr] = useState<string | null>(null);
 
   async function onJoin(id: string) {
-    const res = await joinCampaign(market, id);
-    if (!res.ok) {
-      setJoinErr(joinErrorMessage(res.code));
-      return;
+    try {
+      const res = await joinCampaign(market, id);
+      if (!res.ok) {
+        setJoinErr(joinErrorMessage(res.code));
+        return;
+      }
+      setJoinErr(null);
+      await load();
+    } catch {
+      setJoinErr("Không tham gia được, thử lại sau.");
     }
-    setJoinErr(null);
-    await load();
   }
 
   const [submitFor, setSubmitFor] = useState<string | null>(null);
@@ -104,6 +115,8 @@ export default function CreatorDashboard() {
       } else {
         setSubmitErr(res.message);
       }
+    } catch {
+      setSubmitErr("Không xử lý được, thử lại sau.");
     } finally {
       setSubmitBusy(false);
     }
@@ -131,6 +144,8 @@ export default function CreatorDashboard() {
       });
       if (!res.ok) setPayoutErr(res.message);
       await load();
+    } catch {
+      setPayoutErr("Không xử lý được, thử lại sau.");
     } finally {
       setPayoutBusy(false);
     }
@@ -166,6 +181,8 @@ export default function CreatorDashboard() {
       user={{ name: "Nguyễn Minh Anh", sub: `Creator · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}>
 
       <MarketStrip market={market} note="Đổi VN/PH ở góc phải để thấy dữ liệu re-scope" />
+
+      {loadErr && <div style={{ marginBottom: 12 }}><Chip tone="danger">{loadErr}</Chip></div>}
 
       {active === "home" && (
         <>
