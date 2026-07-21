@@ -1,13 +1,30 @@
 import { test, expect } from "@playwright/test";
 
-// N7: nút SSO (mock) trên V01 phải gọi API auth THẬT (tạo user+session trong DB) rồi hiện
-// danh tính đã đăng nhập — không còn là hình tĩnh.
-test("V01 login: clicking mock Google actually authenticates via the API", async ({ page }) => {
+// N7: nút SSO (mock) trên V01 phải gọi API auth THẬT (tạo user+session trong DB) rồi TỰ chuyển
+// sang bước tiếp theo (chọn quốc gia) — không kẹt lại màn login.
+test("V01 login: clicking mock Google authenticates and advances to the country flow", async ({ page }) => {
   await page.goto("/mockup/creator/login");
 
   await page.getByRole("button", { name: /Đăng nhập với Google/ }).click();
 
-  // Sau khi API trả session: card "Đã đăng nhập" + email danh tính demo hiện ra.
+  // Đăng nhập thành công → điều hướng sang màn chọn quốc gia, không còn đòi đăng nhập.
+  await expect(page).toHaveURL(/\/mockup\/creator\/country/);
+  await expect(page.getByText(/cần đăng nhập/)).toHaveCount(0);
+});
+
+// N7: quay lại màn login khi ĐÃ có session -> hiện danh tính + đăng xuất được.
+test("V01 login: returning with a session shows identity and can log out", async ({ page }) => {
+  await page.goto("/mockup/creator/login");
+  await page.evaluate(async () => {
+    const s = await fetch("http://localhost:3001/auth/mock-login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "creator.google@demo.affiliate.gl", displayName: "Creator (Google)" }),
+    }).then((r) => r.json());
+    window.localStorage.setItem("ag_session", JSON.stringify({ token: s.token, user: s.user }));
+  });
+
+  await page.goto("/mockup/creator/login");
   await expect(page.getByText("Đã đăng nhập")).toBeVisible();
   await expect(page.getByText("creator.google@demo.affiliate.gl")).toBeVisible();
 

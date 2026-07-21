@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Market } from "../../../../mockup/data";
 import { Frame, Note, StateBar, Card, Btn, BtnRow, Badge } from "../../../../mockup/ui";
 import { usePrefs } from "../../../../mockup/prefs";
@@ -32,6 +33,8 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { lang } = usePrefs();
+  const router = useRouter();
+  const NEXT = "/mockup/creator/country"; // bước tiếp theo sau đăng nhập: chọn quốc gia
 
   // Đọc session đã lưu (nếu quay lại màn này mà chưa logout).
   useEffect(() => {
@@ -46,6 +49,7 @@ export default function LoginScreen() {
       const result = await mockLogin(email, name); // tạo user + session THẬT trong DB
       saveSession(result);
       setSession(result);
+      router.push(NEXT); // đăng nhập xong → tự chuyển sang bước chọn quốc gia
     } catch (e) {
       setError(e instanceof AuthError ? e.message : t(lang, "login.failed"));
     } finally {
@@ -89,6 +93,9 @@ export default function LoginScreen() {
             {t(lang, "login.hello", { name: session.user.displayName })}
           </p>
           <BtnRow>
+            <Btn variant="primary" onClick={() => router.push(NEXT)}>
+              {t(lang, "login.chooseCountry")} →
+            </Btn>
             <Btn variant="ghost" onClick={logout}>
               {t(lang, "login.logout")}
             </Btn>
