@@ -6,6 +6,7 @@ import {
   type NavItem, type Role,
 } from "../ui";
 import { MARKETS, formatMoney, toUsdReference, type Market, type Currency } from "../../../mockup/data";
+import { readPrefMarket } from "../session";
 import { loadSession } from "../../../lib/auth-client";
 import { listCampaigns, myParticipations, joinCampaign, type CampaignSummary, type Participation } from "../../../lib/campaign-client";
 import { submitContent } from "../../../lib/content-client";
@@ -27,11 +28,6 @@ const COVERS: Record<string, string> = {
   Instagram: "linear-gradient(135deg,#3a1720,#5a2340)",
   YouTube: "linear-gradient(135deg,#2a1414,#4a1d1d)",
 };
-
-function readPrefMarket(): Market {
-  if (typeof window === "undefined") return "VN";
-  return window.localStorage.getItem("ag_pref_market") === "PH" ? "PH" : "VN";
-}
 
 // Mã lỗi thật từ apps/api/src/campaign/join.service.ts (đầy suất thì vào waitlist -> vẫn ok:true,
 // nên không có mã "hết suất" ở đây — chỉ 3 nhánh conflict thật + fallback chung).

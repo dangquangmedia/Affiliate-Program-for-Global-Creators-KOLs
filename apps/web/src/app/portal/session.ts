@@ -26,3 +26,10 @@ export async function enterAs(role: PortalRole, market: PortalMarket): Promise<v
   window.localStorage.setItem("ag_pref_market", market);
   window.location.assign(`/portal/${role}`);
 }
+
+// Đọc nước ưu tiên đã lưu (SP-1 T2) để dashboard mở đúng thị trường — dùng chung cho
+// mọi dashboard trong /portal (creator, ops, ...) thay vì mỗi trang tự định nghĩa lại.
+export function readPrefMarket(): "VN" | "PH" {
+  if (typeof window === "undefined") return "VN";
+  return window.localStorage.getItem("ag_pref_market") === "PH" ? "PH" : "VN";
+}

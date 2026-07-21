@@ -5,13 +5,9 @@ import {
   Shell, MarketStrip, Kpi, Panel, Chip, Btn, Note, Empty, Icon, css as s, type NavItem, type Role,
 } from "../ui";
 import { type Market } from "../../../mockup/data";
+import { readPrefMarket } from "../session";
 import { getKycQueue, reviewKyc, type KycQueueItem, type FieldDecision } from "../../../lib/kyc-client";
 import { contentQueue, reviewContent, type ContentQueueItem } from "../../../lib/content-client";
-
-function readPrefMarket(): Market {
-  if (typeof window === "undefined") return "VN";
-  return window.localStorage.getItem("ag_pref_market") === "PH" ? "PH" : "VN";
-}
 
 // Mã lỗi thật từ apps/api/src/content/content.service.ts review().
 const CONTENT_ERROR_MESSAGES: Record<string, string> = {
@@ -33,21 +29,26 @@ export default function OpsDashboard() {
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [k, c] = await Promise.all([getKycQueue(market), contentQueue(market)]);
-    let forbiddenMsg: string | null = null;
-    if ("forbidden" in k) {
-      setKyc([]);
-      forbiddenMsg = "Bạn không có quyền xem hàng đợi KYC ở thị trường này.";
-    } else {
-      setKyc(k);
+    try {
+      const [k, c] = await Promise.all([getKycQueue(market), contentQueue(market)]);
+      let forbiddenMsg: string | null = null;
+      if ("forbidden" in k) {
+        setKyc([]);
+        forbiddenMsg = "Bạn không có quyền xem hàng đợi KYC ở thị trường này.";
+      } else {
+        setKyc(k);
+      }
+      if ("forbidden" in c) {
+        setContent([]);
+        forbiddenMsg = "Bạn không có quyền xem hàng đợi nội dung ở thị trường này.";
+      } else {
+        setContent(c);
+      }
+      setLoadErr(forbiddenMsg);
+    } catch {
+      // Lỗi mạng/transport — KHÔNG để hàng đợi trống bị hiểu nhầm là "không có gì cần duyệt".
+      setLoadErr("Không tải được dữ liệu, thử lại sau.");
     }
-    if ("forbidden" in c) {
-      setContent([]);
-      forbiddenMsg = "Bạn không có quyền xem hàng đợi nội dung ở thị trường này.";
-    } else {
-      setContent(c);
-    }
-    setLoadErr(forbiddenMsg);
   }, [market]);
 
   useEffect(() => {
@@ -80,9 +81,12 @@ export default function OpsDashboard() {
       const res = await reviewContent(market, id, "APPROVE");
       if (!res.ok) {
         setContentErr(contentErrorMessage(res.code));
+        await load(); // hàng đã bị người khác xử lý (vd ALREADY_REVIEWED) -> refetch để item rớt khỏi queue thay vì cho retry vô nghĩa
         return;
       }
       await load();
+    } catch {
+      setContentErr("Không xử lý được, thử lại sau.");
     } finally {
       setContentBusy(false);
     }
@@ -94,9 +98,12 @@ export default function OpsDashboard() {
       const res = await reviewContent(market, id, "REJECT", reason);
       if (!res.ok) {
         setContentErr(contentErrorMessage(res.code));
+        await load();
         return;
       }
       await load();
+    } catch {
+      setContentErr("Không xử lý được, thử lại sau.");
     } finally {
       setContentBusy(false);
     }
