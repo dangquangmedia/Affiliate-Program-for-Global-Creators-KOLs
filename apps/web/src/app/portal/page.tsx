@@ -2,8 +2,8 @@ import Link from "next/link";
 import s from "./portal.module.css";
 import { Icon } from "./ui";
 
-// Landing khu /portal: hero giới thiệu nền tảng + chọn vai để vào đúng dashboard.
-// Server component (tĩnh) — chỉ điều hướng, không state.
+// Landing khu /portal: một khung liền mạch — header (logo + prototype ở góc phải) → hero thân
+// thiện → chọn vai → footer (kiểm chứng country-context /vn /ph). Server component (tĩnh).
 
 export const metadata = { title: "Affiliate GLOBAL · Control Center" };
 
@@ -24,19 +24,26 @@ export default function PortalLanding() {
   return (
     <div className={s.app} data-market="VN">
       <div className={s.landing}>
-        <div className={s.landTop}>
-          <span className={s.logoMark}><Icon name="globe" size={19} /></span>
-          <span className={s.brandName}>Affiliate GLOBAL<span>Control Center</span></span>
-        </div>
+        <div className={s.landFrame}>
+          {/* header: brand trái · prototype góc phải */}
+          <header className={s.landHeader}>
+            <span className={s.logoMark}><Icon name="globe" size={19} /></span>
+            <span className={s.brandName}>Affiliate GLOBAL<span>Control Center</span></span>
+            <div className={s.landHeaderRight}>
+              <Link href="/mockup" className={s.cornerBtn} data-testid="link-mockup">
+                <Icon name="eye" size={16} /> Xem prototype
+              </Link>
+            </div>
+          </header>
 
-        <div className={s.landWrap}>
+          {/* hero */}
           <section className={s.hero}>
-            <span className={s.heroEyebrow}><Icon name="spark" size={13} /> Nền tảng affiliate đa quốc gia</span>
-            <h1 className={s.heroTitle}>Một cỗ máy tiền, <em>hai thị trường</em> tách biệt tuyệt đối.</h1>
+            <span className={s.heroEyebrow}><Icon name="spark" size={13} /> Nền tảng affiliate đa quốc gia · VN &amp; PH</span>
+            <h1 className={s.heroTitle}>Chào mừng đến <em>Trung tâm điều hành</em></h1>
             <p className={s.heroSub}>
-              Việt Nam và Philippines chạy trên cùng hệ thống nhưng dữ liệu, tiền tệ, thuế và mức rút
-              không bao giờ trộn lẫn. Từ nội dung được duyệt tới lúc rút tiền — mọi trạng thái đều minh
-              bạch, mọi quyết định đều để lại vết. Chọn vai để vào đúng bảng điều khiển.
+              Chọn vai của bạn để mở đúng bảng điều khiển. Mỗi thị trường có dữ liệu, tiền tệ và quy
+              trình tách biệt — từ nội dung được duyệt tới lúc rút tiền, mọi trạng thái đều minh bạch
+              và mọi quyết định đều để lại vết.
             </p>
             <div className={s.heroStats}>
               <div className={s.heroStat}><b>2</b><span>thị trường · VND / PHP</span></div>
@@ -58,10 +65,14 @@ export default function PortalLanding() {
             ))}
           </div>
 
-          <p className={s.disclose}>
-            Môi trường demo · dữ liệu mẫu, không phải PII thật · SSO và OTP được mock có công bố.
-            Tỷ giá USD chỉ để tham chiếu, không dùng để thanh toán.
-          </p>
+          <div className={s.landFoot}>
+            <span>Môi trường demo · dữ liệu mẫu, không phải PII thật · SSO/OTP mock có công bố · USD chỉ tham chiếu.</span>
+            <span className={s.footLinks}>
+              Kiểm chứng country-context:
+              <Link href="/vn" className={s.footLink} data-testid="link-vn">/vn</Link>
+              <Link href="/ph" className={s.footLink} data-testid="link-ph">/ph</Link>
+            </span>
+          </div>
         </div>
       </div>
     </div>
