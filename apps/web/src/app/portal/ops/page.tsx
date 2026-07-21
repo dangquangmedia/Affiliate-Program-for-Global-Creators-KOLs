@@ -34,18 +34,20 @@ export default function OpsDashboard() {
 
   const load = useCallback(async () => {
     const [k, c] = await Promise.all([getKycQueue(market), contentQueue(market)]);
+    let forbiddenMsg: string | null = null;
     if ("forbidden" in k) {
       setKyc([]);
-      setLoadErr("Bạn không có quyền xem hàng đợi KYC ở thị trường này.");
+      forbiddenMsg = "Bạn không có quyền xem hàng đợi KYC ở thị trường này.";
     } else {
       setKyc(k);
     }
     if ("forbidden" in c) {
       setContent([]);
-      setLoadErr("Bạn không có quyền xem hàng đợi nội dung ở thị trường này.");
+      forbiddenMsg = "Bạn không có quyền xem hàng đợi nội dung ở thị trường này.";
     } else {
       setContent(c);
     }
+    setLoadErr(forbiddenMsg);
   }, [market]);
 
   useEffect(() => {
