@@ -96,7 +96,7 @@ export interface NavItem { key: string; label: string; icon: IconName; badge?: n
 
 export function Shell({
   role, market, setMarket, marketLocked, nav, active, setActive,
-  title, subtitle, user, showUsd, setShowUsd, children,
+  title, subtitle, user, showUsd, setShowUsd, children, variant, kycOk,
 }: {
   role: Role;
   market: Market;
@@ -111,9 +111,71 @@ export function Shell({
   showUsd: boolean;
   setShowUsd: (v: boolean) => void;
   children: ReactNode;
+  variant?: "passport";
+  kycOk?: boolean;
 }) {
   const initials = user.name.split(" ").slice(-2).map((w) => w[0]).join("").toUpperCase();
   const mobileNav = nav.slice(0, 5);
+
+  if (variant === "passport") {
+    return (
+      <div className={s.app} data-market={market} data-portal-root data-shell-variant="passport">
+        <div style={{ display: "flex", minHeight: "100vh" }}>
+          <aside className={s.passportRail}>
+            <span className={s.logoMark} style={{ width: 28, height: 28 }}><Icon name="globe" size={16} /></span>
+            <button className={s.passportRailBtn} aria-label="Đổi quốc gia" title="Đổi quốc gia">
+              <Icon name="globe" size={17} />
+            </button>
+            <button className={s.passportRailBtn} aria-label="Thông báo" title="Thông báo">
+              <Icon name="bell" size={17} />
+            </button>
+            <ThemeToggle />
+            <div className={s.passportRailFoot}>
+              <Link href="/portal" className={s.passportRailBtn} style={{ textDecoration: "none" }} aria-label="Đổi vai / Đăng xuất" title="Đổi vai / Đăng xuất">
+                <Icon name="logout" size={17} />
+              </Link>
+            </div>
+          </aside>
+
+          <div className={s.main} style={{ flex: 1, minWidth: 0 }}>
+            <header className={s.passportHeader}>
+              <div>
+                <div className={s.passportEyebrow}>{role.scope} · {MARKETS[market].name}</div>
+                <div className={s.passportName}>{user.name}</div>
+                <div className={s.passportId}>HỒ SƠ #{role.key.toUpperCase()}-{market}-{initials}</div>
+              </div>
+              <div className={`${s.passportStamp} ${kycOk ? s.passportStampOk : ""}`}>
+                {kycOk ? "ĐÃ\nDUYỆT" : "CHỜ\nDUYỆT"}
+              </div>
+            </header>
+
+            <nav className={s.passportTabs} aria-label="Điều hướng">
+              {nav.map((n) => (
+                <button key={n.key} onClick={() => setActive(n.key)}
+                  className={`${s.passportTab} ${active === n.key ? s.passportTabActive : ""}`}>
+                  {n.label}
+                  {n.badge ? <span className={s.passportTabBadge}>{n.badge}</span> : null}
+                </button>
+              ))}
+            </nav>
+
+            <main className={s.content}>{children}</main>
+          </div>
+        </div>
+
+        <nav className={s.mobileNav} aria-label="Điều hướng">
+          {mobileNav.map((n) => (
+            <button key={n.key} onClick={() => setActive(n.key)}
+              className={`${s.mNavItem} ${active === n.key ? s.mNavActive : ""}`}>
+              <Icon name={n.icon} size={21} />
+              {n.label.split(" ")[0]}
+            </button>
+          ))}
+        </nav>
+      </div>
+    );
+  }
+
   return (
     <div className={s.app} data-market={market} data-portal-root>
       <div className={s.shell}>

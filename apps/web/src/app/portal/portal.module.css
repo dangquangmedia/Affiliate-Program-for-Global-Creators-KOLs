@@ -123,6 +123,70 @@
   --topbar-bg: #FFFFFFcc;
 }
 
+/* ---- Passport variant: structural classes (header/tab-nav/rail) ---- */
+.passportRail {
+  width: 52px;
+  background: var(--surface-deep);
+  border-right: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+  gap: 18px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+.passportRailBtn {
+  width: 32px; height: 32px; border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  background: none; border: none; color: var(--text-mute); cursor: pointer;
+}
+.passportRailBtn:hover { color: var(--text); background: var(--surface-2); }
+.passportRailFoot { margin-top: auto; }
+
+.passportHeader {
+  background: linear-gradient(135deg, var(--surface), var(--elevated));
+  border-bottom: 2px solid var(--brand);
+  padding: 18px 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.passportEyebrow { color: var(--text-mute); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; }
+.passportName { color: var(--text); font-family: Georgia, "Times New Roman", serif; font-size: 20px; margin-top: 2px; }
+.passportId { color: var(--text-mute); font-size: 11px; margin-top: 2px; font-family: ui-monospace, "Consolas", monospace; }
+.passportStamp {
+  width: 52px; height: 52px; border-radius: 50%;
+  border: 2px solid var(--brand);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--brand); font-size: 10.5px; font-weight: 700; text-align: center; line-height: 1.2;
+  transform: rotate(-8deg);
+  flex-shrink: 0;
+}
+.passportStampOk { border-color: var(--ok); color: var(--ok); }
+
+.passportTabs {
+  display: flex; gap: 0;
+  padding: 0 26px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-soft);
+  overflow-x: auto;
+}
+.passportTab {
+  color: var(--text-mute); font-size: 13px; font-weight: 600;
+  padding: 12px 16px; border: none; background: none; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+}
+.passportTab:hover { color: var(--text); }
+.passportTabActive { color: var(--text); border-bottom-color: var(--brand); }
+.passportTabBadge {
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text);
+}
+
 /* border-box toàn khu: padding không cộng thêm ngoài width -> không tràn ngang */
 .app, .app * { box-sizing: border-box; }
 
