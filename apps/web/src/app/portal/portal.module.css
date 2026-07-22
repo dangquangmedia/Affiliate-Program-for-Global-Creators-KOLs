@@ -83,6 +83,46 @@
   --shadow-lg: 0 24px 60px #1a2b5018;
 }
 
+/* ---- Trạm điều hành biên giới (Passport theme) — chỉ áp khi Shell nhận variant="passport",
+   xem docs/superpowers/specs/2026-07-22-portal-creator-passport-theme-design.md ---- */
+.app[data-shell-variant="passport"] {
+  --ink: #121B3A;
+  --surface: #0D142B;
+  --surface-2: #16204A;
+  --elevated: #1B2447;
+  --line: #2A3B66;
+  --line-soft: #1F2C4E;
+  --text: #EDE6D3;
+  --text-dim: #B7C2DE;
+  --text-mute: #8FA0C9;
+  --brand: #D9A441;
+  --brand-2: #E6BD6B;
+  --brand-soft: #D9A44126;
+  --ok: #4ADE80;
+  --ok-soft: #4ADE801f;
+  --warn: #D9A441;
+  --warn-soft: #D9A4411f;
+  --surface-deep: #0A0F22;
+  --topbar-bg: #0D142Bcc;
+}
+.app[data-shell-variant="passport"][data-theme="light"] {
+  --ink: #EDE6D3;
+  --surface: #FFFFFF;
+  --surface-2: #F7F1E3;
+  --elevated: #FFFFFF;
+  --line: #DCCFA6;
+  --line-soft: #E9E0C8;
+  --text: #121B3A;
+  --text-dim: #3D4A73;
+  --text-mute: #6B7BA6;
+  --brand-soft: #B8801f22;
+  --ok-soft: #4ADE8024;
+  --warn-soft: #B880151f;
+  --warn: #8A5E10;
+  --surface-deep: #F7F1E3;
+  --topbar-bg: #FFFFFFcc;
+}
+
 /* border-box toàn khu: padding không cộng thêm ngoài width -> không tràn ngang */
 .app, .app * { box-sizing: border-box; }
 
