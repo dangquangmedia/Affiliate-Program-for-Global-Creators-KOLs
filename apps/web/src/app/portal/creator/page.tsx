@@ -184,7 +184,8 @@ export default function CreatorDashboard() {
     <Shell role={ROLE} market={market} setMarket={setMarket} nav={navWithBadge} active={active} setActive={setActive}
       title={NAV.find((n) => n.key === active)?.label ?? "Trang chủ"}
       subtitle="Hồ sơ Creator — dữ liệu tách biệt theo từng nước"
-      user={{ name: "Nguyễn Minh Anh", sub: `Creator · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}>
+      user={{ name: "Nguyễn Minh Anh", sub: `Creator · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}
+      variant="passport" kycOk={!!kyc && !kycPending}>
 
       <MarketStrip market={market} note="Đổi VN/PH ở góc phải để thấy dữ liệu re-scope" />
 
@@ -195,9 +196,11 @@ export default function CreatorDashboard() {
           <div className={`${s.grid} ${s.kpiGrid}`}>
             <Kpi label="Trạng thái KYC" icon="shield" tone={kycPending ? "warn" : "ok"}
               value={kycPending ? "Cần bổ sung" : kyc ? "Đã duyệt" : "Chưa nộp"}
-              sub={kycPending ? <><Icon name="alert" size={13} /> có mục cần sửa</> : <><Icon name="check" size={13} /> Đủ điều kiện Join</>} />
+              sub={kycPending ? <><Icon name="alert" size={13} /> có mục cần sửa</> : <><Icon name="check" size={13} /> Đủ điều kiện Join</>}
+              stamp={kyc ? { text: kycPending ? "CHỜ" : "OK", ok: !kycPending } : undefined} />
             <Kpi label="Chiến dịch cần làm" icon="layers" tone="brand" value={String(openTasks.length)} sub={<>đang chờ nộp / sửa nội dung</>} />
-            <Kpi label="Thu nhập chờ đối soát" icon="clock" tone="warn" value={fm(money.pending)} usd={usd(money.pending)} />
+            <Kpi label="Thu nhập chờ đối soát" icon="clock" tone="warn" value={fm(money.pending)} usd={usd(money.pending)}
+              stamp={money.pending > 0 ? { text: "CHỜ" } : undefined} />
             <Kpi label="Số dư ví (rút được)" icon="wallet" tone="ok" value={fm(withdrawable)} usd={usd(withdrawable)} />
           </div>
 

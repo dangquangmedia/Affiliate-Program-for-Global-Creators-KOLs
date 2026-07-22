@@ -123,7 +123,8 @@ export function Shell({
         <div style={{ display: "flex", minHeight: "100vh" }}>
           <aside className={s.passportRail}>
             <span className={s.logoMark} style={{ width: 28, height: 28 }}><Icon name="globe" size={16} /></span>
-            <button className={s.passportRailBtn} aria-label="Đổi quốc gia" title="Đổi quốc gia">
+            <button className={s.passportRailBtn} aria-label="Đổi quốc gia" title="Đổi quốc gia"
+              disabled={marketLocked} onClick={() => setMarket(market === "VN" ? "PH" : "VN")}>
               <Icon name="globe" size={17} />
             </button>
             <button className={s.passportRailBtn} aria-label="Thông báo" title="Thông báo">
@@ -149,7 +150,7 @@ export function Shell({
               </div>
             </header>
 
-            <nav className={s.passportTabs} aria-label="Điều hướng">
+            <aside className={s.passportTabs} aria-label="Điều hướng">
               {nav.map((n) => (
                 <button key={n.key} onClick={() => setActive(n.key)}
                   className={`${s.passportTab} ${active === n.key ? s.passportTabActive : ""}`}>
@@ -157,7 +158,7 @@ export function Shell({
                   {n.badge ? <span className={s.passportTabBadge}>{n.badge}</span> : null}
                 </button>
               ))}
-            </nav>
+            </aside>
 
             <main className={s.content}>{children}</main>
           </div>
