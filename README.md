@@ -21,7 +21,8 @@ xem `docs/HARD_PROBLEMS.md`.
 
 ## Yêu cầu
 
-- **Node.js `24.11.1`** (xem `.nvmrc`)
+- **Go `1.26.5`** (backend, migration, seed, reclaim)
+- **Node.js `24.11.1`** (chỉ frontend và test tooling; xem `.nvmrc`)
 - **pnpm `10.15.1`** qua Corepack: `corepack enable && corepack prepare pnpm@10.15.1 --activate`
 - **Docker Desktop** (chỉ để chạy PostgreSQL local — API và Web chạy native, không trong container)
 
@@ -39,17 +40,16 @@ corepack pnpm bootstrap
 
 1. Tạo `.env` từ `.env.example` nếu chưa có (mật khẩu local/synthetic — đổi nếu cần bảo mật).
 2. `docker compose up -d postgres` rồi chờ Postgres nhận kết nối.
-3. `prisma generate` → `prisma migrate deploy` (áp mọi migration lên DB rỗng) → `prisma db seed`
-   (VN/PH + tài khoản 4 vai + campaign demo).
+3. Go migration → reference seed → demo seed (VN/PH + tài khoản 4 vai + campaign demo).
 
 > Docker Desktop phải đang chạy trước khi gọi `bootstrap`.
 
 ## Chạy app
 
-Hai terminal (API tự nạp `.env` khi khởi động — không cần source env thủ công cho `dev:*`/`test`):
+Hai terminal (Go API tự nạp `.env`; không cần source env thủ công):
 
 ```powershell
-corepack pnpm dev:api    # NestJS  → http://localhost:3001
+corepack pnpm dev:api    # Go API  → http://localhost:3001
 corepack pnpm dev:web    # Next.js → http://localhost:3000
 ```
 
@@ -82,16 +82,21 @@ content → (Ops duyệt) → xem thu nhập → (Finance đối soát + khoá) 
 ## Kiểm thử
 
 ```powershell
-corepack pnpm lint        # eslint (apps/api + apps/web)
-corepack pnpm typecheck   # tsc --noEmit cho api + web
-corepack pnpm test        # API: node:test (105 test, DB-backed) · Web: Playwright E2E (17 test)
-corepack pnpm build       # tsc build (api) + next build (web)
+corepack pnpm lint                  # go vet + ESLint frontend
+corepack pnpm typecheck             # compile toàn bộ Go + tsc frontend
+corepack pnpm test:api              # Go unit/integration + PostgreSQL
+corepack pnpm run test:api:parity   # 105/105 legacy acceptance case trên Go
+corepack pnpm run test:api:differential # Nest oracle ↔ Go normalized probes
+corepack pnpm run test:api:race     # Linux CGO race detector + DB synthetic cô lập
+corepack pnpm run test:web          # 25/25 Playwright; runner tự dựng Go API
+corepack pnpm build                 # Go build + Next build
 
-corepack pnpm verify      # cả 4 bước trên
+corepack pnpm verify                # lint + typecheck + API/parity/differential/E2E + build
 ```
 
-`pnpm test` cần Postgres đang chạy + đã seed (xem phần cài đặt). Playwright tự khởi động API + Web
-nếu chưa chạy.
+`pnpm test` cần PostgreSQL local đã migrate/seed. Hai runner parity/E2E build binary Go tạm và tự
+dọn; E2E dùng port `3101/3200` để không đụng phiên dev ở `3001/3000`. Race suite dùng Docker DB
+synthetic riêng và không truyền credential DB local vào container.
 
 ## Reset DB sạch
 
@@ -103,10 +108,10 @@ corepack pnpm bootstrap    # dựng lại từ đầu
 ## Cấu trúc
 
 ```text
-apps/api      NestJS modular monolith — auth/country/kyc/campaign/content/ledger/
-              reconciliation/payout/audit; Prisma 7 + PostgreSQL 17
+apps/api-go   Go modular monolith — HTTP/RBAC/sqlc/pgx; 36/36 operation; PostgreSQL 17
+apps/api      NestJS/Prisma oracle lịch sử — chỉ dùng differential/fallback, không nằm trên runtime path
 apps/web      Next.js App Router — 13 màn prototype (/mockup) + route ngữ cảnh nước (/vn /ph)
-apps/api/prisma  schema lean 18 bảng + migrations + seed.sql
+apps/api-go/db  migration + reference/demo seed + typed SQL source
 docs/         PRODUCT / DATA_MODEL / ARCHITECTURE / HARD_PROBLEMS (nguồn sự thật về phạm vi + vì sao)
 Plan/         KE_HOACH_V2.md (kế hoạch) + LOG.md (đọc trước để nắm trạng thái)
 apps/worker, packages/*   scaffolding dành sẵn — CHƯA dùng trong bản V2
@@ -116,11 +121,10 @@ apps/worker, packages/*   scaffolding dành sẵn — CHƯA dùng trong bản V2
 
 - **`/health` trả 503 / E2E timeout "webServer"**: Docker Desktop tắt → Postgres mất. Kiểm
   `docker info`, chạy `docker compose up -d postgres`, đợi healthy rồi thử lại (API tự reconnect).
-- **`P1000: Authentication failed`** khi migrate/seed: volume Postgres tạo bằng mật khẩu khác `.env`
-  hiện tại. Reset: `docker compose down -v` rồi `corepack pnpm bootstrap` (dữ liệu chỉ là synthetic).
-- **`DATABASE_URL` not resolved** khi chạy `db:*` trực tiếp: các lệnh `prisma` CLI không tự nạp
-  `.env`. `bootstrap` đã nạp giúp; nếu chạy tay, nạp env trước (PowerShell:
-  `Get-Content .env | ForEach-Object { if ($_ -match '^(\w+)=(.*)$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }`).
+- **Authentication failed khi migrate/seed**: volume Postgres được tạo bằng mật khẩu khác `.env`.
+  Với dữ liệu local synthetic, reset bằng `docker compose down -v` rồi chạy lại `bootstrap`.
+- **`DATABASE_URL is required`**: tạo `.env` từ `.env.example`; Go tự tìm file này từ thư mục hiện
+  tại đi ngược lên repository root.
 - **Port bận**: đổi `AFFILIATE_DB_PORT` (Postgres), hoặc giải phóng `3000`/`3001` trước khi chạy.
 - **`corepack pnpm setup` chạy nhầm PATH-setup của pnpm**: dùng đúng tên script `bootstrap`
   (`setup` là lệnh built-in của pnpm).

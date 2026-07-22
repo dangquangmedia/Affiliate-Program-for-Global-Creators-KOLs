@@ -1,14 +1,7 @@
-import { test, before, after } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import "reflect-metadata";
-import "../src/load-env";
-import { NestFactory } from "@nestjs/core";
-import type { INestApplication } from "@nestjs/common";
-import { AppModule } from "../src/app.module";
-import { HttpExceptionFilter } from "../src/http-exception.filter";
-import { PrismaService } from "../src/prisma.service";
+import { goApiBaseUrl, scalar } from "./go-api-harness";
 
-let app: INestApplication;
 let baseUrl: string;
 let adminVn: string;
 let opsVn: string;
@@ -62,8 +55,8 @@ async function makePendingEarning(tag: string): Promise<{ token: string; earning
   const mine = await (await fetch(`${baseUrl}/me/country/vn/campaigns/${cid}/content`, { headers: bearer(token) })).json();
   const sid = mine.submissions[0].id;
   await fetch(`${baseUrl}/ops/vn/content/${sid}/review`, { method: "POST", headers: jsonH(opsVn), body: JSON.stringify({ decision: "APPROVE" }) });
-  const earning = (await app.get(PrismaService).db.earning.findFirst({ where: { submissionId: sid } })) as { id: string };
-  return { token, earningId: earning.id };
+  const earningId = await scalar<string>("SELECT id::text AS value FROM earning WHERE submission_id=$1", [sid]);
+  return { token, earningId };
 }
 
 const createBatch = (token: string) =>
@@ -71,21 +64,14 @@ const createBatch = (token: string) =>
 const lockBatch = (token: string, id: string) =>
   fetch(`${baseUrl}/ops/vn/reconciliation/${id}/lock`, { method: "POST", headers: bearer(token) });
 const earningStatus = async (id: string): Promise<string> =>
-  ((await app.get(PrismaService).db.earning.findFirst({ where: { id } })) as { status: string }).status;
+  scalar<string>("SELECT status::text AS value FROM earning WHERE id=$1", [id]);
 
 before(async () => {
-  app = await NestFactory.create(AppModule, { logger: false });
-  app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(0);
-  baseUrl = `http://127.0.0.1:${app.getHttpServer().address().port}`;
+  baseUrl = await goApiBaseUrl();
   adminVn = await login("admin.vn@demo.affiliate.gl");
   opsVn = await login("ops.vn@demo.affiliate.gl");
   financeVn = await login("finance.vn@demo.affiliate.gl");
   financePh = await login("finance.ph@demo.affiliate.gl");
-});
-
-after(async () => {
-  await app.close();
 });
 
 test("reconciliation requires LOCAL_FINANCE (creator -> 403, ops -> 403)", async () => {

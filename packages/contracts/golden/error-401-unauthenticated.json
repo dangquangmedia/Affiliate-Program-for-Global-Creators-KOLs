@@ -1,0 +1,13 @@
+{
+  "status": 401,
+  "body": {
+    "error": {
+      "code": "UNAUTHENTICATED",
+      "message": "Missing session token.",
+      "status": 401,
+      "correlationId": "<correlation-id>",
+      "retryable": false
+    }
+  }
+}
+

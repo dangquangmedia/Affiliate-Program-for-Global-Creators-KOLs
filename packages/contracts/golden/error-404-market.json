@@ -1,0 +1,13 @@
+{
+  "status": 404,
+  "body": {
+    "error": {
+      "code": "RESOURCE_NOT_FOUND",
+      "message": "\"xx\" is not a recognized market.",
+      "status": 404,
+      "correlationId": "<correlation-id>",
+      "retryable": false
+    }
+  }
+}
+

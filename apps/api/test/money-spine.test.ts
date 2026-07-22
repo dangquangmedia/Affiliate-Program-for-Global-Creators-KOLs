@@ -1,18 +1,12 @@
-import { test, before, after } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import "reflect-metadata";
-import "../src/load-env";
 import { randomUUID } from "node:crypto";
-import { NestFactory } from "@nestjs/core";
-import type { INestApplication } from "@nestjs/common";
-import { AppModule } from "../src/app.module";
-import { HttpExceptionFilter } from "../src/http-exception.filter";
+import { goApiBaseUrl } from "./go-api-harness";
 
 // N15 — E2E cả spine tiền trên VN + PH ở tầng API: login → KYC → join → content → approve →
 // đối soát → AVAILABLE → rút (OTP + reserve) → provider mock. Chứng minh cùng một bộ code chạy
 // đúng cho 2 nước có tiền tệ/thuế/mức tối thiểu khác nhau (VND exp0 thuế 10% / PHP exp2 thuế 8%).
 
-let app: INestApplication;
 let baseUrl: string;
 
 const bearer = (t: string): Record<string, string> => ({ authorization: `Bearer ${t}` });
@@ -101,14 +95,7 @@ const FIXTURES: MarketFixture[] = [
 ];
 
 before(async () => {
-  app = await NestFactory.create(AppModule, { logger: false });
-  app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(0);
-  baseUrl = `http://127.0.0.1:${app.getHttpServer().address().port}`;
-});
-
-after(async () => {
-  await app.close();
+  baseUrl = await goApiBaseUrl();
 });
 
 for (const fx of FIXTURES) {

@@ -1,0 +1,12 @@
+FROM golang:1.26.5-bookworm
+
+WORKDIR /src/apps/api-go
+COPY apps/api-go/go.mod apps/api-go/go.sum ./
+RUN go mod download
+COPY apps/api-go/ ./
+COPY pnpm-workspace.yaml /src/pnpm-workspace.yaml
+COPY docs/API_CONTRACT_CURRENT.md /src/docs/API_CONTRACT_CURRENT.md
+COPY packages/contracts/ /src/packages/contracts/
+
+ENV CGO_ENABLED=1
+CMD ["go", "test", "-race", "./...", "-count=1"]

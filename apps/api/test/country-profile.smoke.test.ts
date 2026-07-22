@@ -1,21 +1,12 @@
-import { test, before, after } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import "reflect-metadata";
-import "../src/load-env";
-import { NestFactory } from "@nestjs/core";
-import type { INestApplication } from "@nestjs/common";
-import { AppModule } from "../src/app.module";
-import { HttpExceptionFilter } from "../src/http-exception.filter";
+import { goApiBaseUrl } from "./go-api-harness";
 
-let app: INestApplication;
 let baseUrl: string;
 let token: string;
 
 before(async () => {
-  app = await NestFactory.create(AppModule, { logger: false });
-  app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(0);
-  baseUrl = `http://127.0.0.1:${app.getHttpServer().address().port}`;
+  baseUrl = await goApiBaseUrl();
 
   const login = await (
     await fetch(`${baseUrl}/auth/mock-login`, {
@@ -25,10 +16,6 @@ before(async () => {
     })
   ).json();
   token = login.token;
-});
-
-after(async () => {
-  await app.close();
 });
 
 const authHeader = (): Record<string, string> => ({ authorization: `Bearer ${token}` });

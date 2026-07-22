@@ -560,3 +560,79 @@ Sau khi dự án đã đóng N1–N20, Anh Quang giao 3 việc (ưu tiên Việc
 **3. Nhiệm vụ phiên sau: KHÔNG ĐỔI — vẫn là SP-2 "Global Admin toàn quyền"** (RBAC CRUD `apps/api/src/admin/staff` + doanh thu tổng USD `GET /admin/global/revenue`) — xem chi tiết mục hand-off SP-1 ngay trên. Việc phụ (a) đã xong (push). Còn (c) i18n /portal + (d) 2 smoke-spec robust vẫn hoãn.
 
 **Môi trường:** như mục trên (Postgres 5433 / API 3001 / web 3000).
+
+---
+
+## Current State & Hand-off (cập nhật 2026-07-22 — Go rewrite Tuần 2, MỚI NHẤT)
+
+- **Vừa xong:** Tuần 1–2 Go rewrite đạt đủ gate; Go API tại `apps/api-go` đang có **17/36 operation** (platform, market, auth/session/RBAC, profile, KYC, campaign, audit). DB sạch/container smoke pass; `go vet` + `go test` xanh; Nest **105/105**, Playwright **25/25**. Image local: `affiliate-api-go:week2`; DB test `affiliate_go_week2` đã xóa. Chưa cutover, Nest `apps/api` vẫn là oracle.
+- **File/biến quan trọng:** `apps/api-go/internal/{auth,country,kyc,campaign,audit,httpapi}/`; SQL tại `apps/api-go/db/queries/`; acceptance `apps/api-go/integration/week2_test.go`; báo cáo `Report/GO_WEEK{1,2}_COMPLETION.md`; kế hoạch `Plan/GO_BACKEND_REWRITE_PLAN.md`. Runtime dùng `DATABASE_URL`, Go port mặc định `3002`, Nest `3001`, Postgres `5433`.
+- **Đầu phiên sau:** triển khai **Tuần 3** — đọc/port `apps/api/src/campaign/{join.controller.ts,join.service.ts,reclaim.scheduler.ts}` sang Go; việc đầu tiên là chốt SQL transaction `SELECT campaign ... FOR UPDATE` và viết test race 3 creator tranh slot cuối (1 `JOINED`, 2 `WAITLISTED`).
+
+---
+
+## Current State & Hand-off (cập nhật 2026-07-22 — Go rewrite Tuần 3, MỚI NHẤT)
+
+- **Vừa xong:** Tuần 3 đạt 3/3 gate; Go API **20/36 operation**. Join dùng campaign row lock + KYC gate + snapshot; waitlist strict-FCFS; leave/reclaim promote; submit/fix deadline + strike; `cmd/reclaim` one-shot đã nằm trong image `affiliate-api-go:week3`. DB sạch, Go test/vet, Nest 105/105, Playwright 25/25 pass. Chưa cutover.
+- **File quan trọng:** `apps/api-go/internal/campaign/join.go`, `db/queries/join.sql`, `internal/store/sqlcgen/join.sql.go`, `cmd/reclaim/main.go`, `integration/week3_test.go`, `Dockerfile`; báo cáo `Report/GO_WEEK3_COMPLETION.md`.
+- **Đầu phiên sau:** triển khai **Tuần 4** — đọc/port content submit/review trước; việc đầu tiên là chốt conditional claim `UPDATE ... WHERE state='SUBMITTED' RETURNING` và test double-approve chỉ tạo 1 earning + 1 bộ ledger.
+
+---
+
+## Current State & Hand-off (cập nhật 2026-07-22 — Go rewrite Tuần 4, MỚI NHẤT)
+
+- **Vừa xong:** Tuần 4 đạt 3/3 gate; Go API **25/36 operation**. Content submit/reject/resubmit + strict attempt chain; conditional review claim; earning + accrual/tax ledger + audit atomic; dashboard/running balance; VN/PH tax dùng `int64`. DB sạch, Go test/vet, Nest 105/105, Playwright 25/25 pass. Image `affiliate-api-go:week4`; chưa cutover.
+- **File quan trọng:** `apps/api-go/internal/{content,earnings}/`, `db/queries/{content,earnings}.sql`, `integration/week4_test.go`, `Report/GO_WEEK4_COMPLETION.md`.
+- **Đầu phiên sau:** triển khai **Tuần 5** — đọc/port reconciliation trước; việc đầu tiên là chốt transaction create/lock batch và test earning chỉ thuộc một batch, double-lock chỉ chuyển `PENDING → AVAILABLE` một lần.
+
+---
+
+## Current State & Hand-off (cập nhật 2026-07-22 — Go rewrite Tuần 5, MỚI NHẤT)
+
+- **Vừa xong:** Tuần 5 đạt 4/4 gate; Go API đủ **36/36 operation**. Reconciliation race-safe; wallet/OTP/payout atomic; profile lock chống overspend; `SUCCESS/FAIL/UNKNOWN_HOLD` + manual resolve; settlement/audit rollback atomic. DB sạch, Go test/vet, Nest 105/105, Playwright 25/25 pass. Image `affiliate-api-go:week5`; chưa cutover.
+- **File quan trọng:** `apps/api-go/internal/{reconciliation,payout}/`, `internal/httpapi/week5.go`, `db/queries/{reconciliation,payout}.sql`, `integration/week5_test.go`, `Report/GO_WEEK5_COMPLETION.md`.
+- **Đầu phiên sau:** triển khai **Tuần 6** — việc đầu tiên là lập ma trận 105 Nest cases ↔ Go acceptance, chạy frontend với Go API port 3001 và ghi differential contract gaps trước khi sửa.
+
+---
+
+## Current State & Hand-off (trước compact — Go rewrite Tuần 5)
+
+- **Vừa xong:** Tuần 5 hoàn tất 4/4 gate; Go API **36/36 operation**, money-spine/concurrency/rollback xanh; image `affiliate-api-go:week5`; chưa cutover.
+- **File/biến chính:** `apps/api-go/internal/{reconciliation,payout}/`, `internal/httpapi/week5.go`, `db/queries/{reconciliation,payout}.sql`, `integration/week5_test.go`, `Report/GO_WEEK5_COMPLETION.md`; `DATABASE_URL`, Go `3002`, Nest `3001`, PostgreSQL `5433`.
+- **Việc đầu tiên phiên sau:** bắt đầu Tuần 6 bằng ma trận **105 Nest cases ↔ Go acceptance**, sau đó chạy frontend với Go API ở port `3001` để ghi contract gaps.
+
+---
+
+## Current State & Hand-off (cập nhật 2026-07-22 — Go rewrite Tuần 6 HOÀN TẤT, MỚI NHẤT)
+
+- **Vừa xong:** Tuần 6 "full parity + hardening" đạt đủ 4/4 gate — **đánh giá lại toàn bộ và kiểm
+  chứng thật trong phiên này** (không chỉ tin README/tài liệu cũ): `go build`/`go vet`/`gofmt`/
+  `govulncheck` sạch; `go test ./...` (kể cả `integration/week6_test.go` — race KYC review 2 Ops
+  cùng duyệt) PASS; **105/105 legacy case** (`test:api:parity`) PASS; **13/13 differential Nest↔Go**
+  PASS; **25/25 Playwright E2E trên Go** (kể cả 7 spec `/portal`) PASS; **`go test -race ./...`**
+  (container Linux CGO cô lập, `compose.race.yaml`) PASS, không data race; **toàn bộ `pnpm verify`**
+  (lint→typecheck→4 tầng test→build Go+Next.js) chạy trót lọt tới bước cuối. Đếm trực tiếp router:
+  **36/36 route** khớp đúng inventory kế hoạch (không suy từ tài liệu). Grep TODO/FIXME/stub trên
+  toàn bộ Go source: sạch. Root scripts (`dev:api`/`build`/`db:*`/`lint`/`typecheck`) đã trỏ hẳn sang
+  Go, không còn Prisma/Nest trên đường chạy chính (`apps/api` NestJS vẫn giữ nguyên làm oracle
+  differential + fallback rollback, không xoá).
+- **Bổ sung trong phiên này:** viết `Report/GO_WEEK6_COMPLETION.md` (thiếu, phá vỡ khuôn báo cáo
+  Tuần 1-5) + thêm dòng "Trạng thái thực thi ngày 22/07/2026: HOÀN TẤT" vào
+  `Plan/GO_BACKEND_REWRITE_PLAN.md` mục Tuần 6.
+- **⚠️ RỦI RO LỚN NHẤT — chưa commit:** TOÀN BỘ Go rewrite (`apps/api-go/` từ Tuần 1 đến nay, ~34
+  file Go + 3 migration + queries + Dockerfile, cộng hạ tầng parity-test root: `docs/API_CONTRACT_
+  CURRENT.md`, `docs/GO_API_PARITY_MATRIX.md`, `packages/contracts/{golden,openapi/current.yaml}`,
+  `scripts/{run-go-api-acceptance,differential-nest-go,run-go-playwright,run-go-race}.mjs`,
+  `compose.race.yaml`, `apps/api/test/go-api-harness.ts`, 12 file `apps/api/test/*.test.ts` đã port,
+  `Report/GO_WEEK{1..6}_COMPLETION.md`, `Plan/GO_BACKEND_REWRITE_PLAN.md`) **đang 100% nằm ngoài git**
+  (`git status` → toàn bộ `??` untracked). Tương đương nhiều tuần công sức đã kiểm chứng chỉ nằm trên
+  đĩa. **Việc đầu tiên phiên sau nếu chưa commit: hỏi Anh Quang và commit+push ngay** trước khi làm
+  gì khác — đây là action có thể mất trắng nếu máy hỏng/mất file.
+- **File/biến quan trọng:** cấu trúc `apps/api-go/{cmd,internal,db,integration}/`; harness
+  `apps/api/test/go-api-harness.ts`; script gốc `scripts/run-go-*.mjs` + `differential-nest-go.mjs`;
+  `DATABASE_URL` port `5433`; Go API mặc định port **3001** (đã đổi từ 3002 — Nest lùi làm oracle
+  phụ, không có port cố định trong luồng dev thường); lệnh tổng `corepack pnpm run verify`.
+- **Đầu phiên sau (sau khi xử lý rủi ro commit ở trên):** Tuần 7 — Google Cloud staging (Cloud Run,
+  Cloud SQL, Secret Manager, migration/reclaim job qua Cloud Run Job, Cloud Scheduler, deploy frontend
+  trỏ Go staging, smoke/E2E trên staging). Việc này cần thông tin/quyền truy cập GCP thật từ Anh
+  Quang (project id, billing, service account) — chưa có trong phiên nào trước đó.

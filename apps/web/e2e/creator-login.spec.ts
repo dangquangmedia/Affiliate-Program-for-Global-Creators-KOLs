@@ -16,7 +16,7 @@ test("V01 login: clicking mock Google authenticates and advances to the country 
 test("V01 login: returning with a session shows identity and can log out", async ({ page }) => {
   await page.goto("/mockup/creator/login");
   await page.evaluate(async () => {
-    const s = await fetch("http://localhost:3001/auth/mock-login", {
+    const s = await fetch("http://localhost:3101/auth/mock-login", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: "creator.google@demo.affiliate.gl", displayName: "Creator (Google)" }),
@@ -38,7 +38,7 @@ test("V01 login: returning with a session shows identity and can log out", async
 test("V02 country: choosing VN creates a real profile scoped to the session", async ({ page }) => {
   await page.goto("/mockup/creator/login");
   await page.evaluate(async () => {
-    const s = await fetch("http://localhost:3001/auth/mock-login", {
+    const s = await fetch("http://localhost:3101/auth/mock-login", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: `e2e-country-${Date.now()}@example.com`, displayName: "E2E Country" }),

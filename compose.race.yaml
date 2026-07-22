@@ -1,0 +1,50 @@
+name: affiliate-week6-race
+
+x-race-service: &race-service
+  image: affiliate-go-race:week6
+  build:
+    context: .
+    dockerfile: apps/api-go/Dockerfile.race
+  environment:
+    DATABASE_URL: postgresql://race_user:race_password@race-postgres:5432/affiliate_race?sslmode=disable
+
+services:
+  race-postgres:
+    image: postgres:17.5-alpine
+    environment:
+      POSTGRES_DB: affiliate_race
+      POSTGRES_USER: race_user
+      POSTGRES_PASSWORD: race_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U race_user -d affiliate_race"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  race-migrate:
+    <<: *race-service
+    command: ["go", "run", "./cmd/migrate", "up"]
+    depends_on:
+      race-postgres:
+        condition: service_healthy
+
+  race-seed-reference:
+    <<: *race-service
+    command: ["go", "run", "./cmd/seed", "reference.sql"]
+    depends_on:
+      race-migrate:
+        condition: service_completed_successfully
+
+  race-seed-demo:
+    <<: *race-service
+    command: ["go", "run", "./cmd/seed", "demo.sql"]
+    depends_on:
+      race-seed-reference:
+        condition: service_completed_successfully
+
+  race:
+    <<: *race-service
+    command: ["go", "test", "-race", "./...", "-count=1"]
+    depends_on:
+      race-seed-demo:
+        condition: service_completed_successfully

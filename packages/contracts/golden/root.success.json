@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "body": {
+    "service": "affiliate-global-api",
+    "endpoints": [
+      "/health",
+      "/markets/{market}/context (e.g. /markets/vn/context)",
+      "POST /auth/mock-login",
+      "GET /auth/me",
+      "POST /auth/logout",
+      "POST /me/country/{market} (auth)",
+      "GET /me/countries (auth)",
+      "GET|POST /me/country/{market}/kyc (auth, creator)",
+      "GET /ops/{market}/kyc/queue · POST /ops/{market}/kyc/{caseId}/review (auth, staff)",
+      "GET /markets/{market}/campaigns · GET .../{id} (auth) · POST .../campaigns (admin)",
+      "POST /markets/{market}/campaigns/{id}/join · /leave · GET /me/country/{market}/participations"
+    ]
+  }
+}
+

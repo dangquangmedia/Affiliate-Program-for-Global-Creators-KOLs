@@ -12,7 +12,7 @@ test("KYC: creator submits, Ops approves, creator sees approved", async ({ page 
   async function loginAs(e: string, name: string): Promise<string> {
     return page.evaluate(
       async ({ e, name }) => {
-        const s = await fetch("http://localhost:3001/auth/mock-login", {
+        const s = await fetch("http://localhost:3101/auth/mock-login", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ email: e, displayName: name }),

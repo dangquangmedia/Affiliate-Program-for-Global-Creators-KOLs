@@ -6,7 +6,7 @@ test("V08 payout: creator withdraws with OTP, Finance settles -> PAID", async ({
   await page.goto("/mockup/creator/login");
 
   const financeToken = await page.evaluate(async () => {
-    const API = "http://localhost:3001";
+    const API = "http://localhost:3101";
     const j = (r: Response) => r.json();
     const login = (email: string) =>
       fetch(`${API}/auth/mock-login`, {
@@ -61,7 +61,7 @@ test("V08 payout: creator withdraws with OTP, Finance settles -> PAID", async ({
 
   // Finance settle SUCCESS (qua API) -> creator reload thấy PAID.
   await page.evaluate(async (financeToken) => {
-    const API = "http://localhost:3001";
+    const API = "http://localhost:3101";
     const q = await fetch(`${API}/ops/vn/payouts`, { headers: { authorization: `Bearer ${financeToken}` } }).then((r) => r.json());
     // Settle mọi lệnh PROCESSING (hàng đợi toàn nước) để chắc chắn lệnh của test này được xử lý.
     for (const p of q as Array<{ id: string }>) {

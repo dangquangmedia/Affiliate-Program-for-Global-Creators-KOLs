@@ -6,7 +6,7 @@ test("V12 reconciliation: Finance creates a batch and locks it", async ({ page }
 
   // Setup: tạo 1 earning PENDING qua API (approve content của 1 creator).
   await page.evaluate(async () => {
-    const API = "http://localhost:3001";
+    const API = "http://localhost:3101";
     const j = (r: Response) => r.json();
     const login = (email: string) =>
       fetch(`${API}/auth/mock-login`, {

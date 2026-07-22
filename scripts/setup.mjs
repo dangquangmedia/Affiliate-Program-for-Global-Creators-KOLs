@@ -1,5 +1,5 @@
-// One-command bootstrap từ máy sạch (N18): ensure .env → Postgres (Docker) → generate → migrate → seed.
-// Chạy: `corepack pnpm setup`. An toàn chạy lại nhiều lần (mọi bước idempotent).
+// One-command bootstrap: ensure .env → Postgres (Docker) → Go migrate → Go seed.
+// Chạy: `corepack pnpm bootstrap`. An toàn chạy lại nhiều lần (mọi bước idempotent).
 // Chỉ dùng cho LOCAL/DEV — mật khẩu trong .env.example là synthetic, không phải bí mật thật.
 import { spawnSync } from "node:child_process";
 import { existsSync, copyFileSync } from "node:fs";
@@ -25,7 +25,7 @@ if (!existsSync(envPath)) {
   log(".env chưa có → copy từ .env.example (local/synthetic, đổi mật khẩu nếu cần bảo mật)");
   copyFileSync(resolve(root, ".env.example"), envPath);
 }
-// Nạp .env vào process.env để prisma CLI (không tự nạp) thấy DATABASE_URL + compose thấy password.
+// Nạp .env để Docker Compose thấy password; Go commands cũng tự nạp file này.
 process.loadEnvFile(envPath);
 if (!process.env.DATABASE_URL) die("DATABASE_URL không có trong .env");
 
@@ -56,19 +56,17 @@ for (let i = 0; i < 40; i++) {
 if (!ready) die("Postgres không sẵn sàng sau ~80s. Kiểm tra `docker compose ps`.");
 console.log("  Postgres ready.");
 
-// 4) Prisma: generate client → migrate → seed VN/PH + tài khoản demo (tất cả idempotent).
-log("Prisma generate…");
-run("corepack pnpm run db:generate");
-log("Áp migrations (migrate deploy)…");
+// 4) Go migration + reference/demo seed (tất cả idempotent).
+log("Áp migrations bằng Go…");
 run("corepack pnpm run db:migrate:deploy");
-log("Seed dữ liệu demo (VN/PH + tài khoản 4 vai + campaign)…");
+log("Seed reference + demo bằng Go (VN/PH + tài khoản 4 vai + campaign)…");
 run("corepack pnpm run db:seed");
 
 console.log(`
 \x1b[32m✔ Xong! Môi trường sẵn sàng.\x1b[0m
 
 Chạy app (2 terminal):
-  corepack pnpm dev:api    # NestJS  → http://localhost:3001
+  corepack pnpm dev:api    # Go API  → http://localhost:3001
   corepack pnpm dev:web    # Next.js → http://localhost:3000
 
 Prototype 13 màn: http://localhost:3000/mockup

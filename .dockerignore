@@ -1,0 +1,11 @@
+**
+!pnpm-workspace.yaml
+!apps/
+!apps/api-go/
+!apps/api-go/**
+apps/api-go/.cache
+!docs/
+!docs/API_CONTRACT_CURRENT.md
+!packages/
+!packages/contracts/
+!packages/contracts/**

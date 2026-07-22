@@ -1,13 +1,7 @@
-import { test, before, after } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import "reflect-metadata";
-import "../src/load-env";
-import { NestFactory } from "@nestjs/core";
-import type { INestApplication } from "@nestjs/common";
-import { AppModule } from "../src/app.module";
-import { HttpExceptionFilter } from "../src/http-exception.filter";
+import { goApiBaseUrl } from "./go-api-harness";
 
-let app: INestApplication;
 let baseUrl: string;
 let creatorToken: string;
 let adminVnToken: string;
@@ -24,17 +18,10 @@ async function login(email: string): Promise<string> {
 const bearer = (t: string): Record<string, string> => ({ authorization: `Bearer ${t}` });
 
 before(async () => {
-  app = await NestFactory.create(AppModule, { logger: false });
-  app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(0);
-  baseUrl = `http://127.0.0.1:${app.getHttpServer().address().port}`;
+  baseUrl = await goApiBaseUrl();
   creatorToken = await login(`n9-creator-${Date.now()}@example.com`);
   adminVnToken = await login("admin.vn@demo.affiliate.gl"); // seed: LOCAL_ADMIN VN
   opsVnToken = await login("ops.vn@demo.affiliate.gl"); // seed: LOCAL_OPS VN (không phải admin)
-});
-
-after(async () => {
-  await app.close();
 });
 
 test("discover lists only VN campaigns for /vn (country isolation)", async () => {

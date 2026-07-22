@@ -7,7 +7,7 @@ test("V05 join: approved creator joins a campaign and sees it in My Campaigns", 
   await page.goto("/mockup/creator/login");
 
   const campaignId = await page.evaluate(async () => {
-    const API = "http://localhost:3001";
+    const API = "http://localhost:3101";
     const j = (r: Response) => r.json();
     const login = (email: string) =>
       fetch(`${API}/auth/mock-login`, {

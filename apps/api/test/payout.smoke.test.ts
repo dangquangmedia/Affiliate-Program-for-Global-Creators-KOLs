@@ -1,15 +1,8 @@
-import { test, before, after } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import "reflect-metadata";
-import "../src/load-env";
 import { randomUUID } from "node:crypto";
-import { NestFactory } from "@nestjs/core";
-import type { INestApplication } from "@nestjs/common";
-import { AppModule } from "../src/app.module";
-import { HttpExceptionFilter } from "../src/http-exception.filter";
-import { PrismaService } from "../src/prisma.service";
+import { goApiBaseUrl, scalar, sql } from "./go-api-harness";
 
-let app: INestApplication;
 let baseUrl: string;
 let adminVn: string;
 let opsVn: string;
@@ -74,18 +67,11 @@ const createPayout = (token: string, body: object) =>
   fetch(`${baseUrl}/me/country/vn/payouts`, { method: "POST", headers: jsonH(token), body: JSON.stringify(body) });
 
 before(async () => {
-  app = await NestFactory.create(AppModule, { logger: false });
-  app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(0);
-  baseUrl = `http://127.0.0.1:${app.getHttpServer().address().port}`;
+  baseUrl = await goApiBaseUrl();
   adminVn = await login("admin.vn@demo.affiliate.gl");
   opsVn = await login("ops.vn@demo.affiliate.gl");
   financeVn = await login("finance.vn@demo.affiliate.gl");
   financePh = await login("finance.ph@demo.affiliate.gl");
-});
-
-after(async () => {
-  await app.close();
 });
 
 test("wallet requires a session (401)", async () => {
@@ -112,9 +98,8 @@ test("request payout with OTP -> PROCESSING, withdrawable drops, ledger reserves
   const w = await wallet(token);
   assert.equal(w.withdrawableMinor, 0); // đã giữ chỗ hết
 
-  const prisma = app.get(PrismaService);
-  const reserve = (await prisma.db.ledgerEntry.findFirst({ where: { refType: "payout", refId: p.id, entryType: "PAYOUT_RESERVE" } })) as { amountMinor: bigint };
-  assert.equal(reserve.amountMinor, -450000n);
+  const amount = await scalar<string>("SELECT amount_minor::text AS value FROM ledger_entry WHERE ref_type='payout' AND ref_id=$1 AND entry_type='PAYOUT_RESERVE'", [p.id]);
+  assert.equal(BigInt(amount), -450000n);
 });
 
 test("amount below country minimum -> 409 BELOW_MIN_PAYOUT", async () => {
@@ -156,11 +141,10 @@ test("idempotency: same key twice -> one payout, reserve once", async () => {
   const first = await (await createPayout(token, { amountMinor: 450000, otpId: otp.otpId, code: otp.code, idempotencyKey: key })).json();
   const second = await (await createPayout(token, { amountMinor: 450000, otpId: otp.otpId, code: otp.code, idempotencyKey: key })).json();
   assert.equal(first.id, second.id); // cùng 1 lệnh
-  const count = await app.get(PrismaService).db.payoutRequest.count?.({ where: { idempotencyKey: key } });
-  // payoutRequest.count không có trong facade -> kiểm qua ledger: đúng 1 reserve.
-  void count;
-  const reserves = (await app.get(PrismaService).db.ledgerEntry.findMany({ where: { refType: "payout", refId: first.id, entryType: "PAYOUT_RESERVE" } })) as unknown[];
-  assert.equal(reserves.length, 1);
+  const payoutCount = await scalar<string>("SELECT count(*)::text AS value FROM payout_request WHERE idempotency_key=$1", [key]);
+  const reserveCount = await scalar<string>("SELECT count(*)::text AS value FROM ledger_entry WHERE ref_type='payout' AND ref_id=$1 AND entry_type='PAYOUT_RESERVE'", [first.id]);
+  assert.equal(Number(payoutCount), 1);
+  assert.equal(Number(reserveCount), 1);
   const w = await wallet(token);
   assert.equal(w.withdrawableMinor, 0); // chỉ trừ 1 lần
 });
@@ -214,10 +198,9 @@ test("settle FAIL -> FAILED_RELEASED + PAYOUT_RELEASE +amount once, withdrawable
   assert.equal(res.status, 201);
   assert.equal((await res.json()).state, "FAILED_RELEASED");
 
-  const prisma = app.get(PrismaService);
-  const releases = (await prisma.db.ledgerEntry.findMany({ where: { refType: "payout", refId: id, entryType: "PAYOUT_RELEASE" } })) as Array<{ amountMinor: bigint }>;
+  const releases = await sql<{ amountMinor: string }>("SELECT amount_minor::text AS \"amountMinor\" FROM ledger_entry WHERE ref_type='payout' AND ref_id=$1 AND entry_type='PAYOUT_RELEASE'", [id]);
   assert.equal(releases.length, 1); // hoàn đúng 1 lần
-  assert.equal(releases[0].amountMinor, 450000n); // +amount
+  assert.equal(BigInt(releases[0].amountMinor), 450000n); // +amount
 
   assert.equal((await wallet(token)).withdrawableMinor, 450000); // số dư phục hồi
 
@@ -234,9 +217,8 @@ test("settle UNKNOWN -> UNKNOWN_HOLD, money stays held, NO release entry, shows 
   assert.equal((await res.json()).state, "UNKNOWN_HOLD");
 
   assert.equal((await wallet(token)).withdrawableMinor, 0); // vẫn giữ (không hoàn vội)
-  const prisma = app.get(PrismaService);
-  const releases = (await prisma.db.ledgerEntry.findMany({ where: { refType: "payout", refId: id, entryType: "PAYOUT_RELEASE" } })) as unknown[];
-  assert.equal(releases.length, 0); // KHÔNG hoàn khi chưa rõ
+  const releaseCount = await scalar<string>("SELECT count(*)::text AS value FROM ledger_entry WHERE ref_type='payout' AND ref_id=$1 AND entry_type='PAYOUT_RELEASE'", [id]);
+  assert.equal(Number(releaseCount), 0); // KHÔNG hoàn khi chưa rõ
 
   const holds = (await (await fetch(`${baseUrl}/ops/vn/payouts/holds`, { headers: bearer(financeVn) })).json()) as Array<{ id: string }>;
   assert.ok(holds.some((h) => h.id === id));
@@ -252,8 +234,7 @@ test("resolveHold FAIL on an UNKNOWN_HOLD -> FAILED_RELEASED + release, withdraw
   assert.equal((await wallet(token)).withdrawableMinor, 450000);
 
   // provider_ref khác nhau mỗi lần thử (UNKNOWN rồi FAIL) -> 2 attempt.
-  const prisma = app.get(PrismaService);
-  const attempts = (await prisma.db.payoutAttempt.findMany({ where: { payoutRequestId: id } })) as Array<{ providerRef: string }>;
+  const attempts = await sql<{ providerRef: string }>('SELECT provider_ref AS "providerRef" FROM payout_attempt WHERE payout_request_id=$1', [id]);
   assert.equal(attempts.length, 2);
   assert.equal(new Set(attempts.map((a) => a.providerRef)).size, 2);
 });
@@ -267,9 +248,8 @@ test("resolveHold SUCCESS on an UNKNOWN_HOLD -> PAID, money stays spent (no rele
   assert.equal((await res.json()).state, "PAID");
   assert.equal((await wallet(token)).withdrawableMinor, 0); // provider thật đã chuyển -> giữ
 
-  const prisma = app.get(PrismaService);
-  const releases = (await prisma.db.ledgerEntry.findMany({ where: { refType: "payout", refId: id, entryType: "PAYOUT_RELEASE" } })) as unknown[];
-  assert.equal(releases.length, 0);
+  const releaseCount = await scalar<string>("SELECT count(*)::text AS value FROM ledger_entry WHERE ref_type='payout' AND ref_id=$1 AND entry_type='PAYOUT_RELEASE'", [id]);
+  assert.equal(Number(releaseCount), 0);
 
   // Đối soát lại lệnh đã kết luận -> 409 NOT_ON_HOLD.
   const again = await resolve(id, "FAIL");

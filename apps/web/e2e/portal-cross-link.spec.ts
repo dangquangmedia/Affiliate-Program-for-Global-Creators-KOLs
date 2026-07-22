@@ -28,7 +28,7 @@ test("cross-link money spine trọn trong /portal", async ({ page }) => {
   await page.goto("/portal");
 
   await page.evaluate(async ({ campaignTitle, hashtag }) => {
-    const API = "http://localhost:3001";
+    const API = "http://localhost:3101";
     const j = (r: Response) => r.json();
     const login = (email: string, displayName?: string) =>
       fetch(`${API}/auth/mock-login`, {

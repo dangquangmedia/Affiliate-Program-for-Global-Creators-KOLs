@@ -1,19 +1,13 @@
-import { test, before, after } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import "reflect-metadata";
-import "../src/load-env";
 import { randomUUID } from "node:crypto";
-import { NestFactory } from "@nestjs/core";
-import type { INestApplication } from "@nestjs/common";
-import { AppModule } from "../src/app.module";
-import { HttpExceptionFilter } from "../src/http-exception.filter";
+import { goApiBaseUrl } from "./go-api-harness";
 
 // N17 — Bộ negative tests gom rõ 3 lớp phòng thủ (đọc 1 file thấy hết cho buổi hỏi đáp):
 //  A. CÁCH LY NƯỚC (bài toán #1): staff nước khác đụng tài nguyên → 404 "không lộ tồn tại".
 //  B. SAI VAI (RBAC): thiếu vai đúng → 403 (route chỉ là ý định; server đối chiếu role_assignment).
 //  C. TRANSITION SAI (state machine): xử lý 2 lần / khoá 2 lần → 409 (claim WHERE state=...).
 
-let app: INestApplication;
 let baseUrl: string;
 let opsVn: string;
 let opsPh: string;
@@ -67,20 +61,13 @@ async function processingPayoutVn(tag: string): Promise<{ creator: string; payou
 }
 
 before(async () => {
-  app = await NestFactory.create(AppModule, { logger: false });
-  app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(0);
-  baseUrl = `http://127.0.0.1:${app.getHttpServer().address().port}`;
+  baseUrl = await goApiBaseUrl();
   opsVn = await login("ops.vn@demo.affiliate.gl");
   opsPh = await login("ops.ph@demo.affiliate.gl");
   adminVn = await login("admin.vn@demo.affiliate.gl");
   financeVn = await login("finance.vn@demo.affiliate.gl");
   financePh = await login("finance.ph@demo.affiliate.gl");
   globalAdmin = await login("global.admin@demo.affiliate.gl");
-});
-
-after(async () => {
-  await app.close();
 });
 
 // ===== A. Cách ly nước — staff nước KHÁC đụng tài nguyên → 404 (không lộ tồn tại) =====

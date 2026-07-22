@@ -9,28 +9,28 @@
   },
   "scripts": {
     "bootstrap": "node scripts/setup.mjs",
-    "db:validate": "prisma validate",
-    "db:generate": "prisma generate",
-    "db:migrate:dev": "prisma migrate dev",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed",
+    "db:migrate:deploy": "go -C apps/api-go run ./cmd/migrate up",
+    "db:migrate:version": "go -C apps/api-go run ./cmd/migrate version",
+    "db:seed": "go -C apps/api-go run ./cmd/seed reference.sql && go -C apps/api-go run ./cmd/seed demo.sql",
     "infra:up": "docker compose up -d postgres",
     "infra:status": "docker compose ps",
-    "lint": "eslint apps/api/src apps/api/test apps/web/src apps/web/e2e apps/web/playwright.config.ts",
-    "typecheck": "corepack pnpm --filter @affiliate-global/api run typecheck && corepack pnpm --filter @affiliate-global/web run typecheck",
-    "test": "corepack pnpm --filter @affiliate-global/api run test && corepack pnpm --filter @affiliate-global/web run test",
-    "build": "corepack pnpm --filter @affiliate-global/api run build && corepack pnpm --filter @affiliate-global/web run build",
-    "dev:api": "corepack pnpm --filter @affiliate-global/api run dev",
+    "format:api": "go -C apps/api-go fmt ./...",
+    "lint": "go -C apps/api-go vet ./... && eslint apps/web/src apps/web/e2e apps/web/playwright.config.ts",
+    "typecheck": "go -C apps/api-go test ./... -run=^$ && corepack pnpm --filter @affiliate-global/web run typecheck",
+    "test:api": "go -C apps/api-go test ./... -count=1",
+    "test:api:race": "node scripts/run-go-race.mjs",
+    "test:api:parity": "node scripts/run-go-api-acceptance.mjs",
+    "test:api:differential": "node scripts/differential-nest-go.mjs",
+    "test:web": "node scripts/run-go-playwright.mjs",
+    "test": "corepack pnpm run test:api && corepack pnpm run test:api:parity && corepack pnpm run test:api:differential && corepack pnpm run test:web",
+    "build": "go -C apps/api-go build ./... && corepack pnpm --filter @affiliate-global/web run build",
+    "dev:api": "go -C apps/api-go run ./cmd/api",
     "dev:web": "corepack pnpm --filter @affiliate-global/web run dev",
     "verify": "corepack pnpm run lint && corepack pnpm run typecheck && corepack pnpm run test && corepack pnpm run build"
   },
   "devDependencies": {
     "eslint": "^10.7.0",
-    "prisma": "^7.8.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.64.0"
-  },
-  "dependencies": {
-    "@prisma/client": "7.8.0"
   }
 }

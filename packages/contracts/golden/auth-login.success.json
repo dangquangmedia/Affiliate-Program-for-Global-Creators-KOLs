@@ -1,0 +1,13 @@
+{
+  "status": 201,
+  "body": {
+    "token": "<token>",
+    "expiresAt": "<iso-date>",
+    "user": {
+      "id": "<uuid>",
+      "email": "golden@example.com",
+      "displayName": "Golden User"
+    }
+  }
+}
+

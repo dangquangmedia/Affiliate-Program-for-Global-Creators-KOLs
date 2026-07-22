@@ -6,7 +6,7 @@ test("V06 content: creator submits, Ops approves -> creator sees approved + earn
   await page.goto("/mockup/creator/login");
 
   const { campaignId, opsToken } = await page.evaluate(async () => {
-    const API = "http://localhost:3001";
+    const API = "http://localhost:3101";
     const j = (r: Response) => r.json();
     const login = (email: string) =>
       fetch(`${API}/auth/mock-login`, {
@@ -55,7 +55,7 @@ test("V06 content: creator submits, Ops approves -> creator sees approved + earn
   // Ops duyệt (qua API — UI Ops đã phủ ở test khác) -> exactly-once earning phía server.
   await page.evaluate(
     async ({ campaignId, opsToken }) => {
-      const API = "http://localhost:3001";
+      const API = "http://localhost:3101";
       const q = await fetch(`${API}/ops/vn/content/queue`, { headers: { authorization: `Bearer ${opsToken}` } }).then((r) => r.json());
       const mineInQueue = q.find((s: { campaignTitle: string }) => s.campaignTitle.startsWith("e2e-content-"));
       await fetch(`${API}/ops/vn/content/${mineInQueue.submissionId}/review`, {

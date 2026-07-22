@@ -1,0 +1,13 @@
+{
+  "status": 400,
+  "body": {
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "A valid email is required.",
+      "status": 400,
+      "correlationId": "<correlation-id>",
+      "retryable": false
+    }
+  }
+}
+

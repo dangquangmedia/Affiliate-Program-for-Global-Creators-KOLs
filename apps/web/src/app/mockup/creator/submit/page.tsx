@@ -23,7 +23,6 @@ function SubmitInner() {
   // Mở link nộp nội dung của nước nào → chọn nước đó (kéo theo ngôn ngữ + tiền tệ).
   useEffect(() => {
     if (queryMarket && queryMarket !== market) setMarket(queryMarket);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryMarket]);
 
   const [status, setStatus] = useState<"loading" | "needLogin" | "missing" | "notFound" | "ready">("loading");

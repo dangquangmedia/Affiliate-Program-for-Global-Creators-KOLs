@@ -1,0 +1,748 @@
+openapi: 3.1.0
+info:
+  title: Affiliate GLOBAL Current API
+  version: 1.0.0-go-rewrite-freeze
+  description: Behavioral contract frozen from the running Nest oracle on 2026-07-22.
+servers:
+  - url: /
+
+paths:
+  /:
+    get:
+      operationId: getRoot
+      responses:
+        "200": { description: Service index, content: { application/json: { schema: { $ref: "#/components/schemas/RootInfo" } } } }
+  /health:
+    get:
+      operationId: getHealth
+      responses:
+        "200": { description: Database is reachable, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /markets/{market}/context:
+    get:
+      operationId: getMarketContext
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Market context, content: { application/json: { schema: { $ref: "#/components/schemas/MarketContext" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /auth/mock-login:
+    post:
+      operationId: mockLogin
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MockLoginInput" } } } }
+      responses:
+        "201": { description: Session issued, content: { application/json: { schema: { $ref: "#/components/schemas/LoginResult" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /auth/me:
+    get:
+      operationId: getCurrentAuth
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Session-derived identity and roles, content: { application/json: { schema: { $ref: "#/components/schemas/AuthContext" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/logout:
+    post:
+      operationId: logout
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201": { description: Session revoked, content: { application/json: { schema: { $ref: "#/components/schemas/Ok" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /me/countries:
+    get:
+      operationId: listMyCountries
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Creator country profiles, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/MyCountryProfile" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /me/country/{market}:
+    post:
+      operationId: selectCountry
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "201": { description: Idempotently selected country profile, content: { application/json: { schema: { $ref: "#/components/schemas/MyCountryProfile" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /me/country/{market}/kyc:
+    get:
+      operationId: getMyKyc
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Creator KYC case, content: { application/json: { schema: { $ref: "#/components/schemas/KycCase" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: submitMyKyc
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/KycSubmitInput" } } } }
+      responses:
+        "201": { description: Submitted or resubmitted KYC, content: { application/json: { schema: { $ref: "#/components/schemas/KycCase" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /ops/{market}/kyc/queue:
+    get:
+      operationId: listKycQueue
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Country-scoped KYC queue, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/KycQueueItem" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /ops/{market}/kyc/{caseId}/review:
+    post:
+      operationId: reviewKyc
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/CaseId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/KycReviewInput" } } } }
+      responses:
+        "201": { description: Reviewed KYC, content: { application/json: { schema: { $ref: "#/components/schemas/KycCase" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /markets/{market}/campaigns:
+    get:
+      operationId: listCampaigns
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Market campaign discovery, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/CampaignSummary" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createCampaign
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CampaignCreateInput" } } } }
+      responses:
+        "201": { description: Campaign created, content: { application/json: { schema: { $ref: "#/components/schemas/CampaignDetail" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /markets/{market}/campaigns/{id}:
+    get:
+      operationId: getCampaign
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/ID" }]
+      responses:
+        "200": { description: Campaign detail, content: { application/json: { schema: { $ref: "#/components/schemas/CampaignDetail" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /markets/{market}/campaigns/{id}/similar:
+    get:
+      operationId: listSimilarCampaigns
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/ID" }]
+      responses:
+        "200": { description: Similar campaigns, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/CampaignSummary" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /markets/{market}/campaigns/{id}/join:
+    post:
+      operationId: joinCampaign
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/ID" }]
+      responses:
+        "201": { description: Joined or waitlisted participation, content: { application/json: { schema: { $ref: "#/components/schemas/Participation" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /markets/{market}/campaigns/{id}/leave:
+    post:
+      operationId: leaveCampaign
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/ID" }]
+      responses:
+        "201": { description: Left participation, content: { application/json: { schema: { $ref: "#/components/schemas/Participation" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /me/country/{market}/participations:
+    get:
+      operationId: listMyParticipations
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Creator participations, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Participation" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /me/country/{market}/campaigns/{campaignId}/content:
+    get:
+      operationId: getMyContent
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/CampaignID" }]
+      responses:
+        "200": { description: Creator content attempts, content: { application/json: { schema: { $ref: "#/components/schemas/MyContent" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: submitContent
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/CampaignID" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ContentSubmitInput" } } } }
+      responses:
+        "201": { description: Content submitted, content: { application/json: { schema: { $ref: "#/components/schemas/MyContent" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /ops/{market}/content/queue:
+    get:
+      operationId: listContentQueue
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Country-scoped content queue, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ContentQueueItem" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /ops/{market}/content/{submissionId}/review:
+    post:
+      operationId: reviewContent
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/SubmissionID" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ContentReviewInput" } } } }
+      responses:
+        "201": { description: Content reviewed, content: { application/json: { schema: { $ref: "#/components/schemas/Submission" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /me/country/{market}/earnings:
+    get:
+      operationId: getEarnings
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Earnings and append-only ledger, content: { application/json: { schema: { $ref: "#/components/schemas/EarningsDashboard" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /ops/{market}/reconciliation:
+    get:
+      operationId: listReconciliationBatches
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Reconciliation batches, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ReconBatch" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createReconciliationBatch
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      requestBody: { required: false, content: { application/json: { schema: { $ref: "#/components/schemas/ReconCreateInput" } } } }
+      responses:
+        "201": { description: Open reconciliation batch, content: { application/json: { schema: { $ref: "#/components/schemas/ReconBatch" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /ops/{market}/reconciliation/{batchId}:
+    get:
+      operationId: getReconciliationBatch
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/BatchID" }]
+      responses:
+        "200": { description: Reconciliation batch with lines, content: { application/json: { schema: { $ref: "#/components/schemas/ReconBatch" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /ops/{market}/reconciliation/{batchId}/lock:
+    post:
+      operationId: lockReconciliationBatch
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/BatchID" }]
+      responses:
+        "201": { description: Locked immutable batch, content: { application/json: { schema: { $ref: "#/components/schemas/ReconBatch" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /me/country/{market}/wallet:
+    get:
+      operationId: getWallet
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Creator wallet, content: { application/json: { schema: { $ref: "#/components/schemas/Wallet" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /me/country/{market}/payouts/otp:
+    post:
+      operationId: requestPayoutOtp
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "201": { description: Mock payout OTP, content: { application/json: { schema: { $ref: "#/components/schemas/Otp" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /me/country/{market}/payouts:
+    post:
+      operationId: createPayout
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PayoutCreateInput" } } } }
+      responses:
+        "201": { description: Processing payout with reserved balance, content: { application/json: { schema: { $ref: "#/components/schemas/Payout" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /ops/{market}/payouts:
+    get:
+      operationId: listPayoutQueue
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Country payout queue, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PayoutQueueItem" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /ops/{market}/payouts/holds:
+    get:
+      operationId: listPayoutHolds
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }]
+      responses:
+        "200": { description: Unknown-hold payout queue, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PayoutQueueItem" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /ops/{market}/payouts/{id}/settle:
+    post:
+      operationId: settlePayout
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/ID" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PayoutSettleInput" } } } }
+      responses:
+        "201": { description: Provider result applied, content: { application/json: { schema: { $ref: "#/components/schemas/Payout" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /ops/{market}/payouts/{id}/resolve:
+    post:
+      operationId: resolvePayoutHold
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Market" }, { $ref: "#/components/parameters/ID" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PayoutResolveInput" } } } }
+      responses:
+        "201": { description: Unknown hold resolved, content: { application/json: { schema: { $ref: "#/components/schemas/Payout" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /admin/audit:
+    get:
+      operationId: listAudit
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: market, in: query, required: false, schema: { type: string, enum: [vn, ph] } }
+      responses:
+        "200": { description: Global append-only audit feed, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AuditEvent" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    Market: { name: market, in: path, required: true, schema: { type: string, enum: [vn, ph] } }
+    ID: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    CaseId: { name: caseId, in: path, required: true, schema: { type: string, format: uuid } }
+    CampaignID: { name: campaignId, in: path, required: true, schema: { type: string, format: uuid } }
+    SubmissionID: { name: submissionId, in: path, required: true, schema: { type: string, format: uuid } }
+    BatchID: { name: batchId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    BadRequest: { description: Invalid input, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Unauthorized: { description: Missing or invalid session, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Forbidden: { description: Authenticated but wrong role or country assignment, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    NotFound: { description: Missing or out-of-country resource, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Conflict: { description: Invalid state transition or idempotency conflict, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    ServiceUnavailable: { description: Database unavailable, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+  schemas:
+    UUID: { type: string, format: uuid }
+    ISODate: { type: string, format: date-time }
+    MoneyMinor: { type: integer, format: int64 }
+    NullableString: { type: [string, "null"] }
+    NullableMoney: { type: [integer, "null"], format: int64 }
+    Ok:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      properties: { ok: { type: boolean, const: true } }
+    RootInfo:
+      type: object
+      additionalProperties: false
+      required: [service, endpoints]
+      properties:
+        service: { type: string, const: affiliate-global-api }
+        endpoints: { type: array, items: { type: string } }
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, db]
+      properties: { status: { type: string, const: ok }, db: { type: string, const: up } }
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, status, correlationId, retryable]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            status: { type: integer }
+            correlationId: { type: string, format: uuid }
+            retryable: { type: boolean }
+    MarketContext:
+      type: object
+      additionalProperties: false
+      required: [market, countryName, locale, fallbackLocale, currency, currencyExponent, configVersion, enabled]
+      properties:
+        market: { type: string, enum: [VN, PH] }
+        countryName: { type: string }
+        locale: { type: string }
+        fallbackLocale: { type: string }
+        currency: { type: string }
+        currencyExponent: { type: integer }
+        configVersion: { type: integer }
+        enabled: { type: boolean }
+    AuthUser:
+      type: object
+      additionalProperties: false
+      required: [id, email, displayName]
+      properties: { id: { $ref: "#/components/schemas/UUID" }, email: { type: string }, displayName: { type: string } }
+    AuthRole:
+      type: object
+      additionalProperties: false
+      required: [countryId, role]
+      properties: { countryId: { type: [string, "null"], format: uuid }, role: { type: string } }
+    AuthContext:
+      type: object
+      additionalProperties: false
+      required: [user, roles]
+      properties:
+        user: { $ref: "#/components/schemas/AuthUser" }
+        roles: { type: array, items: { $ref: "#/components/schemas/AuthRole" } }
+    MockLoginInput:
+      type: object
+      required: [email]
+      properties: { email: { type: string, format: email }, displayName: { type: string } }
+    LoginResult:
+      type: object
+      additionalProperties: false
+      required: [token, expiresAt, user]
+      properties:
+        token: { type: string }
+        expiresAt: { $ref: "#/components/schemas/ISODate" }
+        user: { $ref: "#/components/schemas/AuthUser" }
+    CountryContext:
+      type: object
+      additionalProperties: false
+      required: [market, countryName, currency, currencyExponent, locale, fallbackLocale]
+      properties:
+        market: { type: string, enum: [VN, PH] }
+        countryName: { type: string }
+        currency: { type: string }
+        currencyExponent: { type: integer }
+        locale: { type: string }
+        fallbackLocale: { type: string }
+    MyCountryProfile:
+      type: object
+      additionalProperties: false
+      required: [profileId, onboardingState, context]
+      properties:
+        profileId: { $ref: "#/components/schemas/UUID" }
+        onboardingState: { type: string }
+        context: { $ref: "#/components/schemas/CountryContext" }
+    KycField:
+      type: object
+      additionalProperties: false
+      required: [key, label, value, state, reason]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        value: { $ref: "#/components/schemas/NullableString" }
+        state: { type: string, enum: [EMPTY, FILLED, ACCEPTED, NEEDS_CHANGES] }
+        reason: { $ref: "#/components/schemas/NullableString" }
+    KycCase:
+      type: object
+      additionalProperties: false
+      required: [caseId, state, fields]
+      properties:
+        caseId: { $ref: "#/components/schemas/UUID" }
+        state: { type: string, enum: [DRAFT, SUBMITTED, RESUBMITTED, APPROVED, REJECTED] }
+        fields: { type: array, items: { $ref: "#/components/schemas/KycField" } }
+    KycQueueItem:
+      allOf:
+        - { $ref: "#/components/schemas/KycCase" }
+        - type: object
+          required: [creatorName, pendingFields]
+          properties: { creatorName: { type: string }, pendingFields: { type: integer } }
+    KycSubmitInput:
+      type: object
+      required: [values]
+      properties: { values: { type: object, additionalProperties: { type: string } } }
+    KycReviewInput:
+      type: object
+      required: [decisions]
+      properties:
+        decisions:
+          type: array
+          items:
+            type: object
+            required: [key, decision]
+            properties:
+              key: { type: string }
+              decision: { type: string, enum: [ACCEPT, NEEDS_CHANGES] }
+              reason: { type: string }
+    CampaignSummary:
+      type: object
+      additionalProperties: false
+      required: [id, title, brand, platform, requiredHashtag, currency, rewardMinor, status, slotsTotal, slotsTaken, slotsLeft, full]
+      properties:
+        id: { $ref: "#/components/schemas/UUID" }
+        title: { type: string }
+        brand: { type: string }
+        platform: { type: string }
+        requiredHashtag: { type: string }
+        currency: { type: string }
+        rewardMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        status: { type: string, enum: [ACTIVE, PAUSED, ENDED] }
+        slotsTotal: { type: integer }
+        slotsTaken: { type: integer }
+        slotsLeft: { type: integer }
+        full: { type: boolean }
+    RewardRule:
+      type: object
+      additionalProperties: false
+      required: [triggerType, pricingType, capType, flatAmountMinor, capSlots, budgetCapMinor]
+      properties:
+        triggerType: { type: string }
+        pricingType: { type: string }
+        capType: { type: string }
+        flatAmountMinor: { $ref: "#/components/schemas/NullableMoney" }
+        capSlots: { type: [integer, "null"] }
+        budgetCapMinor: { $ref: "#/components/schemas/NullableMoney" }
+    CampaignDetail:
+      allOf:
+        - { $ref: "#/components/schemas/CampaignSummary" }
+        - type: object
+          required: [brief, reward]
+          properties:
+            brief: { type: string }
+            reward: { anyOf: [{ $ref: "#/components/schemas/RewardRule" }, { type: "null" }] }
+    CampaignCreateInput:
+      type: object
+      required: [title, brand, platform, requiredHashtag, brief, rewardMinor, slotsTotal]
+      properties:
+        title: { type: string }
+        brand: { type: string }
+        platform: { type: string }
+        requiredHashtag: { type: string }
+        brief: { type: string }
+        rewardMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        slotsTotal: { type: integer }
+    Participation:
+      type: object
+      required: [campaignId, state, snapshotRewardMinor, currency, submitDeadlineAt, waitlistedAt, waitlistPosition, joinedAt, strikeCount]
+      properties:
+        campaignId: { $ref: "#/components/schemas/UUID" }
+        campaignTitle: { type: string }
+        state: { type: string }
+        snapshotRewardMinor: { $ref: "#/components/schemas/NullableMoney" }
+        currency: { $ref: "#/components/schemas/NullableString" }
+        submitDeadlineAt: { type: [string, "null"], format: date-time }
+        waitlistedAt: { type: [string, "null"], format: date-time }
+        waitlistPosition: { type: [integer, "null"] }
+        joinedAt: { type: [string, "null"], format: date-time }
+        strikeCount: { type: integer }
+    Submission:
+      type: object
+      additionalProperties: false
+      required: [id, attemptNo, url, state, rejectReason, hashtagOk, platformOk, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/UUID" }
+        attemptNo: { type: integer }
+        url: { type: string }
+        state: { type: string }
+        rejectReason: { $ref: "#/components/schemas/NullableString" }
+        hashtagOk: { type: boolean }
+        platformOk: { type: boolean }
+        createdAt: { $ref: "#/components/schemas/ISODate" }
+    MyContent:
+      type: object
+      additionalProperties: false
+      required: [participationState, campaignTitle, requiredHashtag, platform, fixDeadlineAt, submissions]
+      properties:
+        participationState: { type: string }
+        campaignTitle: { $ref: "#/components/schemas/NullableString" }
+        requiredHashtag: { $ref: "#/components/schemas/NullableString" }
+        platform: { $ref: "#/components/schemas/NullableString" }
+        fixDeadlineAt: { type: [string, "null"], format: date-time }
+        submissions: { type: array, items: { $ref: "#/components/schemas/Submission" } }
+    ContentQueueItem:
+      type: object
+      additionalProperties: false
+      required: [submissionId, creatorName, campaignTitle, url, attemptNo, hashtagOk, platformOk, submittedAt]
+      properties:
+        submissionId: { $ref: "#/components/schemas/UUID" }
+        creatorName: { type: string }
+        campaignTitle: { type: string }
+        url: { type: string }
+        attemptNo: { type: integer }
+        hashtagOk: { type: boolean }
+        platformOk: { type: boolean }
+        submittedAt: { $ref: "#/components/schemas/ISODate" }
+    ContentSubmitInput:
+      type: object
+      required: [url, caption]
+      properties: { url: { type: string }, caption: { type: string } }
+    ContentReviewInput:
+      type: object
+      required: [decision]
+      properties: { decision: { type: string, enum: [APPROVE, REJECT] }, reason: { type: string } }
+    Earning:
+      type: object
+      required: [id, campaignTitle, grossMinor, taxMinor, netMinor, currency, status, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/UUID" }
+        campaignTitle: { $ref: "#/components/schemas/NullableString" }
+        grossMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        taxMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        netMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        currency: { type: string }
+        status: { type: string }
+        createdAt: { $ref: "#/components/schemas/ISODate" }
+    EarningsSummary:
+      type: object
+      required: [currency, totalGrossMinor, totalTaxMinor, totalNetMinor, pendingNetMinor, availableNetMinor, paidNetMinor]
+      properties:
+        currency: { $ref: "#/components/schemas/NullableString" }
+        totalGrossMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        totalTaxMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        totalNetMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        pendingNetMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        availableNetMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        paidNetMinor: { $ref: "#/components/schemas/MoneyMinor" }
+    LedgerEntry:
+      type: object
+      required: [id, entryType, amountMinor, currency, refType, refId, createdAt, balanceAfterMinor]
+      properties:
+        id: { $ref: "#/components/schemas/UUID" }
+        entryType: { type: string }
+        amountMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        currency: { type: string }
+        refType: { type: string }
+        refId: { $ref: "#/components/schemas/UUID" }
+        createdAt: { $ref: "#/components/schemas/ISODate" }
+        balanceAfterMinor: { $ref: "#/components/schemas/MoneyMinor" }
+    LedgerView:
+      type: object
+      required: [entries, balanceMinor, currency]
+      properties:
+        entries: { type: array, items: { $ref: "#/components/schemas/LedgerEntry" } }
+        balanceMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        currency: { $ref: "#/components/schemas/NullableString" }
+    EarningsDashboard:
+      type: object
+      required: [earnings, summary, ledger]
+      properties:
+        earnings: { type: array, items: { $ref: "#/components/schemas/Earning" } }
+        summary: { $ref: "#/components/schemas/EarningsSummary" }
+        ledger: { $ref: "#/components/schemas/LedgerView" }
+    ReconLine:
+      type: object
+      required: [id, earningId, creatorName, campaignTitle, netMinor, currency, anomaly]
+      properties:
+        id: { $ref: "#/components/schemas/UUID" }
+        earningId: { $ref: "#/components/schemas/UUID" }
+        creatorName: { type: string }
+        campaignTitle: { $ref: "#/components/schemas/NullableString" }
+        netMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        currency: { type: string }
+        anomaly: { $ref: "#/components/schemas/NullableString" }
+    ReconBatch:
+      type: object
+      required: [id, period, status, lockedAt, lineCount, totalNetMinor, currency]
+      properties:
+        id: { $ref: "#/components/schemas/UUID" }
+        period: { type: string }
+        status: { type: string, enum: [OPEN, LOCKED] }
+        lockedAt: { type: [string, "null"], format: date-time }
+        lineCount: { type: integer }
+        totalNetMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        currency: { $ref: "#/components/schemas/NullableString" }
+        lines: { type: array, items: { $ref: "#/components/schemas/ReconLine" } }
+    ReconCreateInput:
+      type: object
+      properties: { period: { type: string } }
+    Payout:
+      type: object
+      required: [id, amountMinor, currency, state, requestedAt]
+      properties:
+        id: { $ref: "#/components/schemas/UUID" }
+        amountMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        currency: { type: string }
+        state: { type: string, enum: [PROCESSING, PAID, FAILED_RELEASED, UNKNOWN_HOLD] }
+        requestedAt: { $ref: "#/components/schemas/ISODate" }
+    PayoutQueueItem:
+      allOf:
+        - { $ref: "#/components/schemas/Payout" }
+        - type: object
+          required: [creatorName]
+          properties: { creatorName: { type: string } }
+    Otp:
+      type: object
+      required: [otpId, code, expiresAt]
+      properties:
+        otpId: { $ref: "#/components/schemas/UUID" }
+        code: { type: string }
+        expiresAt: { $ref: "#/components/schemas/ISODate" }
+    Wallet:
+      type: object
+      required: [withdrawableMinor, minPayoutMinor, currency, payouts]
+      properties:
+        withdrawableMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        minPayoutMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        currency: { type: string }
+        payouts: { type: array, items: { $ref: "#/components/schemas/Payout" } }
+    PayoutCreateInput:
+      type: object
+      required: [amountMinor, otpId, code, idempotencyKey]
+      properties:
+        amountMinor: { $ref: "#/components/schemas/MoneyMinor" }
+        otpId: { $ref: "#/components/schemas/UUID" }
+        code: { type: string }
+        idempotencyKey: { type: string }
+    PayoutSettleInput:
+      type: object
+      required: [result]
+      properties: { result: { type: string, enum: [SUCCESS, FAIL, UNKNOWN] } }
+    PayoutResolveInput:
+      type: object
+      required: [result]
+      properties: { result: { type: string, enum: [SUCCESS, FAIL] } }
+    AuditEvent:
+      type: object
+      required: [id, actorName, action, countryCode, targetType, targetId, metadata, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/UUID" }
+        actorName: { type: string }
+        action: { type: string }
+        countryCode: { type: [string, "null"] }
+        targetType: { $ref: "#/components/schemas/NullableString" }
+        targetId: { type: [string, "null"], format: uuid }
+        metadata: {}
+        createdAt: { $ref: "#/components/schemas/ISODate" }
+

@@ -1,13 +1,7 @@
-import { test, before, after } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import "reflect-metadata";
-import "../src/load-env";
 import { randomUUID } from "node:crypto";
-import { NestFactory } from "@nestjs/core";
-import type { INestApplication } from "@nestjs/common";
-import { AppModule } from "../src/app.module";
-import { HttpExceptionFilter } from "../src/http-exception.filter";
-import { PrismaService } from "../src/prisma.service";
+import { goApiBaseUrl, sql } from "./go-api-harness";
 
 // N17 — Audit trail AD-02. Mọi quyết định của staff (KYC/content/đối soát/payout/campaign) phải
 // để lại vết append-only, ghi TRONG CÙNG transaction với hành động. Bộ test chứng minh:
@@ -15,7 +9,6 @@ import { PrismaService } from "../src/prisma.service";
 // (2) hành động bị rollback (409) KHÔNG để lại vết (audit atomic với quyết định);
 // (3) chỉ GLOBAL_ADMIN đọc được nhật ký toàn cục; lọc theo nước hoạt động.
 
-let app: INestApplication;
 let baseUrl: string;
 let opsVn: string;
 let adminVn: string;
@@ -36,7 +29,10 @@ async function login(email: string): Promise<string> {
 
 type AuditRow = { action: string; targetType: string | null; targetId: string | null; metadata: unknown; countryId: string | null };
 const auditsFor = async (targetId: string): Promise<AuditRow[]> =>
-  (await app.get(PrismaService).db.auditEvent.findMany({ where: { targetId } })) as AuditRow[];
+  sql<AuditRow>(
+    'SELECT action, target_type AS "targetType", target_id::text AS "targetId", metadata, country_id::text AS "countryId" FROM audit_event WHERE target_id=$1',
+    [targetId],
+  );
 
 interface SpineIds {
   creator: string;
@@ -100,18 +96,11 @@ async function runSpine(tag: string): Promise<SpineIds> {
 }
 
 before(async () => {
-  app = await NestFactory.create(AppModule, { logger: false });
-  app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(0);
-  baseUrl = `http://127.0.0.1:${app.getHttpServer().address().port}`;
+  baseUrl = await goApiBaseUrl();
   opsVn = await login("ops.vn@demo.affiliate.gl");
   adminVn = await login("admin.vn@demo.affiliate.gl");
   financeVn = await login("finance.vn@demo.affiliate.gl");
   globalAdmin = await login("global.admin@demo.affiliate.gl");
-});
-
-after(async () => {
-  await app.close();
 });
 
 test("audit view requires a session (401)", async () => {

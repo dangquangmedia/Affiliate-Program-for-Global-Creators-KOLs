@@ -5,7 +5,7 @@ test("V07 earnings: approved content shows Net + append-only ledger entries", as
   await page.goto("/mockup/creator/login");
 
   await page.evaluate(async () => {
-    const API = "http://localhost:3001";
+    const API = "http://localhost:3101";
     const j = (r: Response) => r.json();
     const login = (email: string) =>
       fetch(`${API}/auth/mock-login`, {

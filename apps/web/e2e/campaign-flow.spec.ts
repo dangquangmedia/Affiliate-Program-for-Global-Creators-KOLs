@@ -4,7 +4,7 @@ async function loginViaApi(page: import("@playwright/test").Page, email: string,
   await page.goto("/mockup/creator/login");
   await page.evaluate(
     async ({ email, name }) => {
-      const s = await fetch("http://localhost:3001/auth/mock-login", {
+      const s = await fetch("http://localhost:3101/auth/mock-login", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, displayName: name }),

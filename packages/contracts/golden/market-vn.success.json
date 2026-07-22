@@ -1,0 +1,14 @@
+{
+  "status": 200,
+  "body": {
+    "market": "VN",
+    "countryName": "Vietnam",
+    "locale": "vi-VN",
+    "fallbackLocale": "en",
+    "currency": "VND",
+    "currencyExponent": 0,
+    "configVersion": 1,
+    "enabled": true
+  }
+}
+

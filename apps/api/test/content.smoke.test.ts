@@ -1,15 +1,7 @@
-import { test, before, after } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import "reflect-metadata";
-import "../src/load-env";
-import { NestFactory } from "@nestjs/core";
-import type { INestApplication } from "@nestjs/common";
-import { AppModule } from "../src/app.module";
-import { HttpExceptionFilter } from "../src/http-exception.filter";
-import { JoinService } from "../src/campaign/join.service";
-import { PrismaService } from "../src/prisma.service";
+import { goApiBaseUrl, runReclaim, scalar, sql } from "./go-api-harness";
 
-let app: INestApplication;
 let baseUrl: string;
 let adminVn: string;
 let opsVn: string;
@@ -80,17 +72,10 @@ async function latestSubmissionId(token: string, cid: string): Promise<string> {
 }
 
 before(async () => {
-  app = await NestFactory.create(AppModule, { logger: false });
-  app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(0);
-  baseUrl = `http://127.0.0.1:${app.getHttpServer().address().port}`;
+  baseUrl = await goApiBaseUrl();
   adminVn = await login("admin.vn@demo.affiliate.gl");
   opsVn = await login("ops.vn@demo.affiliate.gl");
   opsPh = await login("ops.ph@demo.affiliate.gl");
-});
-
-after(async () => {
-  await app.close();
 });
 
 test("submit without joining -> 404", async () => {
@@ -170,14 +155,14 @@ test("approve -> earning exactly-once with snapshot gross + VN tax 10%", async (
   const mine = await (await fetch(`${baseUrl}/me/country/vn/campaigns/${cid}/content`, { headers: bearer(token) })).json();
   assert.equal(mine.participationState, "APPROVED");
 
-  const prisma = app.get(PrismaService);
-  const count = await prisma.db.earning.count({ where: { submissionId: sid } });
-  assert.equal(count, 1);
-  const earning = (await prisma.db.earning.findFirst({ where: { submissionId: sid } })) as {
-    grossMinor: bigint; taxMinor: bigint; status: string; currency: string;
-  };
-  assert.equal(earning.grossMinor, 100000n); // snapshot đơn giá lúc join
-  assert.equal(earning.taxMinor, 10000n); // VN tax 10% (seed country_config)
+  const earnings = await sql<{ grossMinor: string; taxMinor: string; status: string; currency: string }>(
+    'SELECT gross_minor::text AS "grossMinor", tax_minor::text AS "taxMinor", status::text, currency FROM earning WHERE submission_id=$1',
+    [sid],
+  );
+  assert.equal(earnings.length, 1);
+  const earning = earnings[0];
+  assert.equal(BigInt(earning.grossMinor), 100000n); // snapshot đơn giá lúc join
+  assert.equal(BigInt(earning.taxMinor), 10000n); // VN tax 10% (seed country_config)
   assert.equal(earning.status, "PENDING");
   assert.equal(earning.currency, "VND");
 });
@@ -192,8 +177,8 @@ test("second approve -> 409 ALREADY_REVIEWED, still exactly 1 earning", async ()
   assert.equal(again.status, 409);
   assert.equal((await again.json()).error.code, "ALREADY_REVIEWED");
 
-  const count = await app.get(PrismaService).db.earning.count({ where: { submissionId: sid } });
-  assert.equal(count, 1);
+  const count = await scalar<string>("SELECT count(*)::text AS value FROM earning WHERE submission_id=$1", [sid]);
+  assert.equal(Number(count), 1);
 });
 
 test("RACE: double-click approve (2 concurrent) -> exactly 1 wins, 1 earning", async () => {
@@ -205,8 +190,8 @@ test("RACE: double-click approve (2 concurrent) -> exactly 1 wins, 1 earning", a
   const statuses = [r1.status, r2.status].sort();
   assert.deepEqual(statuses, [201, 409], `một thắng một 409, got ${statuses}`);
 
-  const count = await app.get(PrismaService).db.earning.count({ where: { submissionId: sid } });
-  assert.equal(count, 1, "đúng 1 earning dù duyệt song song");
+  const count = await scalar<string>("SELECT count(*)::text AS value FROM earning WHERE submission_id=$1", [sid]);
+  assert.equal(Number(count), 1, "đúng 1 earning dù duyệt song song");
 });
 
 test("reject requires reason (400); reject sets REJECTED + fix deadline (QĐ-4)", async () => {
@@ -240,12 +225,11 @@ test("resubmit after reject -> attempt 2 chains to attempt 1; approve creates ex
 
   const sid2 = mine.submissions[0].id;
   await review(opsVn, sid2, "APPROVE");
-  const prisma = app.get(PrismaService);
-  const p = (await prisma.db.submission.findFirst({ where: { id: sid2 } })) as { supersedesId: string | null };
-  assert.equal(p.supersedesId, sid1, "attempt 2 trỏ về bản bị từ chối");
+  const supersedesId = await scalar<string>("SELECT supersedes_id::text AS value FROM content_submission WHERE id=$1", [sid2]);
+  assert.equal(supersedesId, sid1, "attempt 2 trỏ về bản bị từ chối");
   // Chỉ bản được duyệt sinh tiền — attempt 1 (rejected) không có earning.
-  assert.equal(await prisma.db.earning.count({ where: { submissionId: sid1 } }), 0);
-  assert.equal(await prisma.db.earning.count({ where: { submissionId: sid2 } }), 1);
+  assert.equal(Number(await scalar<string>("SELECT count(*)::text AS value FROM earning WHERE submission_id=$1", [sid1])), 0);
+  assert.equal(Number(await scalar<string>("SELECT count(*)::text AS value FROM earning WHERE submission_id=$1", [sid2])), 1);
 });
 
 test("REJECTED past fix deadline is reclaimed by worker (QĐ-4 nối N11)", async () => {
@@ -255,12 +239,8 @@ test("REJECTED past fix deadline is reclaimed by worker (QĐ-4 nối N11)", asyn
   await review(opsVn, sid, "REJECT", "Cần sửa");
 
   // Đẩy hạn sửa về quá khứ -> worker phải thu hồi suất (EXPIRED + strike).
-  const prisma = app.get(PrismaService);
-  await prisma.db.$queryRaw`
-    UPDATE participation SET fix_deadline_at = now() - interval '1 hour'
-    WHERE campaign_id = ${cid}::uuid AND state = 'REJECTED' RETURNING id
-  `;
-  const res = await app.get(JoinService).reclaimExpired();
+  await sql("UPDATE participation SET fix_deadline_at=now()-interval '1 hour' WHERE campaign_id=$1 AND state='REJECTED'", [cid]);
+  const res = await runReclaim();
   assert.ok(res.reclaimed >= 1);
 
   const mine = await (await fetch(`${baseUrl}/me/country/vn/campaigns/${cid}/content`, { headers: bearer(token) })).json();
