@@ -284,11 +284,15 @@ export function SectionHead({ title, hint, more }: { title: string; hint?: strin
   );
 }
 
-export function Kpi({ label, icon, value, cur, sub, usd, tone = "mkt" }: {
+export function Kpi({ label, icon, value, cur, sub, usd, tone = "mkt", stamp }: {
   label: string; icon: IconName; value: string; cur?: string; sub?: ReactNode; usd?: string; tone?: Tone;
+  stamp?: { text: string; ok?: boolean };
 }) {
   return (
     <div className={s.kpi} style={{ ["--tone" as string]: toneVar[tone] }}>
+      {stamp && (
+        <span className={`${s.kpiStamp} ${stamp.ok ? s.kpiStampOk : ""}`}>{stamp.text}</span>
+      )}
       <div className={s.kpiTop}><Icon name={icon} size={15} /> {label}</div>
       <div className={s.kpiVal}>{value}{cur && <span className={s.cur}>{cur}</span>}</div>
       {usd && <div className={s.kpiUsd}>{usd}</div>}
