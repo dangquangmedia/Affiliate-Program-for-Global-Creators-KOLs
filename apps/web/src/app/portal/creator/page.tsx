@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Shell, MarketStrip, SectionHead, Kpi, Panel, Chip, Btn, Meter, MoneySpine, Note, Empty, Icon, css as s,
+  Shell, MarketStrip, SectionHead, Kpi, Panel, Chip, Btn, Meter, MoneySpine, Note, Empty, Icon, Modal, css as s,
   type NavItem, type Role,
 } from "../ui";
 import { MARKETS, formatMoney, toUsdReference, type Market, type Currency } from "../../../mockup/data";
@@ -14,7 +14,7 @@ import { getEarnings, type EarningsDashboard, type Earning } from "../../../lib/
 import { getWallet, requestOtp, createPayout, type Wallet } from "../../../lib/payout-client";
 import { getMyKyc, type KycCase } from "../../../lib/kyc-client";
 
-const ROLE: Role = { key: "creator", name: "Minh Anh", scope: "Creator · hồ sơ đa nước", color: "#6e7bff" };
+const ROLE: Role = { key: "creator", name: "Lê Văn Quang", scope: "Creator · hồ sơ đa nước", color: "#6e7bff" };
 const NAV: NavItem[] = [
   { key: "home", label: "Trang chủ", icon: "home" },
   { key: "discover", label: "Khám phá", icon: "compass" },
@@ -164,6 +164,12 @@ export default function CreatorDashboard() {
   }, [earn]);
   const earnings = earn?.earnings ?? [];
 
+  // NGUỒN SỰ THẬT cho "rút được": ví (đã trừ các lệnh đang giữ), KHÔNG phải tổng net AVAILABLE
+  // trọn đời (số đó không trừ tiền đã rút → gây hiểu nhầm "khả dụng" khác với ví).
+  const withdrawable = wallet?.withdrawableMinor ?? 0;
+  // "Đã nhận" = tổng các lệnh rút đã chi trả thật (earning không tự đổi sang PAID vì payout theo số tiền).
+  const paidOut = (wallet?.payouts ?? []).filter((p) => p.state === "PAID").reduce((a, p) => a + p.amountMinor, 0);
+
   const fm = (v: number) => formatMoney(v, cur);
   const usd = (v: number) => (showUsd ? `≈ ${toUsdReference(v, cur)} tham chiếu` : undefined);
   const kycPending = (kyc?.fields ?? []).some((f) => f.state === "NEEDS_CHANGES");
@@ -192,7 +198,7 @@ export default function CreatorDashboard() {
               sub={kycPending ? <><Icon name="alert" size={13} /> có mục cần sửa</> : <><Icon name="check" size={13} /> Đủ điều kiện Join</>} />
             <Kpi label="Chiến dịch cần làm" icon="layers" tone="brand" value={String(openTasks.length)} sub={<>đang chờ nộp / sửa nội dung</>} />
             <Kpi label="Thu nhập chờ đối soát" icon="clock" tone="warn" value={fm(money.pending)} usd={usd(money.pending)} />
-            <Kpi label="Số dư khả dụng" icon="wallet" tone="ok" value={fm(money.available)} usd={usd(money.available)} />
+            <Kpi label="Số dư ví (rút được)" icon="wallet" tone="ok" value={fm(withdrawable)} usd={usd(withdrawable)} />
           </div>
 
           <div className={`${s.grid} ${s.split}`} style={{ marginTop: 22 }}>
@@ -213,7 +219,7 @@ export default function CreatorDashboard() {
               )) : <Empty>Chưa có chiến dịch nào cần nộp.</Empty>}
               <div className={s.taskItem} style={{ ["--tone" as string]: "var(--info)" }}>
                 <span className={s.taskIcon}><Icon name="chart" size={18} /></span>
-                <div className={s.taskBody}><b>{fm(money.available)} sẵn sàng rút</b><span>Trên mức tối thiểu {fm(minPayout)}</span></div>
+                <div className={s.taskBody}><b>{fm(withdrawable)} sẵn sàng rút</b><span>Trên mức tối thiểu {fm(minPayout)}</span></div>
                 <Btn sm onClick={() => setActive("wallet")}>Rút tiền</Btn>
               </div>
             </Panel>
@@ -222,8 +228,8 @@ export default function CreatorDashboard() {
               {money.gross > 0 ? (
                 <MoneySpine segments={[
                   { label: " chờ đối soát", amount: fm(money.pending), value: money.pending, color: "var(--warn)" },
-                  { label: " khả dụng", amount: fm(money.available), value: money.available, color: "var(--info)" },
-                  { label: " đã nhận", amount: fm(money.paid), value: money.paid, color: "var(--ok)" },
+                  { label: " rút được", amount: fm(withdrawable), value: withdrawable, color: "var(--info)" },
+                  { label: " đã nhận", amount: fm(paidOut), value: paidOut, color: "var(--ok)" },
                 ]} />
               ) : <Empty>Chưa có thu nhập ở thị trường {market}.<br />Tham gia chiến dịch để bắt đầu.</Empty>}
             </Panel>
@@ -263,8 +269,8 @@ export default function CreatorDashboard() {
           <div className={`${s.grid} ${s.kpiGrid}`}>
             <Kpi label="Tổng Gross" icon="coins" tone="neutral" value={fm(money.gross)} usd={usd(money.gross)} />
             <Kpi label="Thuế (demo)" icon="scale" tone="warn" value={fm(money.tax)} sub={<>{market === "VN" ? "10%" : "8%"} synthetic</>} />
-            <Kpi label="Net thực nhận" icon="chart" tone="ok" value={fm(money.net)} usd={usd(money.net)} />
-            <Kpi label="Khả dụng để rút" icon="wallet" tone="info" value={fm(money.available)} />
+            <Kpi label="Net thực nhận" icon="chart" tone="ok" value={fm(money.net)} usd={usd(money.net)} sub={<>tổng đã duyệt (trọn đời)</>} />
+            <Kpi label="Khả dụng để rút" icon="wallet" tone="info" value={fm(withdrawable)} sub={<>= số dư ví (đã trừ đã rút)</>} />
           </div>
           <Panel title="Sổ thu nhập" sub="Gross − Thuế = Net, luôn tính lại">
             {earnings.length ? (
@@ -297,7 +303,7 @@ export default function CreatorDashboard() {
         <WalletPanel
           market={market} fm={fm} wallet={wallet}
           busy={payoutBusy} err={payoutErr}
-          onRequestPayout={() => void onPayout(wallet?.withdrawableMinor ?? 0)}
+          onPayout={(amt) => void onPayout(amt)}
         />
       )}
     </Shell>
@@ -363,7 +369,9 @@ function MyCampaigns({
   submitErr: string | null;
   onSubmit: (campaignId: string, url: string, caption: string) => void;
 }) {
+  const submitTitle = mine.find((p) => p.campaignId === submitFor)?.campaignTitle ?? null;
   return (
+    <>
     <Panel title="Chiến dịch của tôi" sub="trạng thái tham gia + nội dung">
       {mine.length === 0 ? (
         <Empty>Chưa tham gia chiến dịch nào ở thị trường này.</Empty>
@@ -389,9 +397,10 @@ function MyCampaigns({
         </div>
       )}
 
+    </Panel>
+
       {submitFor && (
-        <div className={s.field} style={{ marginTop: 18, borderTop: "1px solid var(--line-soft)", paddingTop: 16 }}>
-          <h3 style={{ margin: "0 0 12px" }}>Nộp nội dung</h3>
+        <Modal title="Nộp nội dung" sub={submitTitle ? `Chiến dịch: ${submitTitle}` : undefined} onClose={() => setSubmitFor(null)}>
           {submitErr && <div style={{ marginBottom: 10 }}><Chip tone="danger">{submitErr}</Chip></div>}
           <div className={s.field}>
             <label>URL nội dung</label>
@@ -408,9 +417,9 @@ function MyCampaigns({
             </Btn>
             <Btn variant="ghost" disabled={submitBusy} onClick={() => setSubmitFor(null)}>Huỷ</Btn>
           </div>
-        </div>
+        </Modal>
       )}
-    </Panel>
+    </>
   );
 }
 
@@ -423,18 +432,32 @@ function stateTone(state: string): "danger" | "info" | "ok" | "warn" | "neutral"
 }
 
 function WalletPanel({
-  market, fm, wallet, busy, err, onRequestPayout,
+  market, fm, wallet, busy, err, onPayout,
 }: {
   market: Market;
   fm: (v: number) => string;
   wallet: Wallet | null;
   busy: boolean;
   err: string | null;
-  onRequestPayout: () => void;
+  onPayout: (amountMinor: number) => void;
 }) {
   const available = wallet?.withdrawableMinor ?? 0;
   const min = wallet?.minPayoutMinor ?? 0;
-  const canWithdraw = available >= min && available > 0;
+  const exp = MARKETS[market].exponent;
+  const majorStr = (minor: number) => String(minor / 10 ** exp);
+
+  // Ô nhập số tiền — mặc định = toàn bộ khả dụng; reset khi số dư đổi (VD sau khi rút xong / đổi nước).
+  const [amountStr, setAmountStr] = useState(() => majorStr(available));
+  useEffect(() => { setAmountStr(majorStr(available)); }, [available, exp]);
+
+  const parsed = Number(amountStr.replace(/[\s,]/g, ""));
+  const amountMinor = Number.isFinite(parsed) ? Math.round(parsed * 10 ** exp) : NaN;
+  const hasBalance = available >= min && available > 0;
+  const validAmount = Number.isFinite(amountMinor) && amountMinor > 0;
+  const belowMin = validAmount && amountMinor < min;
+  const overBal = validAmount && amountMinor > available;
+  const canWithdraw = hasBalance && validAmount && !belowMin && !overBal && !busy;
+
   const history = wallet?.payouts ?? [];
   return (
     <div className={`${s.grid} ${s.split}`}>
@@ -443,11 +466,25 @@ function WalletPanel({
           <div className={`${s.kv} ${s.kvBig}`}><span className={s.k}><Icon name="wallet" size={15} /> Khả dụng để rút</span><span className={s.v}>{fm(available)}</span></div>
           <div className={s.kv}><span className={s.k}>Mức rút tối thiểu</span><span className={s.v}>{fm(min)}</span></div>
           {err && <div style={{ marginTop: 10 }}><Chip tone="danger">{err}</Chip></div>}
+          {hasBalance && (
+            <div className={s.field} style={{ marginTop: 14 }}>
+              <label>Số tiền muốn rút (trong phạm vi khả dụng)</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input className={s.input} inputMode="decimal" value={amountStr} disabled={busy}
+                  onChange={(e) => setAmountStr(e.target.value)} data-testid="creator-payout-amount" placeholder={majorStr(available)} />
+                <Btn sm disabled={busy} onClick={() => setAmountStr(majorStr(available))}>Toàn bộ</Btn>
+              </div>
+              {belowMin && <div className={s.fieldHint}>Dưới mức tối thiểu {fm(min)}.</div>}
+              {overBal && <div className={s.fieldHint}>Vượt số dư khả dụng {fm(available)}.</div>}
+              {!validAmount && amountStr.trim() !== "" && <div className={s.fieldHint}>Nhập số hợp lệ.</div>}
+            </div>
+          )}
           <div style={{ marginTop: 14 }}>
-            <Btn block variant="primary" disabled={!canWithdraw || busy} testId="creator-request-payout" onClick={onRequestPayout}>
-              <Icon name="lock" size={16} /> {busy ? "Đang xử lý…" : "Yêu cầu rút tiền (OTP)"}
+            <Btn block variant="primary" disabled={!canWithdraw} testId="creator-request-payout"
+              onClick={() => onPayout(amountMinor)}>
+              <Icon name="lock" size={16} /> {busy ? "Đang xử lý…" : hasBalance ? `Yêu cầu rút ${validAmount ? fm(amountMinor) : ""} (OTP)` : "Yêu cầu rút tiền (OTP)"}
             </Btn>
-            {!canWithdraw && <div style={{ fontSize: 12, color: "var(--text-mute)", marginTop: 8, textAlign: "center" }}>Số dư dưới mức tối thiểu — chưa thể rút.</div>}
+            {!hasBalance && <div style={{ fontSize: 12, color: "var(--text-mute)", marginTop: 8, textAlign: "center" }}>Số dư dưới mức tối thiểu — chưa thể rút.</div>}
           </div>
         </Panel>
         <Note>OTP demo được server tự công bố kèm phản hồi nên bấm 1 lần là rút xong. Khi rút, tiền được <b>reserve</b> khỏi số dư ngay. Nếu provider báo <b>FAIL</b> → hoàn về ví đúng 1 lần. Nếu <b>UNKNOWN</b> → giữ tiền chờ Finance xác minh, không tự hoàn.</Note>
@@ -480,4 +517,3 @@ function PayoutChip({ state }: { state: string }) {
   const v = PAYOUT_MAP[state as keyof typeof PAYOUT_MAP] ?? (["info", "clock", state] as const);
   return <Chip tone={v[0]} icon={v[1]}>{v[2]}</Chip>;
 }
-

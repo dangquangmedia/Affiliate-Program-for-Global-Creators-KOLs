@@ -416,6 +416,33 @@
 }
 .input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
 .inputLock { opacity: 0.55; }
+.fieldHint { font-size: 11.5px; margin-top: 6px; color: var(--danger); }
+
+/* Modal (dialog nổi giữa màn) — dùng cho form nộp nội dung */
+.modalScrim {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: #05070ccc; backdrop-filter: blur(4px);
+  animation: modalFade 0.14s ease;
+}
+.modalCard {
+  width: 100%; max-width: 480px; max-height: calc(100vh - 48px); overflow-y: auto;
+  background: linear-gradient(180deg, var(--surface), var(--surface-deep));
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg); padding: 22px;
+  animation: modalRise 0.16s ease;
+}
+.modalHead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.modalHead h3 { margin: 0; font-size: 17px; font-weight: 700; flex: 1; }
+.modalSub { font-size: 12.5px; color: var(--text-dim); margin: 0 0 16px; }
+.modalClose {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: var(--r-sm); font-size: 15px; line-height: 1;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--text-dim); cursor: pointer;
+}
+.modalClose:hover { color: var(--text); border-color: var(--brand); }
+@keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* reward-rule axis picker */
 .axis { display: flex; flex-direction: column; gap: 8px; }

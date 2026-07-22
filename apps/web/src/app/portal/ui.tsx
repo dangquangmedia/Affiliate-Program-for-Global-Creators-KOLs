@@ -303,4 +303,29 @@ export function Empty({ children }: { children: ReactNode }) {
   return <div className={s.emptyState}><Icon name="compass" size={30} /><div>{children}</div></div>;
 }
 
+/* --------------------------- Modal ---------------------------------- */
+// Dialog nổi giữa màn: hiện ngay bất kể vị trí nút đã bấm (không bị đẩy khuất dưới bảng dài).
+// Đóng khi bấm nền mờ hoặc Esc. Nội dung không đóng khi click (stopPropagation).
+export function Modal({ title, sub, onClose, children }: {
+  title: string; sub?: string; onClose: () => void; children: ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className={s.modalScrim} onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={s.modalCard} onClick={(e) => e.stopPropagation()}>
+        <div className={s.modalHead}>
+          <h3>{title}</h3>
+          <button className={s.modalClose} onClick={onClose} aria-label="Đóng" type="button">✕</button>
+        </div>
+        {sub && <p className={s.modalSub}>{sub}</p>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export { s as css };
