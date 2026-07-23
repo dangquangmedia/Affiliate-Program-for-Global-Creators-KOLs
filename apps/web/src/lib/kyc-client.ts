@@ -1,7 +1,6 @@
 // Client trình duyệt cho KYC (N8). Bearer từ session đã lưu.
+import { API_BASE } from "./api-base";
 import { loadSession } from "./auth-client";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
 
 export type FieldState = "EMPTY" | "FILLED" | "ACCEPTED" | "NEEDS_CHANGES";
 export type CaseState = "DRAFT" | "SUBMITTED" | "RESUBMITTED" | "APPROVED" | "REJECTED";

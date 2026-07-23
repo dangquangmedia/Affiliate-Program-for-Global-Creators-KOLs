@@ -1,7 +1,6 @@
 // Client trình duyệt gọi API country-context (N7). Mọi request gắn Bearer từ session đã lưu.
+import { API_BASE } from "./api-base";
 import { loadSession } from "./auth-client";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
 
 export interface CountryContext {
   market: string;

@@ -2,8 +2,7 @@
 // Token lưu localStorage; mọi request sau gắn `Authorization: Bearer <token>`.
 // Đây là "spine chạy thật" chạm tới trình duyệt: đăng nhập tạo user + session THẬT trong DB.
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+import { API_BASE } from "./api-base";
 
 const STORAGE_KEY = "ag_session";
 

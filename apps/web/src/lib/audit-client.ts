@@ -1,7 +1,6 @@
 // Client trình duyệt cho nhật ký audit (N17, AD-02). Chỉ Global Admin đọc được. Bearer từ session.
+import { API_BASE } from "./api-base";
 import { loadSession } from "./auth-client";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
 
 export interface AuditEvent {
   id: string;

@@ -1,7 +1,6 @@
 // Client trình duyệt cho dashboard thu nhập + sổ cái (N12). Bearer từ session đã lưu.
+import { API_BASE } from "./api-base";
 import { loadSession } from "./auth-client";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
 
 export interface Earning {
   id: string;

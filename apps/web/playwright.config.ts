@@ -34,10 +34,9 @@ export default defineConfig({
       url: "http://localhost:3200",
       reuseExistingServer: false,
       timeout: 30_000,
-      env: {
-        API_BASE_URL: "http://localhost:3101",
-        NEXT_PUBLIC_API_BASE_URL: "http://localhost:3101",
-      },
+      // Chỉ đặt biến phía server: trình duyệt gọi `/api-proxy`, Next rewrite về đây. Không đặt
+      // `NEXT_PUBLIC_*` để cổng test không bị nhúng vào bundle dùng chung với `dev:web`.
+      env: { API_BASE_URL: "http://localhost:3101" },
     },
   ],
 });

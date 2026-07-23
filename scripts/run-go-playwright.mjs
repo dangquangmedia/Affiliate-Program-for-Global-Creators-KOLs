@@ -30,11 +30,9 @@ const nextBin = resolve(root, "apps/web/node_modules/next/dist/bin/next");
 const web = spawn(process.execPath, [nextBin, "dev", "-p", "3200"], {
   cwd: resolve(root, "apps/web"),
   stdio: "ignore",
-  env: {
-    ...childEnv,
-    API_BASE_URL: "http://localhost:3101",
-    NEXT_PUBLIC_API_BASE_URL: "http://localhost:3101",
-  },
+  // Chỉ biến phía server: trình duyệt gọi `/api-proxy`, Next rewrite về API test. Đặt
+  // `NEXT_PUBLIC_*` sẽ nhúng cổng test vào bundle dùng chung `.next` với `dev:web`.
+  env: { ...childEnv, API_BASE_URL: "http://localhost:3101" },
 });
 
 async function waitFor(url, child, label) {
