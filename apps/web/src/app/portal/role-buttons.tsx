@@ -53,7 +53,7 @@ export function RoleGrid({ roles }: { roles: readonly RoleCardData[] }) {
             <span className={s.rcIcon}><Icon name={r.icon} size={22} /></span>
             <span className={s.rcName}>{r.name}</span>
             <span className={s.rcDesc}>{r.desc}</span>
-            <span className={s.rcGo}>Mở dashboard <Icon name="arrow" size={15} /></span>
+            <span className={s.rcGo}>Mở <Icon name="arrow" size={15} /></span>
           </button>
         ))}
       </div>

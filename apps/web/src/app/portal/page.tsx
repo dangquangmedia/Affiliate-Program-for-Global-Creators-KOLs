@@ -10,20 +10,20 @@ export const metadata = { title: "Affiliate GLOBAL · Control Center" };
 
 const ROLES = [
   { key: "creator", name: "Creator", color: "#6e7bff", icon: "spark",
-    desc: "Hoàn tất KYC, tham gia chiến dịch, nộp nội dung và rút thu nhập theo từng thị trường." },
+    desc: "KYC → chiến dịch → nộp nội dung → rút tiền" },
   { key: "ops", name: "Local Ops", color: "#5ab0f0", icon: "shield",
-    desc: "Duyệt KYC và nội dung theo từng field; khoá đúng thị trường được phân công." },
+    desc: "Duyệt KYC & nội dung theo từng nước" },
   { key: "admin", name: "Local Admin", color: "#2dd4bf", icon: "sliders",
-    desc: "Tạo & quản chiến dịch với quy tắc thưởng 3 trục; ngân sách = số suất × đơn giá." },
+    desc: "Tạo & quản chiến dịch, quy tắc thưởng" },
   { key: "finance", name: "Local Finance", color: "#35d08a", icon: "scale",
-    desc: "Đối soát, khoá batch (bất biến) và xử lý payout 3 trạng thái an toàn tiền." },
+    desc: "Đối soát, khoá batch & payout an toàn" },
   { key: "global", name: "Global Admin", color: "#f6b44c", icon: "globe",
-    desc: "Vai duy nhất vượt biên giới: cấu hình nước, cờ tính năng và nhật ký audit toàn cục." },
+    desc: "Cấu hình nước, cờ tính năng, audit toàn cục" },
 ] as const;
 
 export default function PortalLanding() {
   return (
-    <div className={s.app} data-market="VN" data-portal-root>
+    <div className={s.app} data-market="VN" data-portal-root data-shell-variant="passport">
       <div className={s.landing}>
         <div className={s.landFrame}>
           {/* header: brand trái · theme + prototype góc phải */}
@@ -38,24 +38,25 @@ export default function PortalLanding() {
             </div>
           </header>
 
-          {/* hero */}
+          {/* hero gọn: bản sắc trạm + 1 dòng phụ + dải số liệu mảnh */}
           <section className={s.hero}>
-            <span className={s.heroEyebrow}><Icon name="spark" size={13} /> Nền tảng affiliate đa quốc gia · VN &amp; PH</span>
-            <h1 className={s.heroTitle}>Chào mừng đến <em>Trung tâm điều hành</em></h1>
-            <p className={s.heroSub}>
-              Chọn vai của bạn để mở đúng bảng điều khiển. Mỗi thị trường có dữ liệu, tiền tệ và quy
-              trình tách biệt — từ nội dung được duyệt tới lúc rút tiền, mọi trạng thái đều minh bạch
-              và mọi quyết định đều để lại vết.
-            </p>
-            <div className={s.heroStats}>
-              <div className={s.heroStat}><b>2</b><span>thị trường · VND / PHP</span></div>
-              <div className={s.heroStat}><b>5</b><span>vai điều hành</span></div>
-              <div className={s.heroStat}><b>3</b><span>kết cục payout an toàn</span></div>
-              <div className={s.heroStat}><b>100%</b><span>quyết định có audit</span></div>
+            <div className={s.heroMain}>
+              <div>
+                <span className={s.heroEyebrow}>Nền tảng affiliate đa quốc gia · VN &amp; PH</span>
+                <h1 className={s.heroTitle}>Trạm điều hành biên giới</h1>
+                <p className={s.heroSub}>
+                  Chọn quầy để mở đúng bảng điều khiển — mỗi nước tách biệt dữ liệu, tiền tệ và quy trình.
+                </p>
+              </div>
+              <div className={s.heroStats}>
+                <div className={s.heroStat}><b>2</b><span>thị trường · VND / PHP</span></div>
+                <div className={s.heroStat}><b>5</b><span>vai điều hành</span></div>
+                <div className={s.heroStat}><b>3</b><span>kết cục payout an toàn</span></div>
+                <div className={s.heroStat}><b>100%</b><span>quyết định có audit</span></div>
+              </div>
             </div>
           </section>
 
-          <div className={s.roleGridTitle}>Vào bảng điều khiển theo vai</div>
           <RoleGrid roles={ROLES} />
 
           <div className={s.landFoot}>
