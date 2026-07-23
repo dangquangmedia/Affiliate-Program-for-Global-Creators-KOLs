@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -q -m ' *)",
+      "Bash(python build_deck_v2.py)",
+      "Bash(which soffice *)",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/LibreOffice/program/**)",
+      "Bash(go test *)"
+    ]
+  }
+}

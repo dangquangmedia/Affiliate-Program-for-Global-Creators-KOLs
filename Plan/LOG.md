@@ -636,3 +636,443 @@ Sau khi dự án đã đóng N1–N20, Anh Quang giao 3 việc (ưu tiên Việc
   Cloud SQL, Secret Manager, migration/reclaim job qua Cloud Run Job, Cloud Scheduler, deploy frontend
   trỏ Go staging, smoke/E2E trên staging). Việc này cần thông tin/quyền truy cập GCP thật từ Anh
   Quang (project id, billing, service account) — chưa có trong phiên nào trước đó.
+
+---
+
+## Current State & Hand-off (cập nhật 2026-07-22 — sau Go rewrite: kiểm kê + bảo mật, MỚI NHẤT)
+
+**1. Vừa xong / trạng thái:**
+- Go backend rewrite (Tuần 1-6) đã **commit + push** (`7313720`, xem hand-off ngay phía trên). Sau
+  đó Anh Quang xác nhận **Tuần 7-8 = thuần deploy hạ tầng (GCP)**, tạm dừng — chờ quyền truy cập
+  GCP thật (project id/billing/service account) mới làm tiếp, không tự bắt đầu.
+- **Sửa lỗi runtime `/portal`**: stale webpack chunk (`Cannot find module './169.js'`) do `.next`
+  cache lệch sau thay đổi lớn — đã kill process cũ, xoá `apps/web/.next`, restart `dev:web` sạch.
+  Không phải bug code.
+- **Kiểm kê toàn repo** (agent Explore, background) tìm file thừa/lỗi thời — kết quả:
+  - **Chắc chắn lỗi thời** (CHƯA SỬA — Anh Quang bảo dừng để compact): `docs/ARCHITECTURE.md` (mô
+    tả NestJS/Prisma, không nhắc Go — sai lệch nghiêm trọng nhất); `docs/HARD_PROBLEMS.md` +
+    `Report/MENTOR_QA.md` (bằng chứng "file:dòng" vẫn trỏ `apps/api/prisma/schema.prisma` thay vì
+    Go tương ứng); `Report/Affiliate_GLOBAL_Prototype_Review.pptx` (dựng 21/07, TRƯỚC Go rewrite
+    22/07 — không phản ánh backend Go/105 test/25 E2E).
+  - `Plan/KE_HOACH_V2.md`: phần N11-N20 giả định NestJS xuyên suốt, không còn khớp thực tế (rẽ
+    sang Go giữa chừng) — nên có dòng ghi chú trỏ sang `GO_BACKEND_REWRITE_PLAN.md`, chưa làm.
+  - `prisma.config.ts` (root): xác nhận orphan (không script nào gọi) → **ĐÃ XOÁ** (`git rm`,
+    chưa commit).
+  - Không cần làm gì thêm: `requirements/Book1.xlsx` (bản chính hợp lệ), `Plan/`/`Report/GO_WEEK*`/
+    `scripts/`/`.gitignore` đều ổn, không rác.
+- **Đánh giá bảo mật toàn dự án** (tự làm, không delegate — đã có ngữ cảnh sâu sẵn): KHÔNG có lỗ
+  hổng nghiêm trọng trong logic nghiệp vụ/luồng tiền. Tốt: token session 32-byte `crypto/rand` +
+  SHA-256 hash lưu DB (không lưu thô); sqlc parameterized 100% (không SQLi); CORS đúng 1 origin;
+  panic recovery không lộ stack trace; access log không ghi token/OTP/PII; không
+  `dangerouslySetInnerHTML`; không SSRF (backend không tự fetch URL người dùng). Khoảng hở (chưa
+  sửa, mức trung bình/thấp): (a) không có rate-limit ở login/OTP/payout — cần trước production
+  thật; (b) token lưu `localStorage` không phải httpOnly cookie — thiếu lớp phòng thủ sâu nếu có
+  XSS; (c) OTP mock trả thẳng mã trong response (đã công bố, chỉ cần bỏ khi nối OTP thật); (d)
+  Go API chưa có security header (CSP/HSTS/X-Frame-Options) — chuẩn hoá ở Tuần 7 Cloud Run; (e)
+  `pnpm audit`: 2 high + 3 moderate, nhưng 4/5 nằm trong dev-tooling chain Prisma CLI (không chạy
+  runtime), 1 (`sharp`) là dependency không dùng tới (repo không dùng `next/image` ở đâu) → rủi ro
+  thực tế thấp, nên `pnpm audit fix` cho sạch khi có dịp.
+
+**2. File/biến quan trọng đang thao tác:**
+- `prisma.config.ts` — đã `git rm`, **CHƯA commit** (chờ quyết định gộp commit lần tới).
+- Chưa file nào khác bị sửa trong phiên "dọn dẹp" này — 4 việc "chắc chắn lỗi thời" ở mục 1 vẫn
+  NGUYÊN VẸN, chưa đụng tới.
+
+**3. NHIỆM VỤ ĐẦU PHIÊN SAU** (theo đúng thứ tự Anh Quang đã đồng ý — "tiến hành luôn cả 4 việc"):
+1. Viết lại `docs/ARCHITECTURE.md` phản ánh đúng Go backend (`apps/api-go`) là hệ thống thật; giữ
+   phần NestJS như "lịch sử/oracle" (không xoá, chỉ đổi vai trò mô tả).
+2. Sửa tham chiếu "file:dòng" lỗi thời trong `docs/HARD_PROBLEMS.md` + `Report/MENTOR_QA.md` sang
+   code Go tương ứng (không viết lại toàn bộ, chỉ cập nhật bằng chứng).
+3. Dựng lại `Report/Affiliate_GLOBAL_Prototype_Review.pptx` phản ánh Go rewrite + `/portal` UI mới
+   nhất.
+4. Thêm dòng ghi chú đầu `Plan/KE_HOACH_V2.md` trỏ sang `GO_BACKEND_REWRITE_PLAN.md` cho giai đoạn
+   hậu N10.
+- **Sau đó**: brainstorm hướng **UI sáng tạo mới cho `/portal`** — Anh Quang yêu cầu rõ "không được
+  tạo cảm giác AI chung chung". Đây là việc CREATIVE, bắt buộc dùng skill `superpowers:brainstorming`
+  (hard gate: không code/scaffold trước khi trình bày thiết kế và được duyệt) — hỏi từng câu một,
+  không dồn nhiều câu hỏi 1 lúc. CHƯA bắt đầu brainstorm trong phiên này.
+- Việc phụ (khi rảnh, không khẩn): `pnpm audit fix` dọn 5 vulnerability npm; cân nhắc thêm
+  rate-limit + chuyển session token sang httpOnly cookie nếu tiến gần production thật hơn.
+
+**Môi trường:** Postgres Docker port 5433; Go API `dev:api` port 3001; web `dev:web` port 3000
+(vừa restart sạch, `.next` mới). `git status`: `prisma.config.ts` đã stage xoá, chưa commit.
+
+---
+
+## Current State & Hand-off (cập nhật 22/07/2026 — 4 việc dọn tài liệu xong, MỚI NHẤT)
+
+**1. Vừa xong — cả 4 việc tài liệu theo đúng thứ tự đã chốt:**
+1. **`docs/ARCHITECTURE.md` viết lại toàn bộ**: Go (`apps/api-go`) là hệ thống thật (module,
+   sơ đồ request, auth/session, quyết định kỹ thuật đều mô tả Go/chi/pgx/sqlc); thêm mục 2 giải
+   thích "vì sao port từ NestJS sang Go" + bằng chứng port đúng (105/105 + 13/13 differential +
+   25/25 E2E); NestJS đổi vai thành "oracle lịch sử", không xoá.
+2. **`docs/HARD_PROBLEMS.md`**: toàn bộ 8 mục "Chứng minh trong code" đã đổi từ
+   `apps/api/src/*.ts` + `schema.prisma` sang `apps/api-go/internal/*` + `db/queries/*.sql` +
+   `db/migrations/*.sql` — lấy file:dòng thật bằng cách đọc trực tiếp code Go (dùng Explore agent
+   xác minh từng dòng, không đoán), không đổi phần lý luận/bài toán (vẫn đúng nguyên văn).
+3. **`Report/MENTOR_QA.md`**: sửa Q13/Q14 (kiến trúc/luồng request) từ Prisma/SessionAuthGuard
+   sang Go/chi middleware; Q27/Q28 (bằng chứng test) từ số cũ "44/44, E2E 12/12" sang số thật
+   hiện tại (105/105 parity + 13/13 differential + 25/25 E2E + race); Q32-34 (hướng phát triển)
+   từ "money spine chưa làm, N11-N20 kế hoạch" sang đúng thực tế: money spine + Go rewrite ĐÃ
+   xong, còn lại thuần deploy GCP (Tuần 7-8, đang tạm dừng). Nhóm 0-8 (5 điểm cấn, DB, bảo mật…)
+   giữ nguyên vì đó là quyết định sản phẩm/dữ liệu, không đổi khi đổi backend.
+4. **`Report/Affiliate_GLOBAL_Prototype_Review.pptx`**: sửa bằng `python-pptx` (edit text run tại
+   chỗ, không dựng lại từ đầu — giữ nguyên thiết kế/màu/layout đã có): sơ đồ luồng request slide 5
+   "Prisma / DB" → "Go · pgx / sqlc"; số liệu E2E "17/17" → "25/25" ở cả 2 chỗ (slide 6 + 7); mô
+   tả bằng chứng slide 6 cập nhật "105 legacy + 13 differential Nest↔Go, RACE 4 điểm bắt buộc";
+   slide 8 sửa link tài liệu chết (`Report/REQUIREMENT_TRACEABILITY_MATRIX.md` đã bị xoá ở phiên
+   trước) → trỏ sang `Plan/GO_BACKEND_REWRITE_PLAN.md`; và dòng "hiện tại" ghi rõ chạy trên
+   backend Go. **Không thay ảnh chụp màn hình** trong slide (1/3/6/7 có ảnh cũ) — máy không có
+   LibreOffice/công cụ render pptx để xem lại kết quả sau khi chèn ảnh mới, chèn mù có rủi ro lệch
+   khung/vỡ tỉ lệ ảnh mà không kiểm chứng được, nên ưu tiên an toàn: chỉ sửa text (đã verify lại
+   bằng cách đọc ngược nội dung pptx sau khi lưu, không phải đoán). Nếu muốn ảnh /portal mới nhất
+   trong slide, cần làm ở máy có PowerPoint/LibreOffice để xem trước khi chốt.
+5. **`Plan/KE_HOACH_V2.md`**: thêm đoạn ghi chú ngay đầu file nói rõ N1-N10 chạy trên NestJS/
+   Prisma đúng như mô tả, hậu N10 backend viết lại sang Go theo yêu cầu mentor, quyết định sản
+   phẩm/dữ liệu N11-N20 vẫn đúng nguyên văn, trỏ sang `Plan/GO_BACKEND_REWRITE_PLAN.md` cho giai
+   đoạn Go.
+
+**2. Chưa commit** — toàn bộ sửa đổi trên (`docs/ARCHITECTURE.md`, `docs/HARD_PROBLEMS.md`,
+`Report/MENTOR_QA.md`, `Report/Affiliate_GLOBAL_Prototype_Review.pptx`, `Plan/KE_HOACH_V2.md`)
+cộng `prisma.config.ts` (đã `git rm` từ phiên trước) đều đang là working-tree change, **chưa ai
+yêu cầu commit** trong phiên này — theo git safety protocol, chỉ commit khi Anh Quang yêu cầu rõ.
+
+**3. NHIỆM VỤ ĐẦU PHIÊN SAU (nếu chưa làm trong phiên này):**
+- Hỏi Anh Quang có muốn commit+push đợt dọn tài liệu này không.
+- Bắt đầu **brainstorm UI sáng tạo mới cho `/portal`** — yêu cầu rõ "không được tạo cảm giác AI
+  chung chung". Dùng skill `superpowers:brainstorming` (hard gate: không code/scaffold trước khi
+  trình bày thiết kế và được duyệt), hỏi từng câu một. Nếu phiên này đã bắt đầu brainstorm, xem
+  tiếp phần hội thoại/thiết kế đã chốt tới đâu thay vì hỏi lại từ đầu.
+
+**Môi trường:** không đổi — Postgres Docker 5433, Go API `dev:api` 3001, web `dev:web` 3000 (đã
+xác nhận cả hai đang chạy 200 OK trong phiên này).
+
+---
+
+## Current State & Hand-off (cập nhật 22/07/2026 — brainstorm UI Creator xong, plan sẵn sàng, MỚI NHẤT)
+
+**1. Vừa xong — brainstorm UI sáng tạo `/portal` (dùng skill `superpowers:brainstorming` rồi
+`superpowers:writing-plans`, đã qua visual companion để Anh Quang chọn trực tiếp bằng mắt):**
+- Concept đã chốt: **"Trạm điều hành biên giới" — Con dấu hộ chiếu** (navy `#121B3A` + vàng đồng
+  `#D9A441`, tên/section dùng serif, số tiền dùng monospace). Ẩn dụ khớp đúng bất biến kỹ thuật
+  thật: audit append-only = "mọi quyết định đều có dấu". Anh Quang chọn hướng này sau khi xem 3
+  bảng màu trực quan (loại "Tháp kiểm soát ban đêm" và "Trạm hải quan song ngữ").
+- Bố cục đã chốt: **kết hợp** header kiểu "trang bìa hộ chiếu" (tên/quốc gia/tem trạng thái KYC)
+  + tab ngang kiểu dấu mộc (thay sidebar) + rail icon dọc thu nhỏ cho control phụ (đổi nước/theme/
+  thông báo/đăng xuất). Đã xem mockup gần đúng trang thật (đúng nội dung KYC/chiến dịch/thu nhập/
+  ví hiện có) trước khi chốt.
+- **Phạm vi đã chốt: chỉ Creator dashboard trước** (không đụng Ops/Admin/Finance/Global Admin ở
+  phiên này) — làm mẫu, duyệt xong mới nhân ra 4 dashboard còn lại ở phiên sau.
+- Design doc: `docs/superpowers/specs/2026-07-22-portal-creator-passport-theme-design.md` (đã tự
+  rà soát placeholder/mơ hồ, đã được Anh Quang duyệt).
+- Kế hoạch code: `docs/superpowers/plans/2026-07-22-portal-creator-passport-theme.md` — **4 task**,
+  mỗi task có bước chạy Playwright regression cụ thể + commit riêng:
+  1. Thêm CSS token passport (`.app[data-shell-variant="passport"]`) vào `portal.module.css` —
+     thuần cộng thêm, chưa ai gọi tới nên không ảnh hưởng gì.
+  2. Thêm prop tùy chọn `variant="passport"` + `kycOk` vào `Shell` (`ui.tsx:97-190`) — nhánh
+     render mới hoàn toàn tách biệt, nhánh mặc định (không truyền `variant`) giữ y hệt code hiện
+     tại → 4 dashboard còn lại KHÔNG bị ảnh hưởng (bằng chứng: chạy lại đúng spec Playwright của
+     chúng, phải xanh y như trước).
+  3. Thêm prop tùy chọn `stamp` vào `Kpi` (`ui.tsx:225-236`) — tem trạng thái xoay nghiêng ở góc
+     card, mặc định không truyền thì không đổi gì.
+  4. Nối `creator/page.tsx` dùng `variant="passport"` + gắn `stamp` cho đúng 2 KPI ("Trạng thái
+     KYC", "Thu nhập chờ đối soát") theo đúng quy tắc trong spec.
+- **Ràng buộc bắt buộc xuyên suốt cả 4 task**: không đổi bất kỳ `data-testid` nào (toàn bộ E2E
+  dựa vào đó), không đổi logic/fetch/state trong `creator/page.tsx`, dark/light toggle phải tiếp
+  tục hoạt động, 4 dashboard còn lại phải render y hệt (có specs riêng để verify).
+- Anh Quang chọn cách thực thi: **tự code trực tiếp trong phiên (không qua subagent-driven-
+  development)** vì phạm vi nhỏ.
+
+**2. Chưa bắt đầu code** — plan đã duyệt nhưng **0/4 task đã thực thi**. Anh Quang yêu cầu dừng ở
+đây để `/compact` trước khi làm tiếp.
+
+**3. Việc khác còn treo từ phiên trước (chưa quyết định, KHÔNG liên quan việc trên):**
+- Chưa commit: `docs/ARCHITECTURE.md`, `docs/HARD_PROBLEMS.md`, `Report/MENTOR_QA.md`,
+  `Report/Affiliate_GLOBAL_Prototype_Review.pptx`, `Plan/KE_HOACH_V2.md` (đợt dọn tài liệu Go
+  rewrite) + `prisma.config.ts` (đã `git rm`). Cộng thêm phiên này: `.gitignore` (+`.superpowers/`),
+  2 file spec/plan mới trong `docs/superpowers/`. Tất cả đang là working-tree change, **chưa ai
+  yêu cầu commit**.
+
+**4. NHIỆM VỤ ĐẦU PHIÊN SAU:**
+1. Đọc `docs/superpowers/plans/2026-07-22-portal-creator-passport-theme.md` — bắt đầu thực thi
+   **Task 1** (CSS token), theo đúng thứ tự Step 1→4 trong file (baseline test trước, thêm CSS,
+   test lại, commit). Không cần hỏi lại Anh Quang về hướng thiết kế — đã chốt xong, chỉ còn code.
+2. Sau khi xong cả 4 task của Creator: hỏi Anh Quang có muốn nhân rộng sang Ops/Admin/Finance/
+   Global Admin luôn không, hay dừng lại để duyệt Creator trước.
+3. Tiện thể hỏi Anh Quang có muốn commit đợt dọn tài liệu Go rewrite (mục 3 ở trên) trước khi bắt
+   đầu code UI mới, để tránh gộp 2 việc không liên quan vào chung lịch sử git.
+
+**Môi trường:** không đổi — Postgres Docker 5433, Go API `dev:api` 3001, web `dev:web` 3000. Visual
+companion server (brainstorming) đã dừng sạch (`stop-server.sh`), mockup còn lưu ở
+`.superpowers/brainstorm/1425-1784736190/content/` nếu cần xem lại (đã thêm `.superpowers/` vào
+`.gitignore`).
+
+---
+
+## Current State & Hand-off (cập nhật 23/07/2026 — 4 task passport theme Creator XONG, MỚI NHẤT)
+
+**1. Đã thực thi trọn 4 task của `docs/superpowers/plans/2026-07-22-portal-creator-passport-theme.md`,
+mỗi task 1 commit riêng, tất cả regression xanh:**
+- Task 1 (`1c5cd8e`) — CSS token passport-theme, gated `data-shell-variant="passport"`.
+- Task 2 (`7a6a68a`) — `Shell` nhận `variant="passport"`/`kycOk`, nhánh mặc định byte-identical.
+- Task 3 (`428f331`) — `Kpi` nhận `stamp` tuỳ chọn (tem xoay nghiêng).
+- Task 4 (`065096f`) — Nối Creator dashboard vào variant, + 2 sửa phát sinh ngoài kế hoạch gốc
+  (phát hiện lúc kiểm tra thủ công bằng Playwright MCP):
+  - Nút "Đổi quốc gia" trong rail thiếu `onClick` trong bản kế hoạch gốc → mất chức năng đổi VN/PH
+    so với bản cũ. Đã nối `onClick={() => setMarket(market === "VN" ? "PH" : "VN")}`.
+  - Tab nav passport dùng thẻ `<nav>` làm `portal-cross-link.spec.ts` fail (spec dùng
+    `page.locator("aside").getByRole("button", {name})` để tránh nhầm "Chiến dịch" với "Join chiến
+    dịch" trong lưới campaign). Đã đổi thẻ bao tab nav từ `<nav>` sang `<aside>` (giống cách sidebar
+    gốc vốn không lồng `<nav>` bên trong).
+
+**2. Verify cuối cùng:** 17/17 Playwright spec xanh (9 spec Creator-touching + cross-link +
+4 dashboard còn lại + role-entry). Đã kiểm tra thủ công bằng Playwright MCP: dark theme, light
+theme, đổi VN/PH (cả 2 theme), modal "Nộp nội dung" ở cả dark/light — tất cả đúng palette navy/
+brass, không còn xanh-tím cũ, không có "nền trắng sót lại".
+
+**3. Lưu ý môi trường phát hiện được (không phải bug code):** có 1 tiến trình lạ đang lắng nghe
+port 3001 từ trước phiên này (không phải do phiên này khởi động) — nếu cần dev thủ công `apps/web`
+độc lập, nhớ set `NEXT_PUBLIC_API_BASE_URL`/`API_BASE_URL` trỏ đúng Go API (mặc định fallback trong
+code là `:3001`), và xoá `.next/` nếu đổi biến môi trường mà đổi không thấy hiệu lực (webpack cache
+có thể giữ giá trị inline cũ).
+
+**4. Đã hỏi Anh Quang 2 việc tồn đọng, quyết định:**
+- Rollout theme sang Ops/Admin/Finance/Global Admin: **CHƯA làm** — Anh Quang muốn tự xem Creator
+  trước khi bàn tiếp. Đừng tự động rollout ở phiên sau nếu chưa được hỏi lại.
+- Đợt dọn tài liệu Go rewrite (mục 3 ở phiên trước — `docs/ARCHITECTURE.md`,
+  `docs/HARD_PROBLEMS.md`, `Report/MENTOR_QA.md`, pptx, `Plan/KE_HOACH_V2.md`, xoá
+  `prisma.config.ts`): **vẫn để đó, chưa commit** theo yêu cầu — đừng tự ý commit đợt này ở phiên
+  sau nếu chưa được hỏi lại.
+
+**5. NHIỆM VỤ ĐẦU PHIÊN SAU:** không có việc mặc định — chờ Anh Quang chỉ đạo (có thể là duyệt
+Creator xong rồi bảo rollout, hoặc bảo commit đợt dọn tài liệu, hoặc việc khác hẳn).
+
+---
+
+## Current State & Hand-off (cập nhật 23/07/2026 — ĐÃ ROLLOUT passport sang 4 dashboard, MỚI NHẤT)
+
+**1. Anh Quang duyệt Creator + yêu cầu rollout → đã áp passport theme cho cả 4 dashboard còn lại**
+(Ops/Admin/Finance/Global). 1 commit `4a4ba10`. Cách làm:
+- Generalize `Shell` (ui.tsx): thêm prop tuỳ chọn `headerStamp?: { text; ok? }`. Creator vẫn dùng
+  đường KYC cũ (`kycOk`) → render **byte-identical**, không đổi hành vi. 4 vai kia truyền
+  `headerStamp` riêng: 3 vai staff khoá-nước (Ops/Admin/Finance) đóng dấu **"CÔNG VỤ"** (xanh),
+  Global Admin đóng dấu **"TOÀN CẦU"** (xanh). Mỗi dashboard chỉ thêm `variant="passport"` +
+  `headerStamp` vào call `<Shell>` — không đụng logic/fetch/state.
+- Global: bộ chuyển scope 3 trạng thái (ALL/VN/PH) nằm trong nội dung, **không đụng**; nút globe
+  rail chỉ toggle VN↔PH (vô hại vì control thật là strip trong content).
+- **KHÔNG thêm tem KPI** cho 4 vai này (tem KPI là accent riêng của Creator gắn trạng thái nhị phân
+  KYC/chờ-đối-soát; YAGNI cho vai khác).
+
+**2. Sửa 1 lỗi thật lộ ra khi rollout:** font serif **Georgia render sai dấu tiếng Việt chồng**
+(ầ/ằ/ẵ — dấu huyền tách rời lơ lửng, thấy rõ ở tên "Trần Vận Hành"). Đã đổi `.passportName` sang
+stack `Cambria, Georgia, "Times New Roman", serif` — Cambria là font hệ thống Windows (không phải
+webfont mới, đúng ràng buộc), render đúng; Georgia làm fallback. Đã cập nhật ghi chú trong file
+spec thiết kế. Kiểm chứng bằng Playwright MCP: Cambria render "Trần/Quản/Vũ/Hà" đúng dấu.
+
+**3. Verify:** 17/17 spec xanh sau rollout; chạy lại 7 spec dashboard sau khi đổi font → vẫn xanh.
+Typecheck `tsc --noEmit` sạch. Kiểm tra trực quan cả 4 dashboard bằng Playwright MCP (header/tab/
+rail/dấu đúng palette navy-brass, tên tiếng Việt đúng dấu). Đã dừng server dev + dọn screenshot.
+
+**4. Trạng thái theme:** giờ **cả 5 dashboard** (creator + ops + admin + finance + global) đều dùng
+passport theme. Cập nhật lại memory `project_portal_ui` cho khớp (trước ghi "chỉ Creator").
+
+**5. VẪN CHƯA COMMIT (không đổi từ phiên trước):**
+- Đợt dọn tài liệu Go rewrite (ARCHITECTURE.md, HARD_PROBLEMS.md, MENTOR_QA.md, pptx,
+  KE_HOACH_V2.md, xoá prisma.config.ts) — vẫn treo, chưa được yêu cầu commit.
+- 2 file `docs/superpowers/{specs,plans}/2026-07-22-portal-creator-passport-theme*` vẫn untracked
+  (gồm ghi chú font vừa thêm). Chưa commit tài liệu thiết kế theo nếp phiên trước.
+
+**6. NHIỆM VỤ ĐẦU PHIÊN SAU:** không có việc mặc định — chờ Anh Quang chỉ đạo.
+
+---
+
+## Current State & Hand-off (cập nhật 23/07/2026 — landing /portal đổi passport console)
+
+**1. Redesign trang landing `/portal`** (trang chọn vai) cho khớp passport + gọn 1 khung không
+scroll. 1 commit `6407de3`. Anh Quang chọn bố cục **"hàng 5 quầy ngang"**. Cách làm:
+- `portal/page.tsx`: thêm `data-shell-variant="passport"` lên gốc `.app` → palette navy/brass. Hero
+  thu gọn: bỏ tiêu đề 42px gradient cầu vồng → **tiêu đề serif "Trạm điều hành biên giới"**, 1 dòng
+  phụ ngắn, 4 số liệu thành dải mảnh ngang. Bỏ dòng `roleGridTitle`. **Rút gọn desc 5 vai còn 1
+  dòng** (đổi copy, đã được Anh Quang đồng ý khi chọn bố cục).
+- `portal.module.css`: `.roleGrid` → `repeat(5,1fr)`; nén `.roleCard`/hero/khung; `.heroTitle`
+  dùng serif Cambria; responsive 5→3 (≤1080) →2 (≤560). Đã xoá CSS `.roleGridTitle` (hết dùng).
+- `role-buttons.tsx`: nhãn nút "Mở dashboard" → "Mở →" cho vừa thẻ hẹp. **Không đụng** `enterAs`.
+- Spec: `docs/superpowers/specs/2026-07-23-portal-landing-passport-console-design.md` (untracked).
+
+**2. Verify:** typecheck sạch; `portal-role-entry` + `portal-cross-link` + `creator-login` (6/6)
+xanh (mọi `data-testid` giữ nguyên). Kiểm tra Playwright MCP ở 1440×900: `scrollHeight == innerHeight`
+(900=900) → **thấy đủ 5 quầy KHÔNG scroll**; dark + light đều đúng palette, tên serif đúng dấu. Đã
+dừng server + dọn screenshot.
+
+**3. TRẠNG THÁI PASSPORT THEME:** giờ **cả khu /portal** (landing + 5 dashboard) đều passport. Xong
+mạch redesign UI /portal.
+
+**4. VẪN CHƯA COMMIT (giữ nguyên, chưa được yêu cầu):**
+- Đợt dọn tài liệu Go rewrite (ARCHITECTURE.md, HARD_PROBLEMS.md, MENTOR_QA.md, pptx, KE_HOACH_V2.md,
+  xoá prisma.config.ts).
+- 3 file tài liệu thiết kế trong `docs/superpowers/{specs,plans}/` (2 file passport theme + 1 file
+  landing console vừa tạo) — vẫn untracked theo nếp chưa commit tài liệu thiết kế.
+
+**5. NHIỆM VỤ ĐẦU PHIÊN SAU:** không có việc mặc định — chờ Anh Quang chỉ đạo.
+
+---
+
+## Current State & Hand-off (cập nhật 23/07/2026 — cập nhật README/PRODUCT/pptx theo Go+UI mới, MỚI NHẤT)
+
+**1. Cập nhật 3 tài liệu Anh Quang yêu cầu (CHƯA COMMIT):**
+- `README.md`: lệnh chạy đối chiếu `package.json` thật — vốn ĐÃ đúng (Go `dev:api` 3001, `dev:web`
+  3000). Lệch thật: README trước chỉ dẫn mở `/mockup` `/vn` `/ph`, **thiếu hẳn `/portal`** (UI thật +
+  money spine). Đã thêm `/portal` làm màn chính, sửa bảng tài khoản demo + kịch bản demo sang
+  `/portal/{creator,ops,admin,finance,global}`, sửa dòng "Cấu trúc", thêm intro về Trung tâm điều
+  hành `/portal` + backend Go.
+- `docs/PRODUCT.md`: neo personas vào dashboard `/portal` thật + mô-típ "Trạm điều hành biên giới";
+  thêm subsection **"Trạng thái hiện thực hoá (build state)"** đối chiếu Go code: QĐ-1/2/3 + QĐ-4
+  (reclaim/strike — migration 000003, cmd/reclaim) + QĐ-5 (waitlist) ĐÃ build; QĐ-6/7/8 (apply-duyệt,
+  platform fee, escrow) mới thiết kế + chừa schema, CHƯA build runtime.
+- `Report/Affiliate_GLOBAL_Prototype_Review.pptx`: **thay 6 ảnh screenshot UI cũ (xanh-tím) → passport
+  dark** (Creator s1, Ops s3, Finance s6, Landing+Admin+Global s7). Chụp Playwright MCP dark theme,
+  đúng tỉ lệ box (không méo), thay bằng python-pptx giữ nguyên toạ độ/kích thước. Backup:
+  scratchpad `pptx_backup.pptx`.
+- Ngoài 3 file: sửa `docs/HARD_PROBLEMS.md` kịch bản demo 15' từ mockup (V01–V13) → `/portal` theo vai.
+
+**2. Data pptx đã verify khớp thực tế:** 25 E2E test ✓, 7 spec /portal ✓, 6 route /portal ✓,
+105/105 + 13 differential ✓, Go ✓. Màu chrome deck giữ nguyên (navy + accent màu-vai TRÙNG portal).
+
+**3. Số bảng schema — Anh Quang CHỐT: sửa thành 20.**
+- ✅ `docs/DATA_MODEL.md`: đã sửa 3 chỗ 18→20 (dòng "Nguyên tắc lean", "→ 20 bảng...", và mục 6
+  "Tình trạng hiện thực hoá" viết lại theo Go: 20 bảng = init_lean_schema + sessions + reward_rules
+  + reconciliation_lines, migration `000001_init_lean_schema` + `000003_join_slots_waitlist`).
+- ⏳ **pptx CHƯA sửa được 18→20** — file đang **MỞ TRONG POWERPOINT** (có lock `~$...pptx`), python-pptx
+  ghi bị `PermissionError`. Script sẵn ở `/tmp/fix18.py` (đổi run "18 bảng"→"20 bảng", value "18"→"20",
+  "còn 18 lean"→"còn 20 lean"). **VIỆC CÒN LẠI DUY NHẤT: Anh Quang đóng PowerPoint (đừng lưu đè kẻo mất
+  6 ảnh vừa thay) → chạy lại `python /tmp/fix18.py` (hoặc viết lại script) là xong.** 3 chỗ cần đổi:
+  slide 2 (TextBox "18 bảng lean..."), slide 5 (title "18 bảng lean" + "còn 18 lean"), slide 7 (value "18").
+
+**4. LƯU Ý pptx:** máy KHÔNG có LibreOffice → không render kiểm tra file cuối bằng mắt được; 6 ảnh là
+screenshot thật đã xem qua Playwright, đặt đúng hình học ảnh cũ (tỉ lệ khớp box, không méo). Ảnh có
+badge "N" (Next dev) nhỏ góc trái-dưới, rất nhỏ ở cỡ slide. Backup pptx gốc: scratchpad `pptx_backup.pptx`.
+
+**5. COMMIT — Anh Quang CHỐT: ĐỂ ĐÓ, CHƯA COMMIT.** TẤT CẢ thay đổi tài liệu (đợt này: README, PRODUCT,
+pptx, DATA_MODEL, HARD_PROBLEMS + đợt dọn Go rewrite trước + 3 file tài liệu thiết kế passport trong
+`docs/superpowers/`) VẪN CHƯA COMMIT — giữ nguyên working tree, chờ Anh Quang quyết sau.
+
+**6. NHIỆM VỤ ĐẦU PHIÊN SAU:** chỉ còn 1 việc treo — chạy `/tmp/fix18.py` để đổi 18→20 trong pptx sau
+khi Anh Quang đóng PowerPoint. Ngoài ra không có việc mặc định, chờ Anh Quang chỉ đạo.
+
+---
+
+## Current State & Hand-off (cập nhật 23/07/2026 — mở ngrok cho mentor xem UI, MỚI NHẤT)
+
+**1. YÊU CẦU:** "dùng ngrok chọt vô localhost để mentor check UI".
+
+**2. ĐÃ LÀM (CHƯA COMMIT):**
+- Cài ngrok qua winget (`Ngrok.Ngrok`) → bản 3.3.1 **bị server từ chối** (`ERR_NGROK_121`, tài khoản
+  yêu cầu tối thiểu 3.20.0) → chạy `ngrok update` lên **3.39.10**. Authtoken của Anh Quang **đã lưu**
+  ở `C:\Users\dangq\AppData\Local\ngrok\ngrok.yml` (một lần, không phải làm lại).
+  ngrok.exe **không có trong PATH**, đường dẫn thật:
+  `%LOCALAPPDATA%\Microsoft\WinGet\Packages\Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe\ngrok.exe`
+  (script tự dò nên không cần PATH).
+- `scripts/share.mjs` (MỚI) + script `share` trong `package.json`: dùng lại `dev:api` (3001) và
+  `dev:web` (3000) đang chạy — thiếu cái nào thì tự bật — rồi mở tunnel, in sẵn link.
+  Chạy: `corepack pnpm share`.
+- `apps/web/next.config.mjs`: rewrite `/api-proxy/:path*` → API Go (`API_BASE_URL`, mặc định
+  `http://localhost:3001`) + `allowedDevOrigins` cho domain ngrok.
+- `apps/web/src/lib/api-base.ts` (MỚI): gom 9 chỗ khai báo trùng `const API_BASE = ...` về một chỗ.
+  **Trình duyệt LUÔN gọi đường tương đối `/api-proxy`**; đích thật do server quyết lúc khởi động.
+- 9 file `*-client.ts` (auth/kyc/campaign/content/country/earnings/payout/reconciliation/audit) đổi
+  sang `import { API_BASE } from "./api-base"`.
+- `playwright.config.ts` + `scripts/run-go-playwright.mjs`: **bỏ `NEXT_PUBLIC_API_BASE_URL`**, chỉ giữ
+  `API_BASE_URL` phía server.
+- `README.md`: thêm mục "Chia sẻ UI ra ngoài cho mentor xem (ngrok)".
+
+**3. LINK CHO MENTOR (domain CỐ ĐỊNH của tài khoản, không đổi giữa các lần chạy):**
+`https://triumph-entree-statue.ngrok-free.dev/portal`
+Chỉ sống khi máy bật + `corepack pnpm share` đang chạy. ngrok free hiện trang cảnh báo ở lần mở đầu
+→ mentor bấm **"Visit Site"** (không tắt được ở gói free; đây KHÔNG phải lỗi app).
+
+**4. HAI BUG ĐÃ ĐÀO RA & SỬA TẬN GỐC (bài học, đừng lặp lại):**
+- **Bug 1 — bundle nhúng cứng `localhost:3001`:** `NEXT_PUBLIC_*` bị inline lúc biên dịch, nên trình
+  duyệt mentor gọi localhost của **máy mentor** → Chrome hiện popup "Local Network Access" + banner
+  đỏ "Không kết nối được API auth". Sửa: đường tương đối `/api-proxy` + rewrite (cùng origin, hết CORS).
+- **Bug 2 — hai tiến trình Next ghi chung `apps/web/.next`:** chạy `test:web` trong lúc `dev:web` mở
+  làm bundle bị nhúng cổng test `localhost:3101`, server 3000 phục vụ đúng bundle hỏng đó ra tunnel
+  (mentor thấy lại banner sau khi đã "sửa xong"). Sửa: không nhúng gì vào bundle nữa + bỏ
+  `NEXT_PUBLIC_API_BASE_URL` khỏi cấu hình E2E. **Vẫn còn rủi ro lỗi biên dịch tạm thời nếu chạy
+  `test:web` khi `dev:web` đang mở — đang demo thì đừng chạy test.**
+- Đã thử hướng "server thứ hai + `distDir=.next-share`" rồi **BỎ**: Next tự ghi đè `tsconfig.json` +
+  `next-env.d.ts` trỏ vào distDir lạ → bẩn repo, hỏng typecheck. Đã revert 2 file đó về sạch.
+
+**5. VERIFY (đã chạy thật, không suy đoán):** bundle phục vụ ra tunnel không còn `localhost:3001/3101`;
+xoá sạch localStorage → mở link → bấm Creator → đăng nhập mới thành công, KHÔNG banner, dashboard 8
+chiến dịch + dấu ĐÃ DUYỆT; `/api-proxy/health` qua link trả `{"db":"up","status":"ok"}`;
+**E2E 25/25 passed** (giờ test chạy đúng đường `/api-proxy` mà mentor dùng); lint + typecheck sạch.
+
+**6. LƯU Ý MÔI TRƯỜNG:** trong lúc sửa đã **kill server `dev:web` 3000 cũ** của Anh Quang và **xoá
+`apps/web/.next`** (bắt buộc, để build lại sạch). Terminal `dev:web` cũ là tiến trình chết, đóng đi.
+Lần sau chạy lại bình thường: `dev:api` + `dev:web`, rồi `corepack pnpm share`.
+
+**7. CHƯA COMMIT — toàn bộ vẫn treo** (đợt ngrok này: `api-base.ts`, 9 file `*-client.ts`,
+`next.config.mjs`, `playwright.config.ts`, `scripts/share.mjs`, `scripts/run-go-playwright.mjs`,
+`package.json`, `README.md` + tất cả đợt tài liệu Go/passport trước đó).
+
+**8. NHIỆM VỤ ĐẦU PHIÊN SAU:** (a) vẫn treo việc pptx 18→20 — chạy `/tmp/fix18.py` sau khi Anh Quang
+đóng PowerPoint; (b) Anh Quang chưa quyết commit. Ngoài ra không có việc mặc định.
+
+---
+
+## Current State & Hand-off (cập nhật 23/07/2026 — TUẦN 7 Go rewrite: Google Cloud staging, MỚI NHẤT)
+
+**1. YÊU CẦU:** "đọc log.md và GO_BACKEND_REWRITE_PLAN, triển khai week7". Tuần 1–6 đã HOÀN TẤT từ
+trước (36/36 route, 105/105, 25/25 E2E). Tuần 7 = **Google Cloud staging**.
+
+**2. QUYẾT ĐỊNH PHẠM VI — Anh Quang CHỐT: "Chuẩn bị đủ, chưa tốn tiền".** Lý do phải hỏi: gcloud trên
+máy **chưa đăng nhập tài khoản nào**, và Cloud SQL là dịch vụ tính tiền thật (~10–25 USD/tháng).
+Nên làm trọn phần code/hạ-tầng-as-code + **diễn tập thật bằng Docker local**, chưa bấm deploy GCP.
+
+**3. ĐÃ LÀM (CHƯA COMMIT):**
+- `scripts/smoke.mjs` (MỚI): smoke money-spine **26 bước** qua HTTP thuần, chạy với **bất kỳ base
+  URL** (container local hoặc Cloud Run). Gồm cả khẳng định âm tính: 401/403/409, join lặp không nhân
+  đôi suất, lock lần hai 409, settle lần hai 409. Lệnh: `corepack pnpm smoke <url>`.
+- `compose.staging.yaml` + `scripts/staging-rehearsal.mjs` (MỚI): diễn tập trọn trình tự release
+  bằng **đúng image production**, DB riêng `affiliate_staging` (không đụng DB dev), tự dọn.
+  Lệnh: `corepack pnpm staging:rehearsal` (thêm `--keep` để giữ stack xem tay).
+- `deploy/gcp/` (MỚI, 9 file): `env.example.sh`, `00-bootstrap`, `10-build-push` (image theo commit
+  SHA, không dùng `latest`), `20-database` (Cloud SQL + Secret Manager, mật khẩu sinh ngẫu nhiên
+  không lọt vào repo), `30-migrate` (backup → job → version), `40-deploy-api` (revision `--no-traffic`
+  → smoke → mới chuyển traffic), `50-reclaim` (job + Scheduler OIDC), `60-monitoring` (4 alert
+  policy), `90-rollback`, `README.md`. Đã kiểm `bash -n` cả 9 file.
+- `docs/RUNBOOK_STAGING.md` (MỚI): kiến trúc, trình tự release, cách deploy frontend trỏ API staging
+  (chỉ cần `API_BASE_URL` vì web đã đi qua `/api-proxy`), **bảng xử lý sự cố**, rollback + restore.
+- Sửa code: `internal/config` nhận DSN Cloud SQL unix socket; `Dockerfile` thêm `ENV PORT=8080`;
+  `internal/httpapi/middleware/middleware_test.go` (MỚI) chống lộ token/OTP/KYC trong log.
+- `package.json`: thêm script `smoke` + `staging:rehearsal`. `.gitignore`: bỏ qua `deploy/gcp/env.sh`
+  và `.last-image`.
+- `Report/GO_WEEK7_COMPLETION.md` (MỚI) + cập nhật trạng thái Tuần 7 trong `Plan/GO_BACKEND_REWRITE_PLAN.md`.
+
+**4. HAI KHIẾM KHUYẾT THẬT ĐÃ TÌM RA NHỜ DIỄN TẬP (sẽ làm hỏng lần deploy đầu):**
+- `normalizeDatabaseURL` **từ chối** DSN Cloud SQL unix socket (`postgres://u:p@/db?host=/cloudsql/...`
+  có `Host == ""`) → API sẽ chết ngay ở `config_invalid` trên revision đầu tiên. Đã sửa + 2 test.
+- `Dockerfile` `EXPOSE 8080` nhưng không đặt `PORT`, code mặc định `3001` → container nghe sai cổng.
+  Đã thêm `ENV PORT=8080`.
+- Lưu ý vận hành: `Dockerfile` production phải build với **context `apps/api-go`** (không phải gốc
+  repo); build sai context chỉ "qua" khi còn cache lần build đúng trước đó.
+
+**5. BẰNG CHỨNG (chạy thật trong phiên, không trích báo cáo cũ):** `staging-rehearsal` → **PASS 7/7**
+(image non-root · migration job trên DB rỗng `version=3 dirty=false` · container healthy PORT=8080 ·
+**smoke 26 bước xanh** · reclaim job chạy 2 lần không side effect · log 0/7 mẫu cấm khớp trên 31 dòng
+`http_request` · graceful shutdown `api_stopped`). Thêm: `gofmt` sạch, `pnpm lint` PASS,
+`pnpm test:api` PASS, `bash -n` 9 script PASS.
+
+**6. GATE TUẦN 7: 1/4 ĐẠT TRỌN (log không lộ bí mật), 3/4 ĐẠT PHẦN kiểm chứng được.** Phần chưa làm
+được vì cần cloud thật: migration trên **bản restore**, **Web** staging, và **Scheduler OIDC** tạo
+thật. Không có emulator cho Cloud Run/SQL/Scheduler nên không giả lập được — đã ghi rõ ranh giới ở
+mục 0 và mục 5 của `Report/GO_WEEK7_COMPLETION.md`.
+
+**7. ĐỂ ĐÓNG TUẦN 7 TRÊN GCP:** Anh Quang `gcloud auth login` + bật billing, rồi chạy tuần tự
+`00 → 20 → 10 → 30 → 40 → 50 → 60` trong `deploy/gcp/` (xem `deploy/gcp/README.md`). Xoá Cloud SQL
+sau khi demo mentor thì chi phí gần bằng không.
+
+**8. CHƯA COMMIT — toàn bộ vẫn treo** (đợt Tuần 7 này + đợt ngrok + đợt tài liệu Go/passport trước).
+
+**9. NHIỆM VỤ ĐẦU PHIÊN SAU:** (a) Tuần 8 (soak, rollback rehearsal, bàn giao) — nhưng phụ thuộc có
+staging thật; (b) pptx 18→20 vẫn treo (chờ đóng PowerPoint); (c) Anh Quang chưa quyết commit.

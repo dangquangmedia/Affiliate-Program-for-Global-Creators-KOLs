@@ -4,6 +4,12 @@
 > Thời gian: 4 tuần, 7-8h/ngày, 1 người làm (20 ngày N1–N20, bắt đầu 2026-07-18).
 > Nguyên tắc số 1: **mọi thứ tạo ra phải giải thích được bằng lời** — không sinh tài liệu/code
 > nhiều hơn mức người làm hiểu sâu. Mục tiêu là thể hiện **năng lực lõi**, không phải đếm số tính năng.
+>
+> **Cập nhật 22/07/2026**: kế hoạch N1-N10 dưới đây (Product/Database/Kiến trúc/Core) đã chạy
+> xong trên NestJS/Prisma đúng như mô tả. Từ **hậu N10 (money spine + trở đi)**, theo yêu cầu
+> mentor, backend được **viết lại toàn bộ sang Go** — mọi quyết định sản phẩm/dữ liệu/bài toán
+> khó ở N11-N20 bên dưới vẫn đúng nguyên văn (không đổi khi đổi ngôn ngữ backend), chỉ khác nơi
+> code sống. Kế hoạch thực thi giai đoạn Go (Tuần 1-8) xem tại `Plan/GO_BACKEND_REWRITE_PLAN.md`.
 
 ## 1. Tóm tắt yêu cầu sản phẩm
 

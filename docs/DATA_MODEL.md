@@ -4,7 +4,7 @@
 > Đây là thiết kế trên giấy — schema Prisma thật viết ở N5. Tài liệu này trả lời cho từng
 > bảng: **vì sao nó tồn tại** (màn nào cần) + **khóa unique nào chống bug gì** (invariant).
 >
-> Nguyên tắc lean: 18 bảng, không phải 45. Mỗi bảng phải có ít nhất một màn mockup "đòi" nó ra.
+> Nguyên tắc lean: 20 bảng, không phải 45. Mỗi bảng phải có ít nhất một màn mockup "đòi" nó ra.
 > Bảng nào không chỉ được màn nào cần → cắt.
 
 ## 0. Ba luật xuyên suốt (đọc trước, khỏi lặp ở từng bảng)
@@ -244,7 +244,7 @@ erDiagram
 | V11 Campaign builder | `campaigns`, `reward_rules` |
 | V12 Finance | `reconciliation_batches`, `reconciliation_lines`, `payout_requests`, `ledger_entries` |
 
-→ 18 bảng, mỗi bảng ít nhất 1 màn cần. Không bảng nào mồ côi.
+→ 20 bảng, mỗi bảng ít nhất 1 màn cần. Không bảng nào mồ côi.
 
 ## 4. 7 bài toán khó neo vào schema chỗ nào (bảng chứng minh)
 
@@ -270,7 +270,9 @@ erDiagram
 
 ## 6. Tình trạng hiện thực hóa
 
-- **N5 ✅**: `schema.prisma` = 18 bảng trên đã migrate (`init_lean_18_tables`) + seed VN/PH.
-- **N6 ✅**: thêm bảng `sessions` (`add_session`) cho auth thật. Tổng 19 model.
+- **Schema lean = 20 bảng** đã migrate trên backend Go (`apps/api-go/db/migrations/`:
+  `000001_init_lean_schema` nền + `sessions` cho auth thật + `000003_join_slots_waitlist` thêm
+  state/deadline cho reclaim/waitlist) + seed VN/PH. (Bản Prisma đầu N5 đếm 18; sau khi rewrite
+  sang Go, gộp cả `sessions`, `reward_rules`, `reconciliation_lines` là 20 bảng thật.)
 - Bảng nghiệp vụ còn lại được *nối logic* dần theo lịch (KYC N8, campaign/join N9-10, tiền
   N11-15) — cấu trúc đã có sẵn, chỉ thêm service/controller đọc-ghi.

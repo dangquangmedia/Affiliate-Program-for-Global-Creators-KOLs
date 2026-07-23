@@ -400,6 +400,16 @@ chạy chính. Bằng chứng đầy đủ tại `Report/GO_WEEK6_COMPLETION.md`
 - Reclaim Scheduler authenticated, không dùng timer trong API.
 - Log không lộ token, OTP hoặc dữ liệu KYC.
 
+**Trạng thái thực thi ngày 23/07/2026: PHẦN THỰC THI ĐƯỢC TRÊN MÁY ĐÃ HOÀN TẤT (diễn tập 7/7);
+1/4 gate đạt trọn, 3/4 gate đạt phần kiểm chứng được — chờ project Google Cloud có billing.**
+Quyết định phạm vi của Anh Quang: chuẩn bị đầy đủ, chưa chi tiền cloud. Đã có: image production
+(distroless non-root, `PORT=8080`, 4 binary), `compose.staging.yaml` + `scripts/staging-rehearsal.mjs`
+diễn tập trọn trình tự release bằng đúng image sẽ đẩy lên Artifact Registry, `scripts/smoke.mjs`
+(26 bước money-spine, chạy với bất kỳ base URL), 9 script `deploy/gcp/` tham số hoá + idempotent, và
+`docs/RUNBOOK_STAGING.md`. Diễn tập đã tìm và sửa **2 khiếm khuyết chặn deploy**: config từ chối DSN
+Cloud SQL unix socket, và image thiếu `PORT` mặc định. Bằng chứng đầy đủ tại
+`Report/GO_WEEK7_COMPLETION.md`.
+
 ### Tuần 8 — 14/09 đến 18/09: soak, rollback và bàn giao
 
 **Việc làm**

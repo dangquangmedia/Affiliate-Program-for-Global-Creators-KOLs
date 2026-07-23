@@ -26,6 +26,12 @@ tự tạo campaign với ngân sách nhập tay.
 Ghi chú: Local Ops/Finance/Admin **chỉ thấy dữ liệu nước mình** — đây là ràng buộc sản phẩm,
 không phải chi tiết kỹ thuật (luật dữ liệu từng nước khác nhau).
 
+Mỗi persona giờ có **dashboard thật** trong Trung tâm điều hành `/portal` (`/portal/{creator,ops,
+admin,finance,global}`) — không chỉ là mockup. Cột "Màn hình chính" ở trên chính là các tab trong
+từng dashboard đó. Giao diện thống nhất theo mô-típ **"Trạm điều hành biên giới"** (mỗi vai là một
+quầy kiểm soát; mọi quyết định đóng "dấu" audit không xoá được), củng cố trực quan cho đúng bản
+chất cách-ly-theo-nước + audit append-only của hệ thống.
+
 ### "Core Platform" KHÔNG phải một persona — nó là tầng nền (giải thích điểm dễ nhầm)
 
 Đặc tả yêu cầu nêu *"3 nhóm người dùng: Core Platform, Admin, Creator"*, nhưng thực chất đó là **3
@@ -297,6 +303,24 @@ unknown), tỷ giá (bảng tĩnh).
 **Không làm** (nói được lý do): Brand portal (Phase 2), API/webhook công khai
 (Phase 3), CPS/đơn hàng (QĐ-1), notification push, social account linking, báo cáo nâng cao,
 tính pháp lý thuế thật.
+
+### Trạng thái hiện thực hoá (build state — tính đến bản Go)
+
+Để tách rõ "đã chạy thật" với "mới thiết kế" (tránh hiểu nhầm khi đọc các QĐ có phần "hệ quả
+schema … làm ở Nx"):
+
+- **Đã build & chạy thật end-to-end** (backend Go `apps/api-go`, UI thật `/portal`, cả VN + PH):
+  toàn bộ **luồng lõi mục 4**; **QĐ-1** reward 3 trục ở cấu hình `CONTENT_APPROVED + FLAT`;
+  **QĐ-2** xem thoải mái / Join chặn theo KYC; **QĐ-3** ngân sách = suất × đơn giá (Đầy = suy ra);
+  **QĐ-4** thu hồi suất khi ì (state `EXPIRED`, `strike_count`, SLA nộp/sửa, worker `reclaim`);
+  **QĐ-5** tranh suất cuối bằng khóa hàng + danh sách chờ FCFS (`WAITLISTED`). Payout 3 kết cục,
+  ledger append-only, audit trail đều thật.
+- **Đã chốt thiết kế + chừa schema, CHƯA build runtime** (Phase 1.5/2): **QĐ-6** Apply→duyệt cho
+  campaign đặc thù (`requires_approval`, state `APPLIED`, bảng `social_profile`); **QĐ-7**
+  take-rate phía brand (`platform_fee_bps`, ledger `PLATFORM_FEE`); **QĐ-8** prepaid escrow 100%
+  (`PENDING_FUNDING`, `funded_at`, bút toán escrow/refund). Đây là các quyết định sản phẩm đã suy
+  nghĩ thấu đáo và để ngỏ đường mở rộng, không phải phần bỏ sót.
+- **Mock có công bố** giữ nguyên như trên (SSO/eKYC/OTP/cổng thanh toán/tỷ giá).
 
 ## 6. Câu hỏi thẩm định thường gặp
 
