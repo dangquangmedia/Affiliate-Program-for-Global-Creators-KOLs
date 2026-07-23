@@ -1076,3 +1076,41 @@ sau khi demo mentor thì chi phí gần bằng không.
 
 **9. NHIỆM VỤ ĐẦU PHIÊN SAU:** (a) Tuần 8 (soak, rollback rehearsal, bàn giao) — nhưng phụ thuộc có
 staging thật; (b) pptx 18→20 vẫn treo (chờ đóng PowerPoint); (c) Anh Quang chưa quyết commit.
+
+---
+
+## Current State & Hand-off (cập nhật 23/07/2026 — THỬ DEPLOY GCP: chặn ở billing, MỚI NHẤT)
+
+**1. YÊU CẦU:** "đọc log.md để tiếp tục deploy — tao đã tạo folder sẵn" (Cloud Shell,
+`~/Affiliate_Global`).
+
+**2. ĐÃ COMMIT + PUSH (Anh Quang chốt, lần đầu sau nhiều phiên treo).** Toàn bộ 47 file tồn đọng gom
+thành 3 commit có nghĩa, đẩy lên `origin/main`:
+- `d8fc899 fix(web)` — trình duyệt gọi `/api-proxy` tương đối, bỏ hẳn việc nhúng origin API lúc build.
+- `080e350 feat(deploy)` — trình tự release Cloud Run + smoke + diễn tập local.
+- `ef7315c docs` — tài liệu theo stack Go, xoá `prisma.config.ts` và nhóm file audit day-15..20.
+
+Lý do phải push (không phải upload zip): `10-build-push.sh` gắn image theo **commit SHA**; code chưa
+commit thì image mang SHA của commit cũ → rollback mất dấu, không biết revision nào ứng với code nào.
+
+**3. KHIẾM KHUYẾT THẬT THỨ BA (tìm ra khi rà lại trước lúc bấm deploy):** trình tự release **thiếu
+hẳn bước seed**. `30-migrate` chỉ tạo schema rỗng, mà `40-deploy-api` lại chặn cutover bằng smoke →
+không có country VN/PH thì 404, không có `role_assignment` thì Ops duyệt KYC 403. Lần deploy đầu sẽ
+dừng ở bước 40 **sau khi** Cloud SQL đã tạo và bắt đầu tính tiền. Đã thêm `deploy/gcp/35-seed.sh`
+(Cloud Run Job, `/app/seed` chạy `reference.sql` rồi `demo.sql`, idempotent, `SEED_DEMO=0` cho môi
+trường thật) + cập nhật README deploy và `docs/RUNBOOK_STAGING.md`. **Trình tự đúng giờ là
+`00 → 20 → 10 → 30 → 35 → 40 → 50 → 60`.**
+
+**4. ĐIỂM CHẶN — BILLING ĐÓNG.** Cloud Shell clone code OK (`ef7315c`), nhưng:
+`gcloud billing accounts list` → `019086-F34489-C22C7E · OPEN: False`. Billing account duy nhất đang
+đóng nên không gắn được vào project nào. Không có đường vòng: Artifact Registry, Cloud SQL và **cả
+Cloud Run** đều đòi project bật billing (đổi DB sang nhà cung cấp free bên ngoài cũng không cứu).
+
+**5. QUYẾT ĐỊNH CỦA ANH QUANG: KHÔNG gắn thẻ.** Dừng nhánh deploy GCP. Mentor tiếp tục xem hệ thống
+qua **ngrok** — `corepack pnpm share`, một link duy nhất phục vụ cả UI lẫn API vì web đi qua
+`/api-proxy`. Ranh giới Tuần 7 giữ nguyên như đã báo cáo: script + diễn tập đầy đủ, chưa deploy cloud
+thật — đã ghi rõ vào `Report/GO_WEEK7_COMPLETION.md` mục 6 kèm output billing làm bằng chứng.
+
+**6. NHIỆM VỤ ĐẦU PHIÊN SAU:** (a) Tuần 8 vẫn treo vì phụ thuộc staging thật; (b) pptx 18→20 vẫn
+treo (chờ đóng PowerPoint); (c) nếu sau này có billing account mở → chạy đúng 8 lệnh ở mục 6 của báo
+cáo Tuần 7. Cloud Shell còn bản clone ở `~/Affiliate_Global/app` (miễn phí, xoá lúc nào cũng được).

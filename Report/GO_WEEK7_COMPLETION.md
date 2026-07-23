@@ -33,9 +33,9 @@ Không có dòng nào trong báo cáo này khẳng định đã deploy lên Goog
 | Runbook | `docs/RUNBOOK_STAGING.md` — kiến trúc, trình tự release, deploy frontend, bảng xử lý sự cố, rollback/restore |
 | Hardening code | Config nhận DSN Cloud SQL unix socket; test chống lộ secret trong log |
 
-## 2. Hai khiếm khuyết THẬT phát hiện khi chuẩn bị deploy
+## 2. Ba khiếm khuyết THẬT phát hiện khi chuẩn bị deploy
 
-Đây là giá trị chính của việc diễn tập trước khi bấm deploy — cả hai đều sẽ làm hỏng lần deploy đầu:
+Đây là giá trị chính của việc diễn tập trước khi bấm deploy — cả ba đều sẽ làm hỏng lần deploy đầu:
 
 **(a) API không kết nối được Cloud SQL.** Cloud Run nối Cloud SQL qua **unix socket**, nên DSN không
 có host TCP: `postgresql://user:pass@/db?host=/cloudsql/PROJECT:REGION:INSTANCE`.
@@ -48,6 +48,14 @@ thầm hạ cấp bảo mật. Khoá lại bằng `TestCloudSQLUnixSocketDSNIsAc
 **(b) Image lệch cổng.** Dockerfile `EXPOSE 8080` nhưng không đặt `PORT`, mà mặc định trong code là
 `3001` → container tự chạy sẽ nghe sai cổng so với khai báo. Cloud Run tự tiêm `PORT` nên sẽ không lộ
 ra ở đó, nhưng mọi lần chạy image tại chỗ (kể cả diễn tập này) đều sai. Đã đặt `ENV PORT=8080`.
+
+**(c) Trình tự release thiếu hẳn bước seed.** `30-migrate.sh` chỉ tạo schema rỗng, trong khi
+`40-deploy-api.sh` chặn cutover bằng smoke. Không có `reference.sql` thì không có country VN/PH →
+mọi request có country context trả **404**; không có `demo.sql` thì không có `role_assignment` →
+smoke chết ở bước Ops duyệt KYC trả **403**. Lần deploy đầu sẽ dừng ở bước 40 **sau khi** Cloud SQL
+đã được tạo và bắt đầu tính tiền. Đã bổ sung `deploy/gcp/35-seed.sh` (Cloud Run Job, entrypoint
+`/app/seed`, chạy `reference.sql` rồi `demo.sql`, cả hai idempotent, có `SEED_DEMO=0` để bỏ dữ liệu
+demo ở môi trường thật). Trình tự đúng: `00 → 20 → 10 → 30 → 35 → 40 → 50 → 60`.
 
 Ngoài ra, khi dựng diễn tập còn phát hiện `Dockerfile` production phải build với **context
 `apps/api-go`** (không phải gốc repo); build sai context chỉ "qua" khi còn cache của lần build đúng
@@ -100,16 +108,37 @@ panic trả đúng error envelope và không rò token ra response lẫn log.
 | Reclaim Scheduler **authenticated**, không dùng timer trong API | **ĐẠT PHẦN** | Không timer trong API: ĐẠT (kiểm bằng code — `cmd/reclaim` quét một lượt rồi exit; API không có scheduler). Job idempotent: ĐÃ CHẠY THẬT (hai lần). Scheduler OIDC: **đã viết** `50-reclaim.sh` với service account riêng chỉ có `roles/run.invoker`, **chưa tạo** trên project thật. |
 | Log **không lộ** token, OTP hoặc dữ liệu KYC | **ĐẠT** | Kiểm hai tầng: test Go (`TestAccessLogDoesNotLeakSecrets`) và soát log container thật trong diễn tập (0/7 mẫu cấm khớp trên 31 dòng `http_request`). |
 
-## 6. Việc còn lại để đóng Tuần 7 trên Google Cloud
+## 6. Đã thử deploy thật ngày 23/07/2026 — bị chặn ở billing
 
-Khi có project + billing, đúng 5 lệnh (chi tiết ở `deploy/gcp/README.md`):
+Repo đã được đưa lên GitHub và clone thành công vào Google Cloud Shell (commit `ef7315c`). Kiểm tra
+tài khoản trước khi tạo tài nguyên:
+
+```
+$ gcloud billing accounts list
+ACCOUNT_ID: 019086-F34489-C22C7E   NAME: Mon compte de facturation   OPEN: False
+```
+
+Billing account duy nhất của tài khoản đang ở trạng thái **đóng**, nên không gắn được vào project
+nào. Đây là điểm chặn cứng, không có đường vòng:
+
+| Dịch vụ trong trình tự release | Cần billing |
+|---|---|
+| Artifact Registry (`10-build-push.sh`) | Có — không push được image |
+| Cloud SQL (`20-database.sh`) | Có |
+| Cloud Run service/job (`30`, `35`, `40`, `50`) | Có — project phải bật billing kể cả khi nằm trong free tier |
+
+Đổi database sang nhà cung cấp miễn phí bên ngoài cũng không gỡ được, vì bản thân Cloud Run đã đòi
+billing. **Quyết định của Anh Quang: không gắn thẻ thanh toán** — demo mentor tiếp tục bằng đường
+ngrok đã chạy được (`corepack pnpm share`, một link duy nhất phục vụ cả UI lẫn API qua `/api-proxy`).
+
+Khi nào có billing account mở, đóng Tuần 7 bằng đúng trình tự sau (chi tiết ở `deploy/gcp/README.md`):
 
 ```bash
 gcloud auth login && cp deploy/gcp/env.example.sh deploy/gcp/env.sh   # sửa PROJECT_ID, WEB_ORIGIN
 bash deploy/gcp/00-bootstrap.sh && bash deploy/gcp/20-database.sh
 bash deploy/gcp/10-build-push.sh && bash deploy/gcp/30-migrate.sh
-bash deploy/gcp/40-deploy-api.sh && bash deploy/gcp/50-reclaim.sh
-bash deploy/gcp/60-monitoring.sh
+bash deploy/gcp/35-seed.sh && bash deploy/gcp/40-deploy-api.sh
+bash deploy/gcp/50-reclaim.sh && bash deploy/gcp/60-monitoring.sh
 ```
 
 Chi phí chính là Cloud SQL (`db-f1-micro` ~10–25 USD/tháng); Cloud Run/Scheduler ở mức demo gần như
