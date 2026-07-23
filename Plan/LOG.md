@@ -1111,6 +1111,19 @@ qua **ngrok** — `corepack pnpm share`, một link duy nhất phục vụ cả 
 `/api-proxy`. Ranh giới Tuần 7 giữ nguyên như đã báo cáo: script + diễn tập đầy đủ, chưa deploy cloud
 thật — đã ghi rõ vào `Report/GO_WEEK7_COMPLETION.md` mục 6 kèm output billing làm bằng chứng.
 
-**6. NHIỆM VỤ ĐẦU PHIÊN SAU:** (a) Tuần 8 vẫn treo vì phụ thuộc staging thật; (b) pptx 18→20 vẫn
+**6. ĐÃ XÉT VÀ LOẠI: hosting sẵn có của Anh Quang** (1Panel, gói `wphosting_WPH_2`, có domain riêng).
+Là **shared hosting**, không phải VPS — dấu hiệu: chỉ có PHP selector/WordPress, quota Entry
+Processes & IOPS, và **chỉ MySQL**. Hệ thống cần PostgreSQL 17 (`pgx`, `ON CONFLICT`, `timestamptz`),
+một tiến trình Go thường trực và một tiến trình Node cho Next SSR — shared hosting không đáp ứng cái
+nào. Chuyển sang MySQL là viết lại toàn bộ migration + query sqlc, và mất chính các ràng buộc chống
+double-earning. **Đừng đánh giá lại hosting này ở phiên sau.**
+
+**7. QUYẾT ĐỊNH CUỐI (23/07/2026): giữ nguyên cách demo qua ngrok**, không thuê VPS, không trỏ
+domain. Mỗi lần mentor cần xem: `corepack pnpm share`. Phương án dự phòng đã cân nhắc và Anh Quang
+gác lại — **VPS Việt Nam ~100–200k/tháng, thanh toán chuyển khoản trong nước** (không cần thẻ quốc
+tế như GCP), chạy được đúng `compose.staging.yaml` để có staging thật 24/7 dưới domain riêng. Đây là
+đường mở nếu sau này cần staging thường trực.
+
+**8. NHIỆM VỤ ĐẦU PHIÊN SAU:** (a) Tuần 8 vẫn treo vì phụ thuộc staging thật; (b) pptx 18→20 vẫn
 treo (chờ đóng PowerPoint); (c) nếu sau này có billing account mở → chạy đúng 8 lệnh ở mục 6 của báo
 cáo Tuần 7. Cloud Shell còn bản clone ở `~/Affiliate_Global/app` (miễn phí, xoá lúc nào cũng được).
