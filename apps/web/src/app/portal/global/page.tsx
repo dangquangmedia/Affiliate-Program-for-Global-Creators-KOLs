@@ -72,7 +72,8 @@ export default function GlobalDashboard() {
     <Shell role={ROLE} market={shellMarket} setMarket={(m) => setScope(m)} nav={NAV} active={active} setActive={setActive}
       title={NAV.find((n) => n.key === active)?.label ?? "Tổng quan"}
       subtitle="Vai duy nhất vượt biên giới nước"
-      user={{ name: "Hà Toàn Cục", sub: "Global Admin" }} showUsd={showUsd} setShowUsd={setShowUsd}>
+      user={{ name: "Hà Toàn Cục", sub: "Global Admin" }} showUsd={showUsd} setShowUsd={setShowUsd}
+      variant="passport" headerStamp={{ text: "TOÀN\nCẦU", ok: true }}>
 
       {/* scope 3 giá trị riêng cho Global (Shell chỉ có VN/PH) */}
       <div className={s.mktStrip}>

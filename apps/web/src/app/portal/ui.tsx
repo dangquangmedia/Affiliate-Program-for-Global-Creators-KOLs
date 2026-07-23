@@ -96,7 +96,7 @@ export interface NavItem { key: string; label: string; icon: IconName; badge?: n
 
 export function Shell({
   role, market, setMarket, marketLocked, nav, active, setActive,
-  title, subtitle, user, showUsd, setShowUsd, children, variant, kycOk,
+  title, subtitle, user, showUsd, setShowUsd, children, variant, kycOk, headerStamp,
 }: {
   role: Role;
   market: Market;
@@ -113,9 +113,12 @@ export function Shell({
   children: ReactNode;
   variant?: "passport";
   kycOk?: boolean;
+  headerStamp?: { text: string; ok?: boolean };
 }) {
   const initials = user.name.split(" ").slice(-2).map((w) => w[0]).join("").toUpperCase();
   const mobileNav = nav.slice(0, 5);
+  // Con dấu header hộ chiếu: mặc định là cổng KYC của Creator; các vai khác truyền headerStamp riêng.
+  const stamp = headerStamp ?? { text: kycOk ? "ĐÃ\nDUYỆT" : "CHỜ\nDUYỆT", ok: kycOk };
 
   if (variant === "passport") {
     return (
@@ -145,8 +148,8 @@ export function Shell({
                 <div className={s.passportName}>{user.name}</div>
                 <div className={s.passportId}>HỒ SƠ #{role.key.toUpperCase()}-{market}-{initials}</div>
               </div>
-              <div className={`${s.passportStamp} ${kycOk ? s.passportStampOk : ""}`}>
-                {kycOk ? "ĐÃ\nDUYỆT" : "CHỜ\nDUYỆT"}
+              <div className={`${s.passportStamp} ${stamp.ok ? s.passportStampOk : ""}`}>
+                {stamp.text}
               </div>
             </header>
 

@@ -130,7 +130,8 @@ export default function OpsDashboard() {
     <Shell role={ROLE} market={market} setMarket={() => {}} marketLocked nav={nav} active={active} setActive={setActive}
       title={nav.find((n) => n.key === active)?.label ?? "Tổng quan"}
       subtitle="Trung tâm duyệt — khoá theo thị trường được phân công"
-      user={{ name: "Trần Vận Hành", sub: `Local Ops · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}>
+      user={{ name: "Trần Vận Hành", sub: `Local Ops · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}
+      variant="passport" headerStamp={{ text: "CÔNG\nVỤ", ok: true }}>
 
       <MarketStrip market={market} note="Local Ops không có công tắc VN/PH — chỉ thấy dữ liệu nước mình" />
 

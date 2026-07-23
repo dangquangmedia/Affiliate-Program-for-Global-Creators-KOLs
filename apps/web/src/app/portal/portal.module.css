@@ -154,7 +154,9 @@
   align-items: center;
 }
 .passportEyebrow { color: var(--text-mute); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; }
-.passportName { color: var(--text); font-family: Georgia, "Times New Roman", serif; font-size: 20px; margin-top: 2px; }
+/* Cambria trước Georgia: Georgia render kém dấu tiếng Việt chồng (ầ/ằ/ẵ) — huyền bị tách rời;
+   Cambria (font hệ thống Windows, không phải webfont mới) render đúng, fallback Georgia trên máy thiếu. */
+.passportName { color: var(--text); font-family: Cambria, Georgia, "Times New Roman", serif; font-size: 20px; margin-top: 2px; }
 .passportId { color: var(--text-mute); font-size: 11px; margin-top: 2px; font-family: ui-monospace, "Consolas", monospace; }
 .passportStamp {
   width: 52px; height: 52px; border-radius: 50%;

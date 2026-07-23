@@ -148,7 +148,8 @@ export default function FinanceDashboard() {
     <Shell role={ROLE} market={market} setMarket={() => {}} marketLocked nav={navWithBadge} active={active} setActive={setActive}
       title={NAV.find((n) => n.key === active)?.label ?? "Tổng quan"}
       subtitle="Bàn tài chính — đối soát & chi trả, khoá theo thị trường"
-      user={{ name: "Vũ Tài Chính", sub: `Local Finance · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}>
+      user={{ name: "Vũ Tài Chính", sub: `Local Finance · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}
+      variant="passport" headerStamp={{ text: "CÔNG\nVỤ", ok: true }}>
 
       <MarketStrip market={market} note="Tiền tệ cố định theo nước — không bao giờ cộng gộp VND + PHP" />
 

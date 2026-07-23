@@ -90,7 +90,8 @@ export default function AdminDashboard() {
     <Shell role={ROLE} market={market} setMarket={() => {}} marketLocked nav={NAV} active={active} setActive={setActive}
       title={NAV.find((n) => n.key === active)?.label ?? "Tổng quan"}
       subtitle="Quản trị chiến dịch — khoá theo thị trường được phân công"
-      user={{ name: "Lê Quản Trị", sub: `Local Admin · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}>
+      user={{ name: "Lê Quản Trị", sub: `Local Admin · ${market}` }} showUsd={showUsd} setShowUsd={setShowUsd}
+      variant="passport" headerStamp={{ text: "CÔNG\nVỤ", ok: true }}>
 
       <MarketStrip market={market} note={`Chiến dịch gắn đúng một nước — ${market} không quản campaign nước khác`} />
 
