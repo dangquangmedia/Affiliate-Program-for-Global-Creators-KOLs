@@ -19,5 +19,9 @@ COPY db/seeds /app/seeds
 USER nonroot:nonroot
 ENV MIGRATIONS_PATH=/app/migrations
 ENV SEEDS_PATH=/app/seeds
+# Cloud Run injects PORT; default to its convention so the image behaves identically when run
+# locally for a staging rehearsal. Cloud Run Jobs reuse this image with a different entrypoint
+# (`/app/migrate`, `/app/reclaim`, `/app/seed`).
+ENV PORT=8080
 EXPOSE 8080
 ENTRYPOINT ["/app/api"]

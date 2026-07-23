@@ -17,6 +17,9 @@ apps/api/src/generated/prisma/
 *.pfx
 *.jks
 secrets/
+# Cấu hình deploy thật (tên project) + tag image lần build gần nhất
+deploy/gcp/env.sh
+deploy/gcp/.last-image
 
 # Runtime data and local infrastructure
 *.log
@@ -40,3 +43,6 @@ artifacts/private/
 
 # Playwright MCP screenshot/console artifacts
 .playwright-mcp/
+
+# Superpowers brainstorming visual companion (local session scratch)
+.superpowers/

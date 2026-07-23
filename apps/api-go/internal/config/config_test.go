@@ -36,6 +36,25 @@ func TestPrismaSchemaParameterBecomesSearchPath(t *testing.T) {
 	}
 }
 
+// Cloud Run connects to Cloud SQL through a unix socket, so the DSN has no TCP host at all.
+func TestCloudSQLUnixSocketDSNIsAccepted(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgresql://app:secret@/affiliate_global?host=/cloudsql/proj:asia-southeast1:affiliate-pg")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.DatabaseURL != "postgresql://app:secret@/affiliate_global?host=%2Fcloudsql%2Fproj%3Aasia-southeast1%3Aaffiliate-pg&sslmode=disable" {
+		t.Fatalf("DatabaseURL = %q", cfg.DatabaseURL)
+	}
+}
+
+func TestDatabaseURLWithoutHostOrSocketIsRejected(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgresql:///affiliate_global")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() error = nil, want invalid DATABASE_URL error")
+	}
+}
+
 func TestRemoteDatabaseDoesNotDisableTLS(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgresql://user:pass@10.1.2.3:5432/app?schema=public")
 	cfg, err := Load()

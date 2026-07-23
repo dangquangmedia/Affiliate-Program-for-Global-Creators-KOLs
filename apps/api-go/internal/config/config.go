@@ -101,21 +101,34 @@ func normalizeDatabaseURL(raw string) (string, error) {
 		return "", errors.New("DATABASE_URL is required")
 	}
 	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+	if err != nil || parsed.Scheme == "" {
 		return "", errors.New("DATABASE_URL must be a valid PostgreSQL URL")
 	}
 	query := parsed.Query()
+	// Cloud Run reaches Cloud SQL over a unix socket, so the DSN carries no TCP host:
+	// `postgresql://user:pass@/db?host=/cloudsql/PROJECT:REGION:INSTANCE`. Accept that shape and
+	// reject only a URL that names neither a TCP host nor a socket directory.
+	socketDir := query.Get("host")
+	if parsed.Host == "" && !strings.HasPrefix(socketDir, "/") {
+		return "", errors.New("DATABASE_URL must be a valid PostgreSQL URL")
+	}
 	if schema := query.Get("schema"); schema != "" {
 		query.Del("schema")
 		if query.Get("search_path") == "" {
 			query.Set("search_path", schema)
 		}
 	}
-	if query.Get("sslmode") == "" && (parsed.Hostname() == "localhost" || parsed.Hostname() == "127.0.0.1" || parsed.Hostname() == "::1") {
+	// TLS is meaningless on a unix socket; anywhere else keep the operator's choice untouched so a
+	// remote database is never silently downgraded.
+	if query.Get("sslmode") == "" && (isLoopback(parsed.Hostname()) || (parsed.Host == "" && socketDir != "")) {
 		query.Set("sslmode", "disable")
 	}
 	parsed.RawQuery = query.Encode()
 	return parsed.String(), nil
+}
+
+func isLoopback(host string) bool {
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 // Local development walks upward and loads the repository .env file.

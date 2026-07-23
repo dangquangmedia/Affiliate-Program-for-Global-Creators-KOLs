@@ -4,6 +4,10 @@ Nền tảng affiliate marketing **đa quốc gia** (Việt Nam + Philippines), 
 tiền **chạy thật end-to-end** trên 2 nước có tiền tệ / thuế / mức rút tối thiểu khác nhau, cộng bộ
 **prototype nhiều màn** để trình bày tư duy product.
 
+UI vận hành thật là **Trung tâm điều hành `/portal`** — trang chọn vai + 5 dashboard theo vai
+(giao diện "Trạm điều hành biên giới": navy/brass, header hộ chiếu, tab dấu mộc). Backend là **Go
+modular monolith** (`apps/api-go`); NestJS cũ chỉ còn làm oracle đối chiếu, không nằm trên runtime.
+
 ## Nó làm được gì
 
 - **Cách ly theo nước**: VN (VND, thuế 10%, rút tối thiểu 200.000) và PH (PHP, thuế 8%, rút tối
@@ -55,29 +59,60 @@ corepack pnpm dev:web    # Next.js → http://localhost:3000
 
 Mở trình duyệt:
 
-- `http://localhost:3000/mockup` — **13 màn prototype** (V01–V13) + 2 kịch bản click xuyên màn
-- `http://localhost:3000/vn` · `/ph` — ngữ cảnh nước (nạp từ Postgres qua API)
-- `http://localhost:3001/health` — `{"status":"ok","db":"up"}` khi Postgres sống
+- `http://localhost:3000/portal` — **Trung tâm điều hành (UI thật)**: trang chọn vai + **5 dashboard
+  theo vai** (Creator · Local Ops · Local Admin · Local Finance · Global Admin). **Toàn bộ luồng tiền
+  end-to-end chạy ở đây**, gọi API Go thật. Đây là màn chính để demo.
+- `http://localhost:3000/mockup` — **13 màn prototype tĩnh** (V01–V13) + 2 kịch bản click xuyên màn —
+  dùng trình bày tư duy product, KHÔNG phải luồng chạy thật.
+- `http://localhost:3000/vn` · `/ph` — ngữ cảnh nước (nạp từ Postgres qua API) — kiểm chứng cách ly
+  country-context ở tầng route.
+- `http://localhost:3001/health` — `{"status":"ok","db":"up"}` khi Postgres sống.
 
-Công tắc **VI/EN** và **$USD** ở góc phải mỗi màn prototype; đổi **VN/PH** để thấy cách ly dữ liệu +
-tiền tệ.
+Trong `/portal`: nút **sáng/tối** và **$USD** ở rail/topbar; đổi **VN/PH** để thấy dữ liệu + tiền tệ
+re-scope theo nước.
 
 ## Tài khoản demo (mock SSO — đăng nhập bằng email)
 
 "SSO" là mock: mỗi màn có nút "đăng nhập vai …" gọi `POST /auth/mock-login` với email tương ứng →
 tạo user + session thật trong DB. Domain: `@demo.affiliate.gl`.
 
-| Vai | Email | Dùng cho |
+| Vai | Email | Dashboard `/portal` |
 |---|---|---|
-| **Creator** | *email mới bất kỳ* | Tự tạo khi đăng nhập lần đầu (mỗi email = 1 creator) |
-| **Local Ops** | `ops.vn@` · `ops.ph@` | Duyệt KYC + content (V10) |
-| **Local Admin** | `admin.vn@` · `admin.ph@` | Tạo campaign / builder (V11) |
-| **Local Finance** | `finance.vn@` · `finance.ph@` | Đối soát + chi trả (V12) |
-| **Global Admin** | `global.admin@` | Xem nhật ký audit toàn cục (V13) — vai duy nhất vượt biên giới |
+| **Creator** | `creator.vn@` · `creator.ph@` (hoặc email mới bất kỳ) | `/portal/creator` — KYC · join · nộp content · earnings · rút tiền |
+| **Local Ops** | `ops.vn@` · `ops.ph@` | `/portal/ops` — duyệt KYC + content theo nước |
+| **Local Admin** | `admin.vn@` · `admin.ph@` | `/portal/admin` — tạo & quản campaign (builder) |
+| **Local Finance** | `finance.vn@` · `finance.ph@` | `/portal/finance` — đối soát + bàn payout |
+| **Global Admin** | `global.admin@` | `/portal/global` — audit toàn cục (vai duy nhất vượt biên giới) |
 
-Kịch bản demo gợi ý: đăng nhập creator mới → chọn VN → KYC → (Ops duyệt) → join campaign → nộp
-content → (Ops duyệt) → xem thu nhập → (Finance đối soát + khoá) → rút tiền OTP → (Finance settle) →
-(Global Admin xem audit).
+Kịch bản demo gợi ý (chạy hẳn trong `/portal`, không phải mockup): vào `/portal` → chọn **Creator** →
+chọn VN → KYC → (đổi vai **Local Ops** duyệt) → join campaign → nộp content → (Ops duyệt) → xem thu
+nhập → (**Local Finance** đối soát + khoá batch) → rút tiền OTP → (Finance settle SUCCESS/FAIL/UNKNOWN)
+→ (**Global Admin** xem nhật ký audit). Nút **"Đổi vai"** ở cuối rail đưa về trang chọn vai `/portal`.
+
+## Chia sẻ UI ra ngoài cho mentor xem (ngrok)
+
+Mở một tunnel công khai trỏ vào máy đang chạy dev — mentor chỉ cần một link, không cần cài gì.
+
+```powershell
+# Lần đầu: cài ngrok + nạp authtoken (miễn phí, lấy ở dashboard.ngrok.com)
+winget install --id Ngrok.Ngrok -e
+ngrok config add-authtoken <TOKEN>
+
+corepack pnpm share      # Ctrl+C để đóng tunnel
+```
+
+`share` (script `scripts/share.mjs`) dùng lại API `:3001` và web `:3000` đang chạy (thiếu cái nào thì
+tự bật) rồi mở tunnel, in ra link `https://<tên>.ngrok-free.dev/portal` để gửi mentor. Không cần dừng
+`dev:api` / `dev:web`.
+
+**Vì sao cần proxy:** trình duyệt của mentor không thấy `localhost:3001`. Nên trình duyệt luôn gọi
+đường tương đối `/api-proxy/*` (`src/lib/api-base.ts`), và `next.config.mjs` rewrite đường đó về API
+Go — đích lấy từ `API_BASE_URL` lúc server khởi động, **không nhúng vào bundle**. Một tunnel phục vụ
+cả UI lẫn API, cùng origin nên không dính CORS.
+
+Lưu ý: ngrok free hiện trang cảnh báo ở lần mở đầu — mentor bấm **"Visit Site"** là vào. Bảng theo dõi
+request cục bộ: `http://127.0.0.1:4040`. Nếu ngrok báo `ERR_NGROK_121` (agent quá cũ) thì chạy
+`ngrok update`.
 
 ## Kiểm thử
 
@@ -110,7 +145,7 @@ corepack pnpm bootstrap    # dựng lại từ đầu
 ```text
 apps/api-go   Go modular monolith — HTTP/RBAC/sqlc/pgx; 36/36 operation; PostgreSQL 17
 apps/api      NestJS/Prisma oracle lịch sử — chỉ dùng differential/fallback, không nằm trên runtime path
-apps/web      Next.js App Router — 13 màn prototype (/mockup) + route ngữ cảnh nước (/vn /ph)
+apps/web      Next.js App Router — /portal (UI điều hành THẬT: landing + 5 dashboard theo vai) · /mockup (13 màn prototype tĩnh) · /vn /ph (ngữ cảnh nước)
 apps/api-go/db  migration + reference/demo seed + typed SQL source
 docs/         PRODUCT / DATA_MODEL / ARCHITECTURE / HARD_PROBLEMS (nguồn sự thật về phạm vi + vì sao)
 Plan/         KE_HOACH_V2.md (kế hoạch) + LOG.md (đọc trước để nắm trạng thái)

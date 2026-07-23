@@ -1,0 +1,103 @@
+# Diễn tập trình tự release của Tuần 7 ngay trên máy, bằng ĐÚNG image production sẽ đẩy lên
+# Artifact Registry. Mô phỏng 1-1 các thành phần Cloud Run:
+#
+#   Cloud Run Job `affiliate-migrate`  → service `migrate` (entrypoint /app/migrate)
+#   seed reference/demo                → service `seed-reference` + `seed-demo`
+#   Cloud Run service `affiliate-api`  → service `api` (entrypoint mặc định /app/api, PORT=8080)
+#   Cloud Run Job `affiliate-reclaim`  → service `reclaim` (profile `jobs`, chạy một sweep rồi exit)
+#
+# Database RIÊNG (`affiliate_staging`, không publish port) để không đụng DB dev.
+# Chạy trọn bộ bằng: node scripts/staging-rehearsal.mjs
+
+name: affiliate-staging
+
+x-db-env: &db-env
+  DATABASE_URL: postgresql://staging_app:${STAGING_DB_PASSWORD:-staging_local_only}@postgres:5432/affiliate_staging?sslmode=disable
+
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    environment:
+      POSTGRES_DB: affiliate_staging
+      POSTGRES_USER: staging_app
+      POSTGRES_PASSWORD: ${STAGING_DB_PASSWORD:-staging_local_only}
+    volumes:
+      - affiliate_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks:
+      - affiliate_staging
+
+  # Migration chạy như một job riêng, KHÔNG nằm trong startup của API — đúng quy tắc mục 5 của kế hoạch.
+  migrate:
+    image: ${STAGING_IMAGE:-affiliate-api-go:staging-rehearsal}
+    entrypoint: ["/app/migrate"]
+    command: ["up"]
+    environment: *db-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - affiliate_staging
+
+  seed-reference:
+    image: ${STAGING_IMAGE:-affiliate-api-go:staging-rehearsal}
+    entrypoint: ["/app/seed"]
+    command: ["reference.sql"]
+    environment: *db-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    networks:
+      - affiliate_staging
+
+  seed-demo:
+    image: ${STAGING_IMAGE:-affiliate-api-go:staging-rehearsal}
+    entrypoint: ["/app/seed"]
+    command: ["demo.sql"]
+    environment: *db-env
+    depends_on:
+      seed-reference:
+        condition: service_completed_successfully
+    restart: "no"
+    networks:
+      - affiliate_staging
+
+  api:
+    image: ${STAGING_IMAGE:-affiliate-api-go:staging-rehearsal}
+    environment:
+      <<: *db-env
+      PORT: "8080"
+      WEB_ORIGIN: ${STAGING_WEB_ORIGIN:-http://localhost:3000}
+      DB_MAX_CONNS: "5"
+    ports:
+      - "${STAGING_API_PORT:-8081}:8080"
+    depends_on:
+      seed-demo:
+        condition: service_completed_successfully
+    restart: "no"
+    networks:
+      - affiliate_staging
+
+  # Cloud Scheduler gọi job này; ở đây chạy tay để kiểm chứng "chạy hai lần không side effect sai".
+  reclaim:
+    image: ${STAGING_IMAGE:-affiliate-api-go:staging-rehearsal}
+    entrypoint: ["/app/reclaim"]
+    environment: *db-env
+    profiles: ["jobs"]
+    restart: "no"
+    networks:
+      - affiliate_staging
+
+volumes:
+  affiliate_staging_data:
+
+networks:
+  affiliate_staging:
+    driver: bridge

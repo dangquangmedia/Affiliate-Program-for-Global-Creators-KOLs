@@ -24,8 +24,11 @@
     "test:web": "node scripts/run-go-playwright.mjs",
     "test": "corepack pnpm run test:api && corepack pnpm run test:api:parity && corepack pnpm run test:api:differential && corepack pnpm run test:web",
     "build": "go -C apps/api-go build ./... && corepack pnpm --filter @affiliate-global/web run build",
+    "smoke": "node scripts/smoke.mjs",
+    "staging:rehearsal": "node scripts/staging-rehearsal.mjs",
     "dev:api": "go -C apps/api-go run ./cmd/api",
     "dev:web": "corepack pnpm --filter @affiliate-global/web run dev",
+    "share": "node scripts/share.mjs",
     "verify": "corepack pnpm run lint && corepack pnpm run typecheck && corepack pnpm run test && corepack pnpm run build"
   },
   "devDependencies": {
