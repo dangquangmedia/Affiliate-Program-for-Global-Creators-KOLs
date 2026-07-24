@@ -4,8 +4,8 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, copyFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { DevStackError, ensurePostgres, root } from "./lib/dev-stack.mjs";
 
-const root = resolve(import.meta.dirname, "..");
 const log = (m) => console.log(`\n\x1b[36m▸ ${m}\x1b[0m`);
 const die = (m) => {
   console.error(`\n\x1b[31m✖ ${m}\x1b[0m`);
@@ -13,50 +13,29 @@ const die = (m) => {
 };
 
 // Chạy 1 lệnh, kế thừa stdio + env hiện tại; shell:true để `docker`/`corepack` resolve trên Windows.
-function run(cmd, { optional = false } = {}) {
+function run(cmd) {
   const r = spawnSync(cmd, { stdio: "inherit", shell: true, cwd: root, env: process.env });
-  if (r.status !== 0 && !optional) die(`Lệnh thất bại: ${cmd}`);
-  return r.status === 0;
+  if (r.status !== 0) die(`Lệnh thất bại: ${cmd}`);
 }
 
 // 1) .env — copy từ .env.example nếu chưa có (mật khẩu placeholder khớp cả DB lẫn DATABASE_URL).
+//    Bước này phải nằm ở đây, không nằm trong dev-stack: bootstrap là lệnh DUY NHẤT được phép tạo
+//    .env; các lệnh khác thiếu .env thì phải dừng và bảo người dùng chạy bootstrap.
 const envPath = resolve(root, ".env");
 if (!existsSync(envPath)) {
   log(".env chưa có → copy từ .env.example (local/synthetic, đổi mật khẩu nếu cần bảo mật)");
   copyFileSync(resolve(root, ".env.example"), envPath);
 }
-// Nạp .env để Docker Compose thấy password; Go commands cũng tự nạp file này.
-process.loadEnvFile(envPath);
-if (!process.env.DATABASE_URL) die("DATABASE_URL không có trong .env");
 
-// 2) Postgres qua Docker.
-log("Khởi động Postgres (Docker)…");
-if (!run("docker compose up -d postgres", { optional: true })) {
-  die("Không chạy được `docker compose up -d postgres`. Docker Desktop đã bật chưa?");
+// 2) Docker daemon + Postgres sẵn sàng nhận kết nối (dùng chung với `dev:api`).
+try {
+  await ensurePostgres();
+} catch (error) {
+  if (error instanceof DevStackError) die(error.message);
+  throw error;
 }
 
-// 3) Chờ Postgres nhận kết nối (healthcheck có thể chậm lúc cold start).
-log("Chờ Postgres sẵn sàng…");
-const user = process.env.AFFILIATE_DB_USER ?? "affiliate_app";
-const db = process.env.AFFILIATE_DB_NAME ?? "affiliate_global";
-let ready = false;
-for (let i = 0; i < 40; i++) {
-  // Lệnh dạng chuỗi (không phải args array) để tránh DEP0190 khi shell:true.
-  const r = spawnSync(`docker compose exec -T postgres pg_isready -U ${user} -d ${db}`, {
-    stdio: "ignore",
-    shell: true,
-    cwd: root,
-  });
-  if (r.status === 0) {
-    ready = true;
-    break;
-  }
-  spawnSync(process.execPath, ["-e", "setTimeout(() => {}, 2000)"]); // sleep ~2s, cross-platform
-}
-if (!ready) die("Postgres không sẵn sàng sau ~80s. Kiểm tra `docker compose ps`.");
-console.log("  Postgres ready.");
-
-// 4) Go migration + reference/demo seed (tất cả idempotent).
+// 3) Go migration + reference/demo seed (tất cả idempotent).
 log("Áp migrations bằng Go…");
 run("corepack pnpm run db:migrate:deploy");
 log("Seed reference + demo bằng Go (VN/PH + tài khoản 4 vai + campaign)…");

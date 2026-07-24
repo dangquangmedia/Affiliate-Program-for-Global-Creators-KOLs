@@ -26,7 +26,7 @@
     "build": "go -C apps/api-go build ./... && corepack pnpm --filter @affiliate-global/web run build",
     "smoke": "node scripts/smoke.mjs",
     "staging:rehearsal": "node scripts/staging-rehearsal.mjs",
-    "dev:api": "go -C apps/api-go run ./cmd/api",
+    "dev:api": "node scripts/dev-api.mjs",
     "dev:web": "corepack pnpm --filter @affiliate-global/web run dev",
     "share": "node scripts/share.mjs",
     "verify": "corepack pnpm run lint && corepack pnpm run typecheck && corepack pnpm run test && corepack pnpm run build"

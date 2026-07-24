@@ -43,10 +43,8 @@ corepack pnpm bootstrap
 `bootstrap` (script `scripts/setup.mjs`) làm tất cả và **an toàn chạy lại nhiều lần**:
 
 1. Tạo `.env` từ `.env.example` nếu chưa có (mật khẩu local/synthetic — đổi nếu cần bảo mật).
-2. `docker compose up -d postgres` rồi chờ Postgres nhận kết nối.
+2. Bật Docker Desktop nếu chưa chạy, dựng Postgres, chờ nó nhận kết nối.
 3. Go migration → reference seed → demo seed (VN/PH + tài khoản 4 vai + campaign demo).
-
-> Docker Desktop phải đang chạy trước khi gọi `bootstrap`.
 
 ## Chạy app
 
@@ -56,6 +54,9 @@ Hai terminal (Go API tự nạp `.env`; không cần source env thủ công):
 corepack pnpm dev:api    # Go API  → http://localhost:3001
 corepack pnpm dev:web    # Next.js → http://localhost:3000
 ```
+
+`dev:api` tự lo tiền đề trước khi chạy Go: bật Docker Desktop nếu cần, dựng Postgres, chờ nó nhận
+kết nối. Sau khi khởi động lại máy cứ gọi thẳng lệnh này, không cần `infra:up` trước.
 
 Mở trình duyệt:
 
@@ -154,10 +155,18 @@ apps/worker, packages/*   scaffolding dành sẵn — CHƯA dùng trong bản V2
 
 ## Xử lý sự cố
 
-- **`/health` trả 503 / E2E timeout "webServer"**: Docker Desktop tắt → Postgres mất. Kiểm
-  `docker info`, chạy `docker compose up -d postgres`, đợi healthy rồi thử lại (API tự reconnect).
+- **`/health` trả 503 / E2E timeout "webServer"**: Docker Desktop tắt → Postgres mất. Chạy lại
+  `corepack pnpm dev:api` (tự bật Docker + Postgres), hoặc `corepack pnpm infra:up` nếu API đang
+  chạy sẵn — API tự reconnect khi Postgres sống lại.
 - **Authentication failed khi migrate/seed**: volume Postgres được tạo bằng mật khẩu khác `.env`.
   Với dữ liệu local synthetic, reset bằng `docker compose down -v` rồi chạy lại `bootstrap`.
+- **Migrate báo `type "RoleCode" already exists`**: volume Postgres có từ thời Prisma (còn bảng
+  `_prisma_migrations`), nên sổ `schema_migrations` của Go trống và migrate tưởng phải chạy lại từ
+  đầu. Schema thật đã đủ 3 migration → chỉ cần ghi đúng phiên bản vào sổ:
+  ```powershell
+  docker compose exec -T postgres psql -U affiliate_app -d affiliate_global -c "UPDATE schema_migrations SET version=3, dirty=false;"
+  ```
+  Hoặc làm sạch hẳn: `docker compose down -v` rồi `corepack pnpm bootstrap`.
 - **`DATABASE_URL is required`**: tạo `.env` từ `.env.example`; Go tự tìm file này từ thư mục hiện
   tại đi ngược lên repository root.
 - **Port bận**: đổi `AFFILIATE_DB_PORT` (Postgres), hoặc giải phóng `3000`/`3001` trước khi chạy.
